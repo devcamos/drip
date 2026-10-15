@@ -50,7 +50,7 @@ Spec section 11: one end-to-end encrypted bundle per user on Supabase's free tie
 - [ ] Bundle = the same AES-GCM blob as the backup file (recovery code is the root key), so the server only ever sees ciphertext and a version number.
 - [ ] Optimistic concurrency: reject writes whose base version ≠ server version, then resolve in the client (pull, merge events, push).
 - [ ] Merge strategy: events (top-ups, withdrawals, rate changes, payouts) are append-only with IDs, so merge them as a union. Balances are worked out again from the merged events.
-- [ ] Gamertag handle (`Dee#4821`) and passkey sign-in turn on with sync.
+- [ ] Passkey sign-in turns on with sync. The gamertag (see #13) becomes the account name, and `identity.id` becomes the sync account id.
 - [ ] Rate limits and abuse protection with no personal data stored.
 - [ ] Threat model write-up.
 
@@ -127,3 +127,19 @@ The Playwright smoke tests cover onboarding, add account, top-up, withdraw, Tren
 - [ ] Create the private `devcamos/drip` repo and push `main`.
 - [ ] Branch protection on `main` requiring CI (type check, unit tests with coverage limits, build, Playwright).
 - [ ] Optional: Dependabot for npm and GitHub Actions.
+
+---
+
+## 13. Sync: reserve and check gamertag uniqueness on the server
+**Labels:** `feature`, `v1.1`, `sync`, `identity`
+
+In v1 the user types their own handle (3–16 characters: letters, numbers, `_`). It's stored on the device only as `identity = { id, handle, suffix?, createdAt }`, with **no suffix**, and nothing checks whether it's unique. Settings tells the user: "If this name is taken when sync launches, we'll add a short number to it."
+
+**To do**
+- [ ] Server endpoint to reserve a handle for an `identity.id`. It should be atomic and case-insensitive (`Devo` = `devo`), and store only the id, handle and suffix. No personal data.
+- [ ] If the plain handle is free, keep it with no suffix. If it's taken, give a short random number (1–4 digits, `randomSuffix()` / `withSuffix()` already exist in `lib/identity.ts`) and keep retrying until it's free.
+- [ ] Tell the user in the app what was added (e.g. "devo was taken, so you're devo#4821"), and let them pick a different handle instead.
+- [ ] Prove ownership: later changes must be signed by the account's passkey, so nobody else can claim an `identity.id`.
+- [ ] Optional block list for offensive or reserved handles, plus rate limits on reservations.
+- [ ] Renames: release the old handle after a cooling-off period.
+- [ ] Merge rule when a backup's identity is restored on a new device after sync exists (same id → same account).

@@ -22,12 +22,12 @@ export async function passkeySupported(pkc: any = (globalThis as any).PublicKeyC
 }
 
 /** Register a device passkey (Face ID / Touch ID). Returns the credential id. No server: we only need the local check. */
-export async function registerPasskey(creds: Creds, rpId: string): Promise<string> {
+export async function registerPasskey(creds: Creds, rpId: string, user: { id: Uint8Array; name: string }): Promise<string> {
   const rnd = (n: number) => crypto.getRandomValues(new Uint8Array(n));
   const cred = (await creds.create({
     publicKey: {
       challenge: rnd(32), rp: { name: "Drip", id: rpId },
-      user: { id: rnd(16), name: "drip", displayName: "Drip" },
+      user: { id: user.id as BufferSource, name: user.name, displayName: user.name },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
       timeout: 60000, attestation: "none",

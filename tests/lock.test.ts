@@ -20,17 +20,19 @@ describe("passkey", () => {
   });
   it("registers with a platform authenticator and verifies the same credential", async () => {
     const create = vi.fn(async () => ({ rawId: raw }));
-    const id = await L.registerPasskey({ create, get: vi.fn() } as any, "localhost");
+    const uid = new Uint8Array(16).fill(7);
+    const id = await L.registerPasskey({ create, get: vi.fn() } as any, "localhost", { id: uid, name: "devo#4821" });
     const opts = (create.mock.calls[0] as any)[0].publicKey;
     expect(opts.authenticatorSelection.authenticatorAttachment).toBe("platform");
     expect(opts.authenticatorSelection.userVerification).toBe("required");
+    expect(opts.user).toEqual({ id: uid, name: "devo#4821", displayName: "devo#4821" });
     expect(id).not.toMatch(/[+/=]/);
     const get = vi.fn(async () => ({ rawId: raw }));
     expect(await L.verifyPasskey({ create, get } as any, id, "localhost")).toBe(true);
     expect(new Uint8Array((get.mock.calls[0] as any)[0].publicKey.allowCredentials[0].id)).toEqual(new Uint8Array(raw));
   });
   it("fails closed", async () => {
-    await expect(L.registerPasskey({ create: async () => null, get: vi.fn() } as any, "x")).rejects.toThrow();
+    await expect(L.registerPasskey({ create: async () => null, get: vi.fn() } as any, "x", { id: new Uint8Array(16), name: "a#0000" })).rejects.toThrow();
     expect(await L.verifyPasskey({ create: vi.fn(), get: async () => null } as any, "AQID", "x")).toBe(false);
     expect(await L.verifyPasskey({ create: vi.fn(), get: async () => ({ rawId: new Uint8Array([9]).buffer }) } as any, "AQID", "x")).toBe(false);
     expect(await L.verifyPasskey({ create: vi.fn(), get: async () => { throw new Error("NotAllowed"); } } as any, "AQID", "x")).toBe(false);

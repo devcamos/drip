@@ -5,6 +5,7 @@ import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
 import { emptyData, getItem, isAppData, loadData, saveData, setItem } from "@/lib/db";
 import * as L from "@/lib/lock";
+import * as I from "@/lib/identity";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -65,10 +66,14 @@ export default function Drip() {
   }, []);
 
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
-  if (verifier === null) return <Onboarding onDone={async (v, restored) => {
+  if (verifier === null) return <Onboarding onDone={async (v, restored, identity) => {
     await setItem("verifier", v); setVerifier(v);
-    if (restored) { const d = { ...restored, lastBackupAt: new Date().toISOString() }; await saveData(d); setData(d); }
+    const d = restored ? { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
+    await saveData(d); setData(d);
   }} />;
+  if (!data.identity) return <main><h1>Pick your gamertag</h1>
+    <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
+    <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); setData(d); }} cta="Save gamertag" /></div></main>;
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
@@ -116,7 +121,7 @@ export default function Drip() {
 
   return (
     <>
-      <main>{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div>{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -128,8 +133,25 @@ export default function Drip() {
   );
 }
 
-function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData) => void }) {
+function HandlePicker({ onPick, cta }: { onPick: (i: I.Identity | null) => void; cta?: string }) {
+  const [handle, setHandle] = useState("");
+  const err = handle ? I.handleError(handle) : null;
+  const ok = !!handle && !err;
+  useEffect(() => { if (!cta) onPick(ok ? I.newIdentity(handle) : null); }, [handle]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <label htmlFor="handle">Gamertag (3–16 letters, numbers or _)</label>
+      <input id="handle" value={handle} maxLength={16} autoCapitalize="none" autoComplete="off" spellCheck={false} placeholder="devo" onChange={(e) => setHandle(e.target.value.trim())} />
+      {err ? <p className="err">{err}</p> : ok && <p className="muted" data-testid="tag-preview">You&apos;ll be <b style={{ color: "var(--text)" }}>{handle}</b></p>}
+      <p className="muted">No name, email or phone needed. Don&apos;t use your real name if you&apos;d rather not.</p>
+      {cta && <button className="btn" disabled={!ok} onClick={() => onPick(I.newIdentity(handle))}>{cta}</button>}
+    </>
+  );
+}
+
+function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity) => void }) {
   const [code] = useState(() => C.generateRecoveryCode());
+  const [identity, setIdentity] = useState<I.Identity | null>(null);
   const [saved, setSaved] = useState(false);
   const [mode, setMode] = useState<"new" | "restore">("new");
   return (
@@ -138,6 +160,8 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData) => v
       <p className="muted">See what your savings and investments earn, and when it lands. Everything stays on this device. No email, no sign-up.</p>
       {mode === "new" ? (
         <div className="panel">
+          <h2>Your gamertag</h2>
+          <HandlePicker onPick={setIdentity} />
           <h2>Your recovery code</h2>
           <p className="muted">This code encrypts your backups. Write it down or save it in your password manager. <b>If you lose this code and this device, your data can&apos;t be recovered.</b> Nobody, including us, can reset it.</p>
           <div className="code" data-testid="code">{code}</div>
@@ -146,7 +170,7 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData) => v
             <input type="checkbox" style={{ width: "auto" }} checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I&apos;ve saved my recovery code somewhere safe
           </label>
           <div className="row-gap">
-            <button className="btn" disabled={!saved} onClick={async () => onDone(await C.codeVerifier(code))}>Start</button>
+            <button className="btn" disabled={!saved || !identity} onClick={async () => onDone(await C.codeVerifier(code), undefined, identity!)}>Start</button>
             <button className="btn ghost" onClick={() => setMode("restore")}>Restore a backup</button>
           </div>
         </div>
@@ -373,7 +397,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
         <button className="btn ghost" onClick={() => { onLock({ credentialId: null, enabledAt: null }); setLockMsg("App lock is off."); }}>Turn off app lock</button>
       ) : supported === false ? <p className="muted">This device or browser doesn&apos;t support a passkey lock.</p> : (
         <button className="btn" disabled={!supported} onClick={async () => {
-          try { const id = await L.registerPasskey(navigator.credentials, location.hostname); onLock({ credentialId: id, enabledAt: new Date().toISOString() }); setLockMsg("App lock is on."); }
+          try { const id = await L.registerPasskey(navigator.credentials, location.hostname, { id: I.idBytes(data.identity!.id), name: I.formatTag(data.identity!) }); onLock({ credentialId: id, enabledAt: new Date().toISOString() }); setLockMsg("App lock is on."); }
           catch { setLockMsg("Couldn't set up the passkey."); }
         }}>Turn on app lock</button>
       )}
@@ -409,6 +433,13 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
         <Restore onRestored={(d) => { if (confirm("Replace all data on this device with this backup?")) onRestore(d); }} />
       </div>
       {lockPanel}
+      {data.identity && (
+        <div className="panel"><h2 style={{ marginTop: 0 }}>Your gamertag</h2>
+          <div className="code" data-testid="settings-tag">{I.formatTag(data.identity)}</div>
+          <p className="muted">Stored on this device only, and included in your encrypted backups. Nobody checks yet whether someone else has the same name. <b>If this name is taken when sync launches, we&apos;ll add a short number to it.</b></p>
+          <p className="muted">Account ID: <code>{data.identity.id.slice(0, 8)}…</code> (random, used later for sync)</p>
+        </div>
+      )}
     </>
   );
 }

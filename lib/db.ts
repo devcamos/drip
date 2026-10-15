@@ -1,5 +1,6 @@
 import type { AppData } from "./types";
 import { migrateData } from "./maths";
+import { isIdentity } from "./identity";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
@@ -36,5 +37,5 @@ export async function saveData(d: AppData): Promise<void> { await setItem(KEY, d
 export function isAppData(x: unknown): x is AppData {
   const d = x as AppData;
   return !!d && d.version === 1 && Array.isArray(d.accounts) && Array.isArray(d.snapshots) &&
-    d.accounts.every((a) => typeof a.id === "string" && typeof a.balance === "number" && typeof a.ratePct === "number");
+    (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => typeof a.id === "string" && typeof a.balance === "number" && typeof a.ratePct === "number");
 }

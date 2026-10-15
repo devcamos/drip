@@ -1,3 +1,4 @@
+import type { Identity } from "./identity";
 export type Frequency = "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
 
@@ -26,4 +27,4 @@ export interface Account {
 export interface Snapshot { month: string; totalBalance: number; monthlyIncome: number; deposits?: number; withdrawals?: number }
 
 export interface LockSettings { credentialId: string | null; enabledAt: string | null }
-export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; lock?: LockSettings }
+export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; lock?: LockSettings; identity?: Identity }
