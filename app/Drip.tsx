@@ -247,7 +247,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
           <p className="muted">{{ topup: "Adds money on this date. Interest before it uses the old balance; after it, growth continues from the new amount.",
             withdraw: "Takes money out on this date. Interest after it is worked out on the smaller balance. Withdrawals aren't counted as negative growth.",
             set: "Set the balance shown in your provider's app. This isn't counted as a deposit or withdrawal." }[mode]}</p>
-          <div className="grid"><input inputMode="decimal" placeholder={mode === "set" ? "New balance £" : "Amount £"} aria-label="amount" value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
+          <div className="grid"><input inputMode="decimal" placeholder={mode === "set" ? "New balance £" : "Amount £"} aria-label="amount" value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" aria-label="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
           <div className="row-gap">
             <button className="btn small" disabled={mode === "set" ? !(val !== "" && Number(val) >= 0) : !(Number(val) > 0)} onClick={() => {
               const n = Number(val);
@@ -277,7 +277,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
               <span style={{ textAlign: "right" }}><b>{M.gbp(p.amount)}</b><br /><span className={diff >= 0 ? "ok" : "err"}>{diff >= 0 ? "+" : ""}{M.gbp(diff)}</span></span></li>;
           })}</ul>}
         <label>Log an actual payout</label>
-        <div className="grid"><input inputMode="decimal" placeholder="Amount £" value={amt} onChange={(e) => setAmt(e.target.value)} /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        <div className="grid"><input inputMode="decimal" aria-label="Payout amount" placeholder="Amount £" value={amt} onChange={(e) => setAmt(e.target.value)} /><input type="date" aria-label="Payout date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
         <div className="row-gap"><button className="btn small" disabled={!(Number(amt) > 0)} onClick={() => { onLog({ date, amount: Number(amt), kind: "actual" }); setAmt(""); }}>Log payout</button></div>
       </div>
       <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button><button className="btn danger" onClick={onDelete}>Delete</button></div>
@@ -302,17 +302,17 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
     <>
       <h1>{existing ? "Edit account" : "Add account"}</h1>
       <label>Provider</label>
-      <select value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
-      {isOther && <><label>Provider name</label><input value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
-      <label>Nickname (optional, stays on this device)</label><input value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
+      <select aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
+      {isOther && <><label>Provider name</label><input aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
+      <label>Nickname (optional, stays on this device)</label><input aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
       <div className="grid">
-        <div><label>Balance £</label><input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
-        <div><label>Rate % a year</label><input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
-        <div><label>Type</label><select value={rateType} onChange={(e) => setRateType(e.target.value as RateType)}><option value="interest">Interest</option><option value="dividend">Dividend</option></select></div>
-        <div><label>Paid</label><select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
+        <div><label>Balance £</label><input inputMode="decimal" aria-label="Balance" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
+        <div><label>Rate % a year</label><input inputMode="decimal" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
+        <div><label>Type</label><select aria-label="Type" value={rateType} onChange={(e) => setRateType(e.target.value as RateType)}><option value="interest">Interest</option><option value="dividend">Dividend</option></select></div>
+        <div><label>Paid</label><select aria-label="Paid" value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
       </div>
-      {existing && rate !== "" && Number(rate) !== existing.ratePct && (<><label>New rate applies from</label><input type="date" value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} /></>)}
-      <label>Next payout date</label><input type="date" value={next} onChange={(e) => setNext(e.target.value)} />
+      {existing && rate !== "" && Number(rate) !== existing.ratePct && (<><label>New rate applies from</label><input type="date" aria-label="New rate applies from" value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} /></>)}
+      <label>Next payout date</label><input type="date" aria-label="Next payout date" value={next} onChange={(e) => setNext(e.target.value)} />
       {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(b, r))} a month</p>}
       <div className="row-gap">
         <button className="btn" disabled={!valid} onClick={() => {
@@ -378,7 +378,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
       <div className="panel">
         <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
         <label>Or use your recovery code</label>
-        <input value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
+        <input aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
         <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { if (await C.checkCode(code, verifier)) onUnlock(); else setErr("That isn't your recovery code."); }}>Unlock with code</button></div>
         {err && <p className="err">{err}</p>}
       </div>
@@ -411,7 +411,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
       <p className="muted">Your data lives only on this device. A backup is an encrypted file locked with your recovery code. Save it to Files or iCloud Drive.</p>
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
-        <label>Recovery code</label><input value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
+        <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
         <div className="row-gap"><button className="btn" disabled={busy || !code} onClick={async () => {
           setBusy(true); setMsg(null);
           try {
@@ -448,8 +448,8 @@ function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => voi
   const [file, setFile] = useState<File | null>(null); const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   return (
     <>
-      <label>Backup file</label><input type="file" accept="application/json,.json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      <label>Recovery code</label><input value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
+      <label>Backup file</label><input type="file" aria-label="Backup file" accept="application/json,.json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+      <label>Recovery code</label><input aria-label="Restore recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
       <div className="row-gap"><button className="btn" disabled={!file || !code || busy} onClick={async () => {
         setBusy(true); setErr("");
         try {

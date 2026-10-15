@@ -53,17 +53,17 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
 
   // top-up
   await page.getByRole("button", { name: "Top up" }).click();
-  await page.getByLabel("amount").fill("500");
+  await page.getByLabel("amount", { exact: true }).fill("500");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("events")).toContainText("+£500.00");
   await expect(page.getByText("£3,500.00").first()).toBeVisible();
 
   // withdraw: over-balance rejected, then valid
   await page.getByRole("button", { name: "Withdraw" }).click();
-  await page.getByLabel("amount").fill("99999");
+  await page.getByLabel("amount", { exact: true }).fill("99999");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("can't withdraw more than the balance")).toBeVisible();
-  await page.getByLabel("amount").fill("200");
+  await page.getByLabel("amount", { exact: true }).fill("200");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("events")).toContainText("−£200.00");
   await expect(page.getByText("£3,300.00").first()).toBeVisible();

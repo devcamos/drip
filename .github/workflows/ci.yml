@@ -6,10 +6,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
+      - name: Security audit (fails on high or critical)
+        run: npm audit --audit-level=high
       - run: npm run typecheck
-      - run: npm test
+      - name: Unit + component tests with coverage (global ≥80%, lib ≥90/85)
+        run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
