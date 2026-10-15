@@ -1,4 +1,4 @@
-import type { Account, Frequency, Snapshot } from "./types";
+import type { Account, BalanceEvent, Frequency, Snapshot } from "./types";
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -88,7 +88,7 @@ export function upcoming(accts: Account[], today: string, days = 31) {
 /** Insert/replace the snapshot for the current month. */
 export function upsertSnapshot(snaps: Snapshot[], accts: Account[], now: Date): Snapshot[] {
   const key = monthKey(now);
-  const snap: Snapshot = { month: key, totalBalance: round2(totalBalance(accts)), monthlyIncome: round2(totalMonthlyIncome(accts)) };
+  const snap: Snapshot = { month: key, totalBalance: round2(totalBalance(accts)), monthlyIncome: round2(totalMonthlyIncome(accts)), deposits: round2(depositsInMonth(accts, key)) };
   return [...snaps.filter((s) => s.month !== key), snap].sort((a, b) => a.month.localeCompare(b.month));
 }
 
@@ -100,3 +100,49 @@ export function backupDue(lastBackupAt: string | null, hasData: boolean, now: Da
 }
 
 export const gbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
+
+const DAY = 86400000;
+const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+
+/**
+ * Interest earned between `start` (inclusive) and `end` (exclusive), compounding daily
+ * at an annual rate, with top-ups applied on their date. Interest before a top-up uses
+ * the old balance; after it, compounding continues from the new amount.
+ */
+export function periodGrowth(opening: number, ratePct: number, topups: Pick<BalanceEvent, "date" | "amount">[], start: string, end: string) {
+  const daily = Math.max(ratePct, 0) / 100 / 365;
+  const inRange = topups.filter((x) => x.date >= start && x.date < end && x.amount > 0).sort((a, b) => a.date.localeCompare(b.date));
+  let bal = Math.max(opening, 0), cursor = t(start), deposits = 0;
+  const grow = (to: number) => { const days = Math.max(0, Math.round((to - cursor) / DAY)); bal *= Math.pow(1 + daily, days); cursor = to; };
+  for (const x of inRange) { grow(t(x.date)); bal += x.amount; deposits += x.amount; }
+  grow(t(end));
+  const closing = bal;
+  return { opening: Math.max(opening, 0), deposits, interest: closing - Math.max(opening, 0) - deposits, closing };
+}
+
+/** Apply a top-up: adds to balance and logs the event. */
+export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
+  if (!(amount > 0)) throw new Error("Top-up must be more than £0");
+  return { ...a, balance: round2(a.balance + amount), events: [...(a.events ?? []), { type: "topup", date, amount: round2(amount) }] };
+}
+
+/** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. */
+export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, date: string): A {
+  if (!(balance >= 0)) throw new Error("Balance can't be negative");
+  return { ...a, balance: round2(balance), events: [...(a.events ?? []), { type: "set", date, amount: round2(balance) }] };
+}
+
+/** Sum of top-ups across accounts in a YYYY-MM month. */
+export function depositsInMonth(accts: Pick<Account, "events">[], month: string): number {
+  return accts.reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === "topup" && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
+}
+
+/** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */
+export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: number; growth: number; growthPct: number } | null {
+  const s = [...snaps].sort((a, b) => a.month.localeCompare(b.month));
+  if (s.length < 2) return null;
+  const prev = s[s.length - 2], cur = s[s.length - 1];
+  if (prev.totalBalance <= 0) return null;
+  const change = cur.totalBalance - prev.totalBalance, deposits = cur.deposits ?? 0, growth = change - deposits;
+  return { change, deposits, growth, growthPct: (growth / prev.totalBalance) * 100 };
+}

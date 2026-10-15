@@ -83,6 +83,7 @@ export default function Drip() {
     const a = data.accounts.find((x) => x.id === view.id);
     body = a ? <Detail a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
       onLog={(p) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? { ...x, payouts: [...x.payouts, p] } : x) }))}
+      onChange={(fn) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) }))}
       onDelete={() => { if (confirm(`Delete ${a.provider}?`)) { update((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) })); setView({ name: "home" }); } }} /> : null;
   } else if (view.name === "add") {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
@@ -175,8 +176,10 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
   );
 }
 
-function Detail({ a, onBack, onEdit, onDelete, onLog }: { a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void }) {
+function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }) {
   const [amt, setAmt] = useState(""); const [date, setDate] = useState(today());
+  const [mode, setMode] = useState<"topup" | "set" | null>(null); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
+  const events = [...(a.events ?? [])].sort((x, y) => y.date.localeCompare(x.date));
   const next = M.nextPayout(a.nextPayoutDate, a.frequency, today());
   const history = [...a.payouts].sort((x, y) => y.date.localeCompare(x.date));
   return (
@@ -193,6 +196,27 @@ function Detail({ a, onBack, onEdit, onDelete, onLog }: { a: Account; onBack: ()
         <div className="stat"><div className="muted">Next payout</div><div className="v">{fmtDate(next)}</div></div>
         <div className="stat"><div className="muted">Expected ({a.frequency})</div><div className="v">{M.gbp(M.payoutAmount(a))}</div></div>
       </div>
+      <div className="row-gap">
+        <button className="btn" onClick={() => { setMode("topup"); setVal(""); }}>Top up</button>
+        <button className="btn ghost" onClick={() => { setMode("set"); setVal(String(a.balance)); }}>Update balance</button>
+      </div>
+      {mode && (
+        <div className="panel"><h2 style={{ marginTop: 0 }}>{mode === "topup" ? "Top up" : "Update balance"}</h2>
+          <p className="muted">{mode === "topup" ? "Adds money on this date. Interest before it uses the old balance; after it, growth continues from the new amount." : "Set the balance shown in your provider's app. This isn't counted as a deposit."}</p>
+          <div className="grid"><input inputMode="decimal" placeholder={mode === "topup" ? "Amount £" : "New balance £"} value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
+          <div className="row-gap">
+            <button className="btn small" disabled={mode === "topup" ? !(Number(val) > 0) : !(val !== "" && Number(val) >= 0)} onClick={() => {
+              const n = Number(val); onChange((x) => mode === "topup" ? M.applyTopUp(x, n, vdate) : M.applySetBalance(x, n, vdate)); setMode(null);
+            }}>Save</button>
+            <button className="btn ghost small" onClick={() => setMode(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {events.length > 0 && (
+        <div className="panel"><h2 style={{ marginTop: 0 }}>Top-ups and balance updates</h2>
+          <ul className="list">{events.map((e, i) => <li key={i}><span>{e.type === "topup" ? "Top up" : "Balance set"}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={e.type === "topup" ? "ok" : ""}>{e.type === "topup" ? "+" : ""}{M.gbp(e.amount)}</b></li>)}</ul>
+        </div>
+      )}
       <div className="panel"><h2 style={{ marginTop: 0 }}>Payout history</h2>
         {history.length === 0 ? <p className="muted">No payouts logged yet.</p> :
           <ul className="list">{history.map((p, i) => {
@@ -250,7 +274,7 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
 
 function Trends({ data }: { data: AppData }) {
   const proj = useMemo(() => M.projection(data.accounts), [data.accounts]);
-  const g = M.momGrowth(data.snapshots);
+  const br = M.momBreakdown(data.snapshots); const g = br ? br.growthPct : M.momGrowth(data.snapshots);
   const hist = data.snapshots.slice(-6);
   const max = Math.max(1, ...hist.map((s) => s.totalBalance), ...proj.map((p) => p.balance));
   const total = M.totalBalance(data.accounts);
@@ -261,8 +285,18 @@ function Trends({ data }: { data: AppData }) {
         <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
         <div className="stat"><div className="muted">Monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
         <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
-        <div className="stat"><div className="muted">Month on month</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
+        <div className="stat"><div className="muted">Growth excl. top-ups</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
       </div>
+      {br && (
+        <div className="panel"><h2 style={{ marginTop: 0 }}>This month vs last</h2>
+          <ul className="list">
+            <li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li>
+            <li><span>Growth from interest and returns</span><b className={br.growth >= 0 ? "ok" : "err"}>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li>
+            <li><span>Total change</span><b>{M.gbp(br.change)}</b></li>
+          </ul>
+          <p className="muted">Growth is the change in balance minus top-ups, so manual balance updates count here.</p>
+        </div>
+      )}
       <div className="panel"><h2 style={{ marginTop: 0 }}>Balance by month</h2>
         <p className="muted">Green: recorded. Blue: 12-month projection with interest reinvested.</p>
         <div className="bars">
