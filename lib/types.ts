@@ -1,10 +1,10 @@
 import type { Identity } from "./identity";
-export type Frequency = "monthly" | "quarterly" | "annually";
+export type Frequency = "daily" | "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
 
 export interface Payout { date: string; amount: number; kind: "expected" | "actual" }
 
-export interface BalanceEvent { type: "topup" | "withdraw" | "set"; date: string; amount: number }
+export interface BalanceEvent { type: "topup" | "withdraw" | "set" | "interest"; date: string; amount: number }
 export interface RatePeriod { from: string; ratePct: number } // rate in force from this date
 
 export interface Account {
@@ -19,6 +19,7 @@ export interface Account {
   colour: string;
   payouts: Payout[];
   events?: BalanceEvent[]; // top-ups, withdrawals and manual balance updates
+  accruedThrough?: string; // daily accounts: interest credited for every day before this date
   rateHistory?: RatePeriod[]; // sorted by from; ratePct mirrors the rate in force today
   createdAt: string;
 }

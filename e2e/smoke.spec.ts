@@ -173,3 +173,54 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
   if ((credentials[0] as any).userName !== undefined) expect((credentials[0] as any).userName).toBe("devo");
   expect(tag).toBe("devo");
 });
+
+test("onboarding draft survives leaving the page; after Start it always opens to Accounts", async ({ page, context }) => {
+  await page.goto("/");
+  const code = await page.getByTestId("code").textContent();
+  await page.getByLabel(/Gamertag/).fill("devo");
+  await page.waitForTimeout(300);
+  await page.goto("about:blank");
+  await page.goto("/");
+  await expect(page.getByTestId("code")).toHaveText(code!);
+  await expect(page.getByLabel(/Gamertag/)).toHaveValue("devo");
+  await page.getByLabel(/saved my recovery code/).check();
+  await page.getByRole("button", { name: "Start" }).click();
+  await expect(page.getByText("No accounts yet")).toBeVisible();
+  // reopen like a home-screen launch (new page, same storage)
+  await page.close();
+  const p2 = await context.newPage();
+  await p2.goto("/");
+  await expect(p2.getByText("No accounts yet")).toBeVisible();
+  await expect(p2.getByTestId("header-tag")).toHaveText("💧 Drip · devo");
+  await expect(p2.getByTestId("code")).toHaveCount(0);
+});
+
+test("daily-interest account has no payout date and skips upcoming payouts", async ({ page }) => {
+  await onboard(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Add" }).click();
+  await page.getByLabel("Provider").selectOption("MoneyFarm");
+  await page.getByLabel("Balance").fill("10000");
+  await page.getByLabel("Rate").fill("3.65");
+  await page.getByLabel("Paid").selectOption("daily");
+  await expect(page.getByLabel("Next payout date")).toHaveCount(0);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Per day (est.)")).toBeVisible();
+  await page.getByRole("button", { name: "← Accounts" }).click();
+  await expect(page.getByText(/Daily interest/)).toBeVisible();
+  await expect(page.getByText("Upcoming payouts")).toHaveCount(0);
+});
+
+test("PWA assets: manifest icons incl. maskable, apple-touch-icon 180, favicon, iOS meta", async ({ page, request }) => {
+  await page.goto("/");
+  const m = await (await request.get("/manifest.webmanifest")).json();
+  expect(m.display).toBe("standalone");
+  const icons = m.icons.map((i: any) => `${i.sizes}:${i.purpose}`);
+  expect(icons).toEqual(expect.arrayContaining(["192x192:any", "512x512:any", "512x512:maskable"]));
+  for (const i of m.icons) expect((await request.get(i.src)).ok()).toBe(true);
+  expect(await page.locator('link[rel="apple-touch-icon"]').getAttribute("sizes")).toBe("180x180");
+  expect((await request.get("/apple-touch-icon.png")).ok()).toBe(true);
+  expect((await request.get("/favicon.ico")).ok()).toBe(true);
+  expect(await page.locator('meta[name="apple-mobile-web-app-title"]').getAttribute("content")).toBe("Drip");
+  expect(await page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute("content")).toBe("black-translucent");
+  expect(await page.locator('meta[name="apple-mobile-web-app-capable"]').getAttribute("content")).toBe("yes");
+});

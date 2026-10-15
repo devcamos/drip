@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: "Track your passive income. Data stays on your device.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Drip", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 export const viewport: Viewport = { themeColor: "#0b1020", width: "device-width", initialScale: 1, viewportFit: "cover" };
 

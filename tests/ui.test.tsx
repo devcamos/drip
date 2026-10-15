@@ -353,3 +353,58 @@ describe("app lock", () => {
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
   });
 });
+
+describe("onboarding draft persistence", () => {
+  it("keeps the same recovery code and typed gamertag after leaving and coming back", async () => {
+    const first = render(<Drip />);
+    const code = (await screen.findByTestId("code")).textContent;
+    type(screen.getByLabelText(/Gamertag/), "devo");
+    await waitFor(async () => expect((await (await import("@/lib/draft")).loadDraft())?.handle).toBe("devo"));
+    first.unmount();
+    render(<Drip />);
+    expect(await screen.findByTestId("code")).toHaveTextContent(code!);
+    expect(screen.getByLabelText(/Gamertag/)).toHaveValue("devo");
+    fireEvent.click(screen.getByRole("checkbox"));
+    click("Start");
+    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await (await import("@/lib/draft")).loadDraft()).toBeNull();
+  });
+});
+
+describe("daily interest accounts", () => {
+  it("adds a daily account without a payout date and shows 'Daily interest'", async () => {
+    await seed({ accounts: [acct({ id: "m", provider: "Zopa", nextPayoutDate: today })] });
+    render(<Drip />);
+    await screen.findByText("Total balance");
+    tab("Add");
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "MoneyFarm" } });
+    type(screen.getByLabelText("Balance"), "10000");
+    type(screen.getByLabelText("Rate"), "3.65");
+    fireEvent.change(screen.getByLabelText("Paid"), { target: { value: "daily" } });
+    expect(screen.queryByLabelText("Next payout date")).toBeNull();
+    expect(screen.getByText(/no payout date/)).toBeInTheDocument();
+    click("Save");
+    expect(await screen.findByText("Per day (est.)")).toBeInTheDocument();
+    expect(screen.getByText("Interest shows here from tomorrow.")).toBeInTheDocument();
+    click("← Accounts");
+    expect(screen.getByText(/Daily interest/)).toBeInTheDocument();
+    const up = screen.getByText("Upcoming payouts").closest(".panel")!;
+    expect(within(up as HTMLElement).queryByText("MoneyFarm")).toBeNull();
+  });
+  it("accrues on open and shows interest history by week and month", async () => {
+    const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+    await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, frequency: "daily", accruedThrough: past, rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
+    render(<Drip />);
+    await screen.findByText("Total balance");
+    const saved = await loadData();
+    expect(saved.accounts[0].balance).toBeGreaterThan(10019);
+    expect(saved.accounts[0].accruedThrough).toBe(today);
+    fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
+    const list = await screen.findByTestId("interest-history");
+    expect(list.textContent).toMatch(/Week of/);
+    expect(screen.queryByTestId("events")).toBeNull(); // interest isn't listed as a top-up/withdrawal
+    click("By month");
+    expect(screen.getByTestId("interest-history").textContent).toMatch(/20\d\d/);
+    click("By week");
+  });
+});

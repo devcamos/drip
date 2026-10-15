@@ -8,7 +8,7 @@ export function monthlyIncome(balance: number, ratePct: number): number {
   return (balance * ratePct) / 100 / 12;
 }
 
-const PER_YEAR: Record<Frequency, number> = { monthly: 12, quarterly: 4, annually: 1 };
+const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
 
 /** Amount paid at each payout for the account's frequency. */
 export function payoutAmount(a: Pick<Account, "balance" | "ratePct" | "frequency">): number {
@@ -69,6 +69,7 @@ export function addMonths(date: string, n: number): string {
 
 /** Roll a payout date forward until it is today or later. */
 export function nextPayout(date: string, freq: Frequency, today: string): string {
+  if (freq === "daily") return today;
   const step = 12 / PER_YEAR[freq];
   let d = date, i = 0;
   while (d < today && i < 1000) { i++; d = addMonths(date, step * i); }
@@ -80,6 +81,7 @@ export function upcoming(accts: Account[], today: string, days = 31) {
   const [y, m, d] = today.split("-").map(Number);
   const end = ymd(new Date(Date.UTC(y, m - 1, d + days)));
   return accts
+    .filter((a) => a.frequency !== "daily")
     .map((a) => ({ account: a, date: nextPayout(a.nextPayoutDate, a.frequency, today), amount: payoutAmount(a) }))
     .filter((p) => p.date <= end)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -194,4 +196,39 @@ export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: num
   const change = cur.totalBalance - prev.totalBalance, deposits = cur.deposits ?? 0, withdrawals = cur.withdrawals ?? 0;
   const growth = change - deposits + withdrawals;
   return { change, deposits, withdrawals, growth, growthPct: (growth / prev.totalBalance) * 100 };
+}
+
+/**
+ * Daily accounts: credit estimated interest for each day from `accruedThrough` up to (not including)
+ * `today`, compounding into the balance at the rate in force that day. Logs one "interest" event per day.
+ */
+export function applyDailyAccrual(a: Account, today: string): Account {
+  if (a.frequency !== "daily") return a;
+  const from = a.accruedThrough ?? (a.createdAt || today).slice(0, 10);
+  if (from >= today) return a.accruedThrough ? a : { ...a, accruedThrough: from };
+  const hist = a.rateHistory?.length ? a.rateHistory : [{ from: "0000-01-01", ratePct: a.ratePct }];
+  let bal = Math.max(a.balance, 0); const evs: BalanceEvent[] = [];
+  for (let day = t(from); day < t(today); day += DAY) {
+    const d = ymd(new Date(day));
+    const inc = bal * (Math.max(rateOn(hist, d), 0) / 100 / 365);
+    bal += inc;
+    if (inc > 0) evs.push({ type: "interest", date: d, amount: Math.round(inc * 10000) / 10000 });
+  }
+  return { ...a, balance: round2(bal), accruedThrough: today, events: [...(a.events ?? []), ...evs] };
+}
+
+/** Monday (UTC) of the week containing `date`. */
+export function weekStart(date: string): string {
+  const d = new Date(t(date)); const dow = (d.getUTCDay() + 6) % 7;
+  return ymd(new Date(t(date) - dow * DAY));
+}
+
+/** Interest events grouped by week (Monday) or month, newest first. */
+export function interestHistory(events: BalanceEvent[] | undefined, by: "week" | "month"): { period: string; amount: number }[] {
+  const m = new Map<string, number>();
+  for (const e of events ?? []) if (e.type === "interest") {
+    const k = by === "week" ? weekStart(e.date) : e.date.slice(0, 7);
+    m.set(k, (m.get(k) ?? 0) + e.amount);
+  }
+  return [...m].map(([period, amount]) => ({ period, amount })).sort((x, y) => y.period.localeCompare(x.period));
 }
