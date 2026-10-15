@@ -67,7 +67,7 @@ describe("maths", () => {
     const now = new Date(Date.UTC(2026, 9, 15));
     let s = M.upsertSnapshot([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }], [acct({})], now);
     s = M.upsertSnapshot(s, [acct({ balance: 4000 })], now);
-    expect(s).toEqual([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }, { month: "2026-10", totalBalance: 4000, monthlyIncome: 23.33, deposits: 0 }]);
+    expect(s).toEqual([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }, { month: "2026-10", totalBalance: 4000, monthlyIncome: 23.33, deposits: 0, withdrawals: 0 }]);
   });
   it("backup reminder", () => {
     const now = new Date("2026-10-15T12:00:00Z");

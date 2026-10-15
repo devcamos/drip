@@ -1,4 +1,5 @@
 import type { AppData } from "./types";
+import { migrateData } from "./maths";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
@@ -25,7 +26,10 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
 export async function getItem<T>(key: string): Promise<T | undefined> { return tx("readonly", (s) => s.get(key)); }
 export async function setItem(key: string, value: unknown): Promise<void> { await tx("readwrite", (s) => s.put(value, key)); }
 
-export async function loadData(): Promise<AppData> { return (await getItem<AppData>(KEY)) ?? emptyData(); }
+export async function loadData(): Promise<AppData> {
+  const d = await getItem<AppData>(KEY);
+  return d ? migrateData(d, new Date().toISOString().slice(0, 10)) : emptyData();
+}
 export async function saveData(d: AppData): Promise<void> { await setItem(KEY, d); }
 
 /** Validates an imported object before it replaces local data. */

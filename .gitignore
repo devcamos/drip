@@ -5,3 +5,5 @@ coverage
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+test-results
+playwright-report

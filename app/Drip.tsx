@@ -4,6 +4,7 @@ import type { Account, AppData, Frequency, RateType } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
 import { emptyData, getItem, isAppData, loadData, saveData, setItem } from "@/lib/db";
+import * as L from "@/lib/lock";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -22,10 +23,23 @@ export default function Drip() {
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
   const [deferred, setDeferred] = useState<any>(null);
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
+  const [locked, setLocked] = useState(false);
+  const lockOn = !!data?.lock?.credentialId;
+  useEffect(() => {
+    if (!data) return;
+    let hiddenAt: number | null = null;
+    const onVis = () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else if (L.shouldLock(lockOn, hiddenAt, Date.now(), false)) setLocked(true);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [data, lockOn]);
 
   useEffect(() => {
     (async () => {
-      setData(await loadData());
+      const loaded = await loadData(); setData(loaded);
+      if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
       setVerifier((await getItem<Verifier>("verifier")) ?? null);
       if (navigator.storage?.persist) {
         const already = await navigator.storage.persisted?.();
@@ -55,6 +69,8 @@ export default function Drip() {
     await setItem("verifier", v); setVerifier(v);
     if (restored) { const d = { ...restored, lastBackupAt: new Date().toISOString() }; await saveData(d); setData(d); }
   }} />;
+
+  if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
   const banners = (
     <>
@@ -93,6 +109,7 @@ export default function Drip() {
     }} />;
   } else if (view.name === "trends") body = <Trends data={data} />;
   else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
+    onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
     onRestore={async (d) => { const n = { ...d, lastBackupAt: new Date().toISOString() }; await saveData(n); setData(n); }} />;
   else body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
@@ -178,7 +195,7 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
 
 function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }) {
   const [amt, setAmt] = useState(""); const [date, setDate] = useState(today());
-  const [mode, setMode] = useState<"topup" | "set" | null>(null); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
+  const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null); const [verr, setVerr] = useState(""); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
   const events = [...(a.events ?? [])].sort((x, y) => y.date.localeCompare(x.date));
   const next = M.nextPayout(a.nextPayoutDate, a.frequency, today());
   const history = [...a.payouts].sort((x, y) => y.date.localeCompare(x.date));
@@ -198,23 +215,34 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
       </div>
       <div className="row-gap">
         <button className="btn" onClick={() => { setMode("topup"); setVal(""); }}>Top up</button>
+        <button className="btn ghost" onClick={() => { setMode("withdraw"); setVal(""); setVerr(""); }}>Withdraw</button>
         <button className="btn ghost" onClick={() => { setMode("set"); setVal(String(a.balance)); }}>Update balance</button>
       </div>
       {mode && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>{mode === "topup" ? "Top up" : "Update balance"}</h2>
-          <p className="muted">{mode === "topup" ? "Adds money on this date. Interest before it uses the old balance; after it, growth continues from the new amount." : "Set the balance shown in your provider's app. This isn't counted as a deposit."}</p>
-          <div className="grid"><input inputMode="decimal" placeholder={mode === "topup" ? "Amount £" : "New balance £"} value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
+        <div className="panel"><h2 style={{ marginTop: 0 }}>{{ topup: "Top up", withdraw: "Withdraw", set: "Update balance" }[mode]}</h2>
+          <p className="muted">{{ topup: "Adds money on this date. Interest before it uses the old balance; after it, growth continues from the new amount.",
+            withdraw: "Takes money out on this date. Interest after it is worked out on the smaller balance. Withdrawals aren't counted as negative growth.",
+            set: "Set the balance shown in your provider's app. This isn't counted as a deposit or withdrawal." }[mode]}</p>
+          <div className="grid"><input inputMode="decimal" placeholder={mode === "set" ? "New balance £" : "Amount £"} aria-label="amount" value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
           <div className="row-gap">
-            <button className="btn small" disabled={mode === "topup" ? !(Number(val) > 0) : !(val !== "" && Number(val) >= 0)} onClick={() => {
-              const n = Number(val); onChange((x) => mode === "topup" ? M.applyTopUp(x, n, vdate) : M.applySetBalance(x, n, vdate)); setMode(null);
+            <button className="btn small" disabled={mode === "set" ? !(val !== "" && Number(val) >= 0) : !(Number(val) > 0)} onClick={() => {
+              const n = Number(val);
+              if (mode === "withdraw" && n > a.balance) { setVerr("You can't withdraw more than the balance."); return; }
+              onChange((x) => mode === "topup" ? M.applyTopUp(x, n, vdate) : mode === "withdraw" ? M.applyWithdraw(x, n, vdate) : M.applySetBalance(x, n, vdate)); setMode(null);
             }}>Save</button>
             <button className="btn ghost small" onClick={() => setMode(null)}>Cancel</button>
           </div>
+          {verr && <p className="err">{verr}</p>}
         </div>
       )}
       {events.length > 0 && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>Top-ups and balance updates</h2>
-          <ul className="list">{events.map((e, i) => <li key={i}><span>{e.type === "topup" ? "Top up" : "Balance set"}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={e.type === "topup" ? "ok" : ""}>{e.type === "topup" ? "+" : ""}{M.gbp(e.amount)}</b></li>)}</ul>
+        <div className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2>
+          <ul className="list" data-testid="events">{events.map((e, i) => <li key={i}><span>{{ topup: "Top up", withdraw: "Withdrawal", set: "Balance set" }[e.type]}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={e.type === "topup" ? "ok" : e.type === "withdraw" ? "err" : ""}>{e.type === "topup" ? "+" : e.type === "withdraw" ? "−" : ""}{M.gbp(e.amount)}</b></li>)}</ul>
+        </div>
+      )}
+      {(a.rateHistory?.length ?? 0) > 1 && (
+        <div className="panel"><h2 style={{ marginTop: 0 }}>Rate history</h2>
+          <ul className="list">{[...a.rateHistory!].reverse().map((r) => <li key={r.from}><span>{r.from === "0000-01-01" ? "Since added" : `From ${fmtDate(r.from)} ${r.from.slice(0, 4)}`}</span><b>{r.ratePct}%</b></li>)}</ul>
         </div>
       )}
       <div className="panel"><h2 style={{ marginTop: 0 }}>Payout history</h2>
@@ -242,6 +270,7 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? "interest");
   const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? "monthly");
   const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), 1));
+  const [rateFrom, setRateFrom] = useState(today());
   const isOther = provider === "Other" || (existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
   const b = Number(balance), r = Number(rate);
   const valid = b >= 0 && balance !== "" && r >= 0 && r < 100 && rate !== "" && /^\d{4}-\d{2}-\d{2}$/.test(next) && (!isOther || custom.trim());
@@ -258,13 +287,17 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
         <div><label>Type</label><select value={rateType} onChange={(e) => setRateType(e.target.value as RateType)}><option value="interest">Interest</option><option value="dividend">Dividend</option></select></div>
         <div><label>Paid</label><select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
       </div>
+      {existing && rate !== "" && Number(rate) !== existing.ratePct && (<><label>New rate applies from</label><input type="date" value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} /></>)}
       <label>Next payout date</label><input type="date" value={next} onChange={(e) => setNext(e.target.value)} />
       {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(b, r))} a month</p>}
       <div className="row-gap">
         <button className="btn" disabled={!valid} onClick={() => {
           const name = isOther ? custom.trim() : provider;
-          onSave({ id: existing?.id ?? crypto.randomUUID(), provider: name, label: label.trim(), balance: M.round2(b), ratePct: r, rateType, frequency,
-            nextPayoutDate: next, colour: PROVIDERS[name] ?? PROVIDERS.Other, payouts: existing?.payouts ?? [], createdAt: existing?.createdAt ?? new Date().toISOString() });
+          const createdAt = existing?.createdAt ?? new Date().toISOString();
+          const base: Account = { ...(existing ?? {}), id: existing?.id ?? crypto.randomUUID(), provider: name, label: label.trim(), balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType, frequency,
+            nextPayoutDate: next, colour: PROVIDERS[name] ?? PROVIDERS.Other, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
+            rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };
+          onSave(existing && r !== existing.ratePct ? M.applyRateChange(base, r, rateFrom, today()) : base);
         }}>Save</button>
         <button className="btn ghost" onClick={onCancel}>Cancel</button>
       </div>
@@ -285,16 +318,17 @@ function Trends({ data }: { data: AppData }) {
         <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
         <div className="stat"><div className="muted">Monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
         <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
-        <div className="stat"><div className="muted">Growth excl. top-ups</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
+        <div className="stat"><div className="muted">Growth excl. deposits/withdrawals</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
       </div>
       {br && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>This month vs last</h2>
           <ul className="list">
             <li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li>
+            <li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li>
             <li><span>Growth from interest and returns</span><b className={br.growth >= 0 ? "ok" : "err"}>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li>
             <li><span>Total change</span><b>{M.gbp(br.change)}</b></li>
           </ul>
-          <p className="muted">Growth is the change in balance minus top-ups, so manual balance updates count here.</p>
+          <p className="muted">Growth is the change in balance minus top-ups plus withdrawals, so only manual balance updates can make it look negative.</p>
         </div>
       )}
       <div className="panel"><h2 style={{ marginTop: 0 }}>Balance by month</h2>
@@ -311,11 +345,45 @@ function Trends({ data }: { data: AppData }) {
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData) => void }) {
+function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string; verifier: Verifier; onUnlock: () => void }) {
+  const [code, setCode] = useState(""); const [err, setErr] = useState("");
+  const tryPasskey = async () => { setErr(""); if (await L.verifyPasskey(navigator.credentials, credentialId, location.hostname)) onUnlock(); else setErr("Face ID didn't work. Try again or use your recovery code."); };
+  useEffect(() => { tryPasskey(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <main><h1>Drip is locked 🔒</h1>
+      <div className="panel">
+        <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
+        <label>Or use your recovery code</label>
+        <input value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
+        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { if (await C.checkCode(code, verifier)) onUnlock(); else setErr("That isn't your recovery code."); }}>Unlock with code</button></div>
+        {err && <p className="err">{err}</p>}
+      </div>
+    </main>
+  );
+}
+
+function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData) => void; onLock: (l: AppData["lock"]) => void }) {
+  const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
+  useEffect(() => { L.passkeySupported().then(setSupported); }, []);
+  const lockPanel = (
+    <div className="panel"><h2 style={{ marginTop: 0 }}>App lock</h2>
+      <p className="muted">Ask for Face ID (or your device passkey) when Drip opens and after 5 minutes in the background. Your recovery code also unlocks it.</p>
+      <p className="muted"><b>Be aware:</b> this is a screen lock only. It stops someone casually opening Drip on your phone, but it doesn&apos;t encrypt the data stored on this device. Your phone&apos;s own passcode is the real protection. Backups are always encrypted.</p>
+      {data.lock?.credentialId ? (
+        <button className="btn ghost" onClick={() => { onLock({ credentialId: null, enabledAt: null }); setLockMsg("App lock is off."); }}>Turn off app lock</button>
+      ) : supported === false ? <p className="muted">This device or browser doesn&apos;t support a passkey lock.</p> : (
+        <button className="btn" disabled={!supported} onClick={async () => {
+          try { const id = await L.registerPasskey(navigator.credentials, location.hostname); onLock({ credentialId: id, enabledAt: new Date().toISOString() }); setLockMsg("App lock is on."); }
+          catch { setLockMsg("Couldn't set up the passkey."); }
+        }}>Turn on app lock</button>
+      )}
+      {lockMsg && <p className="ok">{lockMsg}</p>}
+    </div>
+  );
   const [code, setCode] = useState(""); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [busy, setBusy] = useState(false);
   return (
     <>
-      <h1>Backup</h1>
+      <h1>Backup &amp; security</h1>
       <p className="muted">Your data lives only on this device. A backup is an encrypted file locked with your recovery code. Save it to Files or iCloud Drive.</p>
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
@@ -340,6 +408,7 @@ function Settings({ data, verifier, onBackedUp, onRestore }: { data: AppData; ve
         <p className="muted">Replaces everything on this device with the backup.</p>
         <Restore onRestored={(d) => { if (confirm("Replace all data on this device with this backup?")) onRestore(d); }} />
       </div>
+      {lockPanel}
     </>
   );
 }
@@ -355,7 +424,7 @@ function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => voi
         try {
           const d = await C.decryptBackup(JSON.parse(await file!.text()), code);
           if (!isAppData(d)) throw new C.BackupError("The backup's contents aren't valid.");
-          onRestored(d, code);
+          onRestored(M.migrateData(d, today()), code);
         } catch (e) { setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
         finally { setBusy(false); }
       }}>{busy ? "Decrypting…" : "Restore"}</button></div>
