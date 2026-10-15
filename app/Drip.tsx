@@ -158,10 +158,9 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
             const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
             return (
               <button key={a.id} className="card" style={{ background: `linear-gradient(135deg, ${a.colour}, #111)` }} onClick={() => open(a.id)}>
-                <div className="row"><span className="prov">{a.provider}</span><span>{a.ratePct}%</span></div>
-                {a.label && <div className="meta">{a.label}</div>}
-                <div className="bal">{M.gbp(a.balance)}</div>
-                <div className="meta">≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} this month · paid {fmtDate(next)}</div>
+                <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
+                <div className="row meta"><span>{a.label || a.rateType}</span><span>{a.ratePct}%</span></div>
+                <div className="meta" style={{ marginTop: 18 }}>≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} this month · paid {fmtDate(next)}</div>
               </button>
             );
           })}
