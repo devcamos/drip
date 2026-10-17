@@ -96,7 +96,14 @@ export async function syncNow(): Promise<string> {
     if (remote.version !== state.version) throw new Error("Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.");
     if (!state.dirty) return "Cloud copy is up to date.";
     const envelope = await seal(data, state.key);
-    if ((await cloudSnapshot()).signedOut) return "Signed out. Cloud sync is paused.";
+    const current = await cloudSnapshot();
+    if (current.signedOut) return "Signed out. Cloud sync is paused.";
+    // Encryption yields: a restore/reconnect may have replaced this snapshot even
+    // when the server version is unchanged. Reject it before writing remotely.
+    if (!current.state || current.state.userId !== state.userId || current.state.identityId !== state.identityId ||
+      current.state.generation !== state.generation || current.state.version !== state.version) {
+      return "Cloud connection changed during sync. Check its status before continuing.";
+    }
     const saved = await vault("PUT", { version: state.version, envelope }, state.userId);
     const acknowledged = await acknowledgeCloudUpload(state, saved.version, saved.updated_at ?? new Date().toISOString());
     return acknowledged === "queued" ? "Cloud copy saved; newer local changes are queued." : acknowledged === "changed" ? "Cloud connection changed during sync. Check its status before continuing." : "Encrypted cloud copy saved.";

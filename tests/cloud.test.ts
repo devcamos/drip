@@ -3,7 +3,7 @@ const api = vi.hoisted(() => ({ getSession: vi.fn(), signIn: { email: vi.fn() },
 vi.mock("better-auth/client", () => ({ createAuthClient: () => api }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
 import * as cloud from "../lib/cloud";
-import { emptyData, getItem, loadData, saveData, cloudSnapshot, acknowledgeCloudUpload, setItem } from "../lib/db";
+import { emptyData, getItem, loadData, saveData, cloudSnapshot, acknowledgeCloudUpload, commitCloudRestore, setItem } from "../lib/db";
 import { generateRecoveryCode } from "../lib/crypto";
 import type { AppData } from "../lib/types";
 
@@ -111,6 +111,48 @@ describe("versioned offline sync", () => {
     const body = JSON.parse(fetcher.mock.calls[1][1].body as string);
     expect(body.version).toBe(1); expect(body.envelope.app).toBe("drip-cloud");
     expect(JSON.stringify(body)).not.toContain("devo");
+  });
+  it("does not upload discarded local data when a same-account restore completes during encryption", async () => {
+    await configured();
+    const restored = { ...data, lastBackupAt: "restored-cloud-copy" };
+    const connection = (await cloud.readCloudState())!;
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const encrypting = vi.spyOn(crypto.subtle, "encrypt").mockImplementationOnce(async (...args) => {
+      const ciphertext = await encrypt(...args);
+      await commitCloudRestore(restored, { ...connection, generation: "restored", dirty: false }, { salt: "test", hash: "test" });
+      return ciphertext;
+    });
+    const fetcher = vi.fn(async () => response({ version: 1 }));
+    vi.stubGlobal("fetch", fetcher);
+    try {
+      expect(await cloud.syncNow()).toContain("connection changed");
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(fetcher.mock.calls[0]).toEqual(["/api/cloud", expect.objectContaining({ method: "GET" })]);
+      expect(await loadData()).toEqual(restored);
+      expect(await cloud.readCloudState()).toMatchObject({ generation: "restored", version: 1, dirty: false });
+    } finally { encrypting.mockRestore(); }
+  });
+  it.each(["reconnect", "owner", "identity", "version", "disconnect"])("does not upload after a %s changes the connection during encryption", async change => {
+    await configured();
+    const connection = (await cloud.readCloudState())!;
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const encrypting = vi.spyOn(crypto.subtle, "encrypt").mockImplementationOnce(async (...args) => {
+      const ciphertext = await encrypt(...args);
+      await cloud.writeCloudState(change === "disconnect" ? undefined : {
+        ...connection,
+        ...(change === "reconnect" ? { generation: "reconnected" } : {}),
+        ...(change === "owner" ? { userId: "user-2" } : {}),
+        ...(change === "identity" ? { identityId: "other-local-account" } : {}),
+        ...(change === "version" ? { version: 2 } : {}),
+      });
+      return ciphertext;
+    });
+    const fetcher = vi.fn(async () => response({ version: 1 }));
+    vi.stubGlobal("fetch", fetcher);
+    try {
+      expect(await cloud.syncNow()).toContain("connection changed");
+      expect(fetcher).toHaveBeenCalledOnce();
+    } finally { encrypting.mockRestore(); }
   });
   it("keeps newer changes queued when an edit arrives during upload", async () => {
     await configured();
