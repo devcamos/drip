@@ -64,7 +64,7 @@ describe("cloud recovery settings", () => {
     expect(await screen.findByText("Encrypted cloud copy saved.")).toBeInTheDocument();
     expect(cloud.writeCloudState).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", dirty: true }));
     cloud.readCloudState.mockResolvedValue({ userId: "user" });
-    click("Add cloud sign-in passkey");
+    fireEvent.click(screen.getByText("Device sign-in options")); click("Add cloud sign-in passkey");
     expect(await screen.findByText(/Cloud sign-in passkey saved/)).toBeInTheDocument();
     click("Sync now"); await screen.findByText("Encrypted cloud copy saved.");
     click("Disconnect this device");
@@ -87,8 +87,8 @@ describe("cloud recovery settings", () => {
     const restored = await panel();
     await screen.findByText(/Cloud recovery is connected/);
     click("Sync now"); expect(await screen.findByText("Cloud conflict")).toBeInTheDocument();
-    click("Add cloud sign-in passkey"); expect(await screen.findByText(/Passkey was not saved/)).toBeInTheDocument();
-    fill("Recovery code", code); click("Restore cloud accounts");
+    fireEvent.click(screen.getByText("Device sign-in options")); click("Add cloud sign-in passkey"); expect(await screen.findByText(/Passkey was not saved/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Restore an existing cloud copy")); fill("Recovery code", code); click("Restore cloud accounts");
     await waitFor(() => expect(restored).toHaveBeenCalledWith(data, code));
   });
   it("keeps local recovery available when the backend status cannot be fetched", async () => {
@@ -99,7 +99,7 @@ describe("cloud recovery settings", () => {
     cloud.readCloudState.mockResolvedValue({ userId: "user" });
     await panel();
     await screen.findByText(/Cloud recovery is connected/);
-    fill("Recovery code to renew sign-in", code); click("Sign in without replacing local data");
+    fireEvent.click(screen.getByText("Device sign-in options")); fill("Recovery code to renew sign-in", code); click("Sign in without replacing local data");
     expect(await screen.findByText("Encrypted cloud copy saved.")).toBeInTheDocument();
     expect(cloud.restoreCloud).not.toHaveBeenCalled(); expect(cloud.writeCloudState).not.toHaveBeenCalled();
     cloud.authClient.getSession.mockResolvedValue({ data: { user: { id: "another-user" } } });

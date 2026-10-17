@@ -29,4 +29,4 @@ export interface Account {
 export interface Snapshot { month: string; totalBalance: number; monthlyIncome: number; deposits?: number; withdrawals?: number }
 
 export interface LockSettings { credentialId: string | null; enabledAt: string | null }
-export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; lock?: LockSettings; identity?: Identity }
+export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; projection?: { monthlyDeposit: number; years: number }; lock?: LockSettings; identity?: Identity }

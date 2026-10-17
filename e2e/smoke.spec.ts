@@ -38,9 +38,10 @@ test("onboarding shows a recovery code and gates Start", async ({ page }) => {
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
   await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · devo_1");
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByTestId("settings-tag")).toHaveText("devo_1");
-  await expect(page.getByText(/If this name is taken when sync launches, we'll add a short number to it/)).toBeVisible();
+  await expect(page.getByText(/does not need to be unique/)).toBeVisible();
 });
 
 test("add account, top up, withdraw, Trends, backup export and import", async ({ page }) => {
@@ -71,12 +72,13 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   // Trends
   await page.getByRole("navigation").getByRole("button", { name: "Trends" }).click();
   await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
-  await expect(page.getByText("£3,300.00")).toBeVisible();
+  await expect(page.locator(".stat").filter({ hasText: "Total balance" }).getByText("£3,300.00", { exact: true })).toBeVisible();
   await expect(page.getByText("7.00%")).toBeVisible();
-  await expect(page.getByText(/In 12 months:/)).toBeVisible();
+  await expect(page.getByText("Estimated balance in 1 year")).toBeVisible();
 
   // export
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await page.getByPlaceholder("XXXX-XXXX-XXXX-XXXX-XXXX-XXXX").fill("WRONG");
   await page.getByRole("button", { name: "Export backup" }).click();
   await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
@@ -113,7 +115,8 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const code = await onboard(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByText(/screen lock only/)).toBeVisible();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
@@ -159,7 +162,8 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   await onboard(page);
   const tag = await page.getByTestId("header-tag").locator("b").textContent();
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
   const id: string = await page.evaluate(async () => {

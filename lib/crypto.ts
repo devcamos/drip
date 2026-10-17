@@ -28,7 +28,8 @@ export function normaliseCode(code: string): string {
 }
 
 export function isValidCode(code: string): boolean {
-  const n = normaliseCode(code);
+  const normal = normaliseCode(code);
+  const n = normal.startsWith("DRIP2") ? normal.slice(5) : normal;
   return n.length === 24 && [...n].every((c) => ALPHABET.includes(c));
 }
 
@@ -55,7 +56,7 @@ export class BackupError extends Error {}
 export async function decryptBackup<T = unknown>(file: unknown, code: string): Promise<T> {
   const f = file as BackupFile;
   if (!f || f.app !== "drip" || f.v !== 1 || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file.");
-  if (!Number.isInteger(f.iter) || f.iter < 100_000) throw new BackupError("Backup uses unsafe settings.");
+  if (!Number.isInteger(f.iter) || f.iter < 100_000 || f.iter > KDF_ITERATIONS) throw new BackupError("Backup uses unsafe settings.");
   try {
     const key = await deriveKey(code, unb64(f.salt), f.iter);
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(f.iv), additionalData: enc.encode("drip-v1") }, key, unb64(f.ct));

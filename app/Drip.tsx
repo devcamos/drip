@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Account, AppData, Frequency, RateType } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
@@ -9,6 +9,9 @@ import * as I from "@/lib/identity";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
 import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
 import { PwaStatus } from "./PwaStatus";
+import { RecoveryCodes } from "./RecoveryCodes";
+import { Trends } from "./Trends";
+import { downloadRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
 import { writeCloudState } from "@/lib/cloud";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
@@ -24,7 +27,6 @@ export default function Drip() {
   const [data, setData] = useState<AppData | null>(null);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
-  const [persisted, setPersisted] = useState<boolean | null>(null);
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
   const [deferred, setDeferred] = useState<any>(null);
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
@@ -52,7 +54,7 @@ export default function Drip() {
       setVerifier((await getItem<Verifier>("verifier")) ?? null);
       if (navigator.storage?.persist) {
         const already = await navigator.storage.persisted?.();
-        setPersisted(already || (await navigator.storage.persist()));
+        if (!already) await navigator.storage.persist();
       }
     })();
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
@@ -90,19 +92,12 @@ export default function Drip() {
         <div className="banner info">
           {installHint === "ios"
             ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. Keep cloud recovery or exported backups too; installation alone doesn&apos;t guarantee data retention.</span>
-            : <span>Install Drip on this device to keep your data safe.</span>}
+            : <span>Install Drip for quick access and offline tracking.</span>}
           {installHint === "android" && deferred && <button className="btn small" onClick={async () => { deferred.prompt(); setDeferred(null); setInstallHint(null); }}>Install</button>}
           <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, install: true })}>✕</button>
         </div>
       )}
-      {persisted === false && !dismissed.persist && (
-        <div className="banner warn"><span>Your browser may clear Drip&apos;s data if storage gets low. Install the app and export backups regularly.</span>
-          <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, persist: true })}>✕</button></div>
-      )}
-      {M.backupDue(data.lastBackupAt, data.accounts.length > 0, new Date()) && !dismissed.backup && (
-        <div className="banner warn"><span>{data.lastBackupAt ? "It's been over 2 weeks since your last backup." : "You haven't backed up yet."} Keep an exported backup as well as any cloud copy.</span>
-          <button className="btn small" onClick={() => setView({ name: "settings" })}>Back up</button></div>
-      )}
+
     </>
   );
 
@@ -119,7 +114,7 @@ export default function Drip() {
       update((d) => ({ ...d, accounts: existing ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
       setView({ name: "detail", id: a.id });
     }} />;
-  } else if (view.name === "trends") body = <Trends data={data} />;
+  } else if (view.name === "trends") body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
   else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
     onCloudRestored={async (d, code) => { const v = await C.codeVerifier(code); await setItem("verifier", v); setVerifier(v); setData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
@@ -129,11 +124,11 @@ export default function Drip() {
 
   return (
     <>
-      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div><PwaStatus /><CloudSync />{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
-            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Backup" }[n]}
+            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Recovery" }[n]}
           </button>
         ))}
       </nav>
@@ -183,7 +178,7 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
           <h2>Your recovery code</h2>
           <p className="muted">This code encrypts your backups. Write it down or save it in your password manager. <b>If you lose this code and this device, your data can&apos;t be recovered.</b> Nobody, including us, can reset it.</p>
           <div className="code" data-testid="code">{code}</div>
-          <div className="row-gap"><button className="btn ghost small" onClick={() => navigator.clipboard?.writeText(code)}>Copy</button></div>
+          <div className="row-gap"><button className="btn ghost small" onClick={() => navigator.clipboard?.writeText(code)}>Copy</button><button className="btn ghost small" onClick={() => downloadRecoveryCodes([code], draft.handle)}>Download recovery code</button></div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--text)" }}>
             <input type="checkbox" style={{ width: "auto" }} checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I&apos;ve saved my recovery code somewhere safe
           </label>
@@ -361,46 +356,6 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   );
 }
 
-function Trends({ data }: { data: AppData }) {
-  const proj = useMemo(() => M.projection(data.accounts), [data.accounts]);
-  const br = M.momBreakdown(data.snapshots); const g = br ? br.growthPct : M.momGrowth(data.snapshots);
-  const hist = data.snapshots.slice(-6);
-  const max = Math.max(1, ...hist.map((s) => s.totalBalance), ...proj.map((p) => p.balance));
-  const total = M.totalBalance(data.accounts);
-  return (
-    <>
-      <h1>Trends</h1>
-      <div className="grid">
-        <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-        <div className="stat"><div className="muted">Monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
-        <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
-        <div className="stat"><div className="muted">Growth excl. deposits/withdrawals</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
-      </div>
-      {br && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>This month vs last</h2>
-          <ul className="list">
-            <li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li>
-            <li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li>
-            <li><span>Growth from interest and returns</span><b className={br.growth >= 0 ? "ok" : "err"}>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li>
-            <li><span>Total change</span><b>{M.gbp(br.change)}</b></li>
-          </ul>
-          <p className="muted">Growth is the change in balance minus top-ups plus withdrawals, so only manual balance updates can make it look negative.</p>
-        </div>
-      )}
-      <div className="panel"><h2 style={{ marginTop: 0 }}>Balance by month</h2>
-        <p className="muted">Green: recorded. Blue: 12-month projection with interest reinvested.</p>
-        <div className="bars">
-          {hist.map((s) => <div key={s.month} title={M.gbp(s.totalBalance)} style={{ height: `${(s.totalBalance / max) * 100}%` }} />)}
-          {proj.map((p) => <div key={p.month} className="proj" title={M.gbp(p.balance)} style={{ height: `${(p.balance / max) * 100}%` }} />)}
-        </div>
-        <div className="axis">{hist.map((s) => <span key={s.month}>{s.month.slice(5)}</span>)}{proj.map((p) => <span key={p.month}>+{p.month}</span>)}</div>
-        <p className="muted" style={{ marginTop: 12 }}>In 12 months: <b style={{ color: "var(--text)" }}>{M.gbp(proj[11]?.balance ?? 0)}</b> (+{M.gbp((proj[11]?.balance ?? 0) - total)}), if rates stay the same.</p>
-      </div>
-      {g === null && <p className="muted">Month-on-month growth appears after Drip has two months of history.</p>}
-    </>
-  );
-}
-
 function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string; verifier: Verifier; onUnlock: () => void }) {
   const [code, setCode] = useState(""); const [err, setErr] = useState("");
   const tryPasskey = async () => { setErr(""); if (await L.verifyPasskey(navigator.credentials, credentialId, location.hostname)) onUnlock(); else setErr("Face ID didn't work. Try again or use your recovery code."); };
@@ -411,7 +366,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
         <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
         <label>Or use your recovery code</label>
         <input aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
-        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { if (await C.checkCode(code, verifier)) onUnlock(); else setErr("That isn't your recovery code."); }}>Unlock with code</button></div>
+        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { try { if (await C.checkCode(await resolveRecoveryCode(code), verifier)) onUnlock(); else setErr("That isn't your recovery code."); } catch (e) { setErr((e as Error).message); } }}>Unlock with code</button></div>
         {err && <p className="err">{err}</p>}
       </div>
     </main>
@@ -439,17 +394,20 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   const [code, setCode] = useState(""); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [busy, setBusy] = useState(false);
   return (
     <>
-      <h1>Backup &amp; security</h1>
-      <p className="muted">Local accounts work offline. Enable cloud recovery for a copy you can restore on another device, and keep an encrypted file backup too.</p>
+      <h1>Recovery</h1>
+      <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
+      <RecoveryCodes data={data} verifier={verifier} />
       <CloudPanel data={data} verifier={verifier} onRestored={onCloudRestored} />
+      <details className="panel"><summary>Advanced: file backups &amp; app lock</summary>
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
         <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
         <div className="row-gap"><button className="btn" disabled={busy || !code} onClick={async () => {
           setBusy(true); setMsg(null);
           try {
-            if (!(await C.checkCode(code, verifier))) { setMsg({ ok: false, t: "That isn't your recovery code." }); return; }
-            const file = await C.encryptBackup(data, code);
+            const root = await resolveRecoveryCode(code);
+            if (!(await C.checkCode(root, verifier))) { setMsg({ ok: false, t: "That isn't your recovery code." }); return; }
+            const file = await C.encryptBackup(data, root);
             const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
             const name = `drip-backup-${today()}.json`;
             const f = new File([blob], name, { type: "application/json" });
@@ -467,11 +425,12 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
         <Restore onRestored={(d, c) => { if (confirm("Replace all data on this device with this backup? Cloud recovery will be disconnected on this device.")) onRestore(d, c); }} />
       </div>
       {lockPanel}
+      </details>
       {data.identity && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Your gamertag</h2>
           <div className="code" data-testid="settings-tag">{I.formatTag(data.identity)}</div>
-          <p className="muted">Stored on this device only, and included in your encrypted backups. Nobody checks yet whether someone else has the same name. <b>If this name is taken when sync launches, we&apos;ll add a short number to it.</b></p>
-          <p className="muted">Account ID: <code>{data.identity.id.slice(0, 8)}…</code> (random, used later for sync)</p>
+          <p className="muted">Your display name is included in your encrypted cloud copy. It does not need to be unique and cannot be used to sign in or recover your data.</p>
+          <p className="muted">Account ID: <code>{data.identity.id.slice(0, 8)}…</code> (random account identifier)</p>
         </div>
       )}
     </>
@@ -487,9 +446,10 @@ function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => voi
       <div className="row-gap"><button className="btn" disabled={!file || !code || busy} onClick={async () => {
         setBusy(true); setErr("");
         try {
-          const d = await C.decryptBackup(JSON.parse(await file!.text()), code);
+          const root = await resolveRecoveryCode(code);
+          const d = await C.decryptBackup(JSON.parse(await file!.text()), root);
           if (!isAppData(d)) throw new C.BackupError("The backup's contents aren't valid.");
-          onRestored(M.migrateData(d, today()), code);
+          onRestored(M.migrateData(d, today()), root);
         } catch (e) { setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
         finally { setBusy(false); }
       }}>{busy ? "Decrypting…" : "Restore"}</button></div>

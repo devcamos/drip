@@ -47,6 +47,8 @@ describe("encrypted recovery", () => {
     api.signUp.email.mockResolvedValue({ data: null, error: {} });
     await expect(cloud.connect(code, data, true)).rejects.toThrow("Could not sign in");
     await expect(cloud.connect(code, data)).rejects.toThrow("Could not sign in");
+    api.signIn.email.mockResolvedValue({ data: null, error: { status: 429 } });
+    await expect(cloud.connect(code, data)).rejects.toThrow("Too many sign-in attempts");
   });
   it("restores after local data loss using code, including a matching passkey session", async () => {
     const envelope = await cloud.seal(data, key);

@@ -91,5 +91,6 @@ export async function commitCloudRestore(data: AppData, state: unknown, verifier
 export function isAppData(x: unknown): x is AppData {
   const d = x as AppData;
   return !!d && d.version === 1 && Array.isArray(d.accounts) && Array.isArray(d.snapshots) &&
+    (d.projection === undefined || (!!d.projection && Number.isFinite(d.projection.monthlyDeposit) && d.projection.monthlyDeposit >= 0 && d.projection.monthlyDeposit <= 1_000_000 && [1, 3, 5].includes(d.projection.years))) &&
     (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => typeof a.id === "string" && typeof a.balance === "number" && typeof a.ratePct === "number");
 }

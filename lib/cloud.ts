@@ -57,6 +57,7 @@ export async function vault(method = "GET", body?: unknown, ownerId?: string) {
 export async function connect(code: string, data: AppData, create = false) {
   const credentials = await recoveryCredentials(code);
   let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email(credentials);
+  if ((result.error as { status?: number } | null)?.status === 429) throw new Error("Too many sign-in attempts. Wait a few seconds, then try again.");
   if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user" });
   if (result.error || !result.data?.user) throw new Error("Could not sign in. Check your recovery code and connection.");
   return { user: result.data.user, key: await cloudKey(code) };
