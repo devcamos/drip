@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   other: { "apple-mobile-web-app-capable": "yes" },
 };
-export const viewport: Viewport = { themeColor: "#0b1020", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#fffaf1", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="en-GB"><body>{children}</body></html>;

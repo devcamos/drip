@@ -212,7 +212,7 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
           {data.accounts.map((a) => {
             const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
             return (
-              <button key={a.id} className="card" style={{ background: `linear-gradient(135deg, ${a.colour}, #111)` }} onClick={() => open(a.id)}>
+              <button key={a.id} className="card" onClick={() => open(a.id)}>
                 <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
                 <div className="row meta"><span>{a.label || a.rateType}</span><span>{a.ratePct}%</span></div>
                 <div className="meta" style={{ marginTop: 18 }}>≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} this month · {a.frequency === "daily" ? "Daily interest" : `paid ${fmtDate(next)}`}</div>
@@ -241,7 +241,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
   return (
     <>
       <button className="btn ghost small" onClick={onBack}>← Accounts</button>
-      <div className="card" style={{ background: `linear-gradient(135deg, ${a.colour}, #111)`, marginTop: 12, cursor: "default" }}>
+      <div className="card" style={{ marginTop: 12, cursor: "default" }}>
         <div className="row"><span className="prov">{a.provider}</span><span>{a.rateType}</span></div>
         {a.label && <div className="meta">{a.label}</div>}
         <div className="bal">{M.gbp(a.balance)}</div>
