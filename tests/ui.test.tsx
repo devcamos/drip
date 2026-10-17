@@ -32,7 +32,7 @@ beforeEach(() => {
 describe("layout and page", () => {
   it("exports metadata and wraps children", () => {
     expect(metadata.title).toBe("Drip");
-    expect(viewport.themeColor).toBe("#0b1020");
+    expect(viewport.themeColor).toBe("#fffaf1");
     const el = RootLayout({ children: "x" }) as any;
     expect(el.type).toBe("html");
     expect((Page() as any).type).toBe(Drip);
