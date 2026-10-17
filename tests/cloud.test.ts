@@ -2,6 +2,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ getSession: vi.fn(), signIn: { email: vi.fn() }, signUp: { email: vi.fn() } }));
 vi.mock("better-auth/client", () => ({ createAuthClient: () => api }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
+import { unlockLocalVault as cloudUnlock } from "../lib/db";
+import { seedVault } from "./storage-fixtures";
 import * as cloud from "../lib/cloud";
 import { emptyData, getItem, loadData, saveData, cloudSnapshot, acknowledgeCloudUpload, commitCloudRestore, setItem } from "../lib/db";
 import { generateRecoveryCode } from "../lib/crypto";
@@ -18,7 +20,7 @@ beforeEach(() => {
 });
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 async function configured(dirty = true) {
-  await saveData(data);
+  await seedVault(data, code);
   await cloud.writeCloudState({ userId: "user-1", identityId: data.identity!.id, key, version: 1, dirty, lastSyncAt: null, generation: "first", revision: 0 });
 }
 
@@ -62,7 +64,7 @@ describe("encrypted recovery", () => {
     await expect(cloud.restoreCloud(code, "other")).rejects.toThrow("different account");
   });
   it("does not replace local data for a missing cloud copy or a failed decryption", async () => {
-    await saveData(data);
+    await seedVault(data, code);
     vi.stubGlobal("fetch", vi.fn(async () => response({ version: 0, envelope: null })));
     await expect(cloud.restoreCloud(code)).rejects.toThrow("No cloud copy");
     expect((await loadData()).identity).toEqual(data.identity);
@@ -98,6 +100,7 @@ describe("versioned offline sync", () => {
     await configured(); await setItem("deviceSession", { signedOut: true, generation: "out" });
     expect(await cloud.syncNow()).toContain("paused"); expect(api.getSession).not.toHaveBeenCalled();
     await setItem("deviceSession", { signedOut: false, generation: "in" });
+    await cloudUnlock(code);
     vi.stubGlobal("fetch", vi.fn(async () => { await setItem("deviceSession", { signedOut: true, generation: "out-again" }); return response({ version: 1 }); }));
     expect(await cloud.syncNow()).toContain("paused"); expect(fetch).toHaveBeenCalledOnce();
     await expect(cloud.restoreCloud(code)).rejects.toThrow(/Sign in before restoring/);

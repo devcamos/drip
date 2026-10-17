@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
+import { unlock } from "./vault-helpers";
 
 // These journeys share a host/IP. Respect real server Retry-After when several
 // independent test users sign in quickly; never disable production auth limits.
@@ -33,13 +34,14 @@ async function setup(page: Page, handle = "recoverytest") {
 }
 
 test("offline reload keeps accounts and never caches private APIs", async ({ page, context }) => {
-  await setup(page);
+  const code = await setup(page);
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   // Authenticated endpoints must not enter any service-worker cache.
   await page.request.get("/api/cloud/status");
   await context.setOffline(true);
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByText("Total balance")).toBeVisible();
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await expect(page.getByText(/Offline — Drip/)).toBeVisible();
@@ -116,6 +118,7 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   await expect(page.getByText("Total balance")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByText("Total balance")).toBeVisible();
 });
 
@@ -148,6 +151,7 @@ test("downloaded set of six codes independently restores the same cloud account"
       await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
       await expect(returning.getByText("£3,000.00").first()).toBeVisible();
       await returning.reload();
+      await unlock(returning, code);
       await expect(returning.getByText("Total balance")).toBeVisible();
     } finally { await fresh.close(); }
   }
@@ -156,7 +160,7 @@ test("downloaded set of six codes independently restores the same cloud account"
 });
 
 test("mobile Trends shows recorded and estimated balances with editable assumptions", async ({ page }) => {
-  await setup(page);
+  const code = await setup(page);
   await page.getByRole("navigation").getByRole("button", { name: "Trends", exact: true }).click();
   await expect(page.getByRole("img", { name: /Recorded balance/ })).toBeVisible();
   await expect(page.getByText(/Your history starts today/)).toBeVisible();
@@ -166,6 +170,7 @@ test("mobile Trends shows recorded and estimated balances with editable assumpti
   await page.getByRole("button", { name: "Save projection" }).click();
   await expect(page.getByText("Estimated balance in 3 years")).toBeVisible();
   await page.reload();
+  await unlock(page, code);
   await page.getByRole("navigation").getByRole("button", { name: "Trends", exact: true }).click();
   await expect(page.getByText("Estimated balance in 3 years")).toBeVisible();
   for (const width of [390, 320]) {
@@ -183,6 +188,7 @@ test("mobile Trends shows recorded and estimated balances with editable assumpti
 test("sign-out survives reload, locks other tabs and preserves local-only accounts", async ({ page, context }) => {
   const code = await setup(page);
   const other = await context.newPage(); await other.goto("/");
+  await unlock(other, code);
   await expect(other.getByText("Total balance")).toBeVisible();
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -198,6 +204,8 @@ test("sign-out survives reload, locks other tabs and preserves local-only accoun
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Total balance")).toBeVisible();
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
+  await expect(other.getByRole("heading", { name: "Unlock Drip" })).toBeVisible();
+  await unlock(other, code);
   await expect(other.getByText("Total balance")).toBeVisible(); await other.close();
 });
 
@@ -215,6 +223,13 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByLabel("amount", { exact: true }).fill("200");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".bal")).toHaveText("£3,200.00");
+  // A failed offline disconnect must not drop the connection or its queued £200.
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByText("Device sign-in options").click();
+  await page.getByRole("button", { name: "Disconnect this device", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Disconnect this device", exact: true })).toBeEnabled();
+  await expect(page.getByText("Cloud recovery is connected on this device.")).toBeVisible();
+  await expect(page.getByText(/Cloud disconnected on this device/)).toHaveCount(0);
   let warned = false;
   page.on("dialog", async dialog => { warned ||= dialog.message().includes("unsynced changes"); await dialog.accept(); });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -253,5 +268,5 @@ test("signed-out users can restore rampage201 instead of reopening the current p
   await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByText("Total balance"));
   await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
-  await page.reload(); await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
+  await page.reload(); await unlock(page, recovery!); await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
 });

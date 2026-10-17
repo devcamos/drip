@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, it, expect } from "vitest";
 import * as M from "../lib/maths";
 import { saveDraft, loadDraft, clearDraft } from "../lib/draft";
-import { setItem } from "../lib/db";
+import { rawStore } from "./storage-fixtures";
 import type { Account } from "../lib/types";
 
 const acct = (o: Partial<Account> = {}): Account => ({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, rateType: "interest",
@@ -62,7 +62,9 @@ describe("onboarding draft", () => {
   it("returns null if the stored draft can't be decrypted", async () => {
     await saveDraft({ handle: "x", code: "c" });
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-    await setItem("onboardingDraft", { handle: "x", key, iv: new Uint8Array(12), ct: new ArrayBuffer(20) });
+    await clearDraft();
+    await rawStore({ onboardingDraft: { handle: "x", key, iv: new Uint8Array(12), ct: new ArrayBuffer(20) } });
     expect(await loadDraft()).toBeNull();
+    expect((await rawStore()).onboardingDraft).toBeUndefined();
   });
 });

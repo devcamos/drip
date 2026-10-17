@@ -1,6 +1,6 @@
 import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
-import { normaliseCode, isValidCode, codeVerifier } from "./crypto";
+import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey } from "./crypto";
 import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection } from "./db";
 import type { AppData, CloudState } from "./types";
 export type { CloudState } from "./types";
@@ -24,11 +24,7 @@ export async function recoveryCredentials(code: string) {
     password: await hash(`drip-recovery-auth-v1:${normal}`),
   };
 }
-export async function cloudKey(code: string) {
-  if (!isValidCode(code)) throw new Error("Enter your complete recovery code.");
-  const material = await crypto.subtle.importKey("raw", enc.encode(normaliseCode(code)), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode("drip-cloud-encryption-v1"), iterations: 600_000 }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-}
+export const cloudKey = deriveCloudEncryptionKey;
 export async function seal(data: AppData, key: CryptoKey): Promise<Envelope> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   // Device screen-lock credentials are not portable and are never restored elsewhere.
@@ -44,9 +40,9 @@ export async function unseal(envelope: Envelope, key: CryptoKey): Promise<AppDat
   return { ...migrateData(data, new Date().toISOString().slice(0, 10)), lock: undefined };
 }
 export const readCloudState = () => getItem<CloudState>("cloudState");
-export async function writeCloudState(state: CloudState | undefined, expected?: { generation: string | undefined }) {
+export async function writeCloudState(state: CloudState | undefined, expected?: { generation: string | undefined; connectionGeneration?: string }) {
   const session = await getItem<{ generation: string }>("deviceSession");
-  await storeCloudConnection(state, expected ? expected.generation : session?.generation);
+  await storeCloudConnection(state, expected ? expected.generation : session?.generation, expected?.connectionGeneration);
   if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
 }
 
@@ -75,7 +71,7 @@ export async function restoreCloud(code: string, userId?: string, resumeGenerati
   const remote = await vault("GET", undefined, account.user.id, resumeGeneration);
   if (!remote.envelope) throw new Error("No cloud copy exists yet. Use your exported backup or original device.");
   const data = await unseal(remote.envelope, account.key);
-  await commitCloudRestore(data, { userId: account.user.id, identityId: data.identity!.id, key: account.key, version: remote.version, dirty: false, lastSyncAt: remote.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(code), device?.generation, resumeGeneration);
+  await commitCloudRestore(data, { userId: account.user.id, identityId: data.identity!.id, key: account.key, version: remote.version, dirty: false, lastSyncAt: remote.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(code), device?.generation, resumeGeneration, code);
   if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
   return data;
 }

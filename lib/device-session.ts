@@ -1,5 +1,5 @@
-import { getItem, setItem, completeDeviceSession } from "./db";
-import { authClient, connect, readCloudState, restoreCloud } from "./cloud";
+import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut } from "./db";
+import { authClient, connect, restoreCloud } from "./cloud";
 import { checkCode } from "./crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
 import type { AppData } from "./types";
@@ -23,7 +23,7 @@ export async function finishDeviceSignOut(): Promise<void> {
     const status = await fetch("/api/cloud/status", { cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!status.ok) throw new Error("Could not confirm cloud sign-out. Drip is locked on this device; try again online.");
     const available = (await status.json()).available === true;
-    if (available || await readCloudState()) {
+    if (available || await hasCloudConnection()) {
       const result = await authClient.signOut({ fetchOptions: { timeout: 8000, retry: 0, headers: { "X-Drip-Signout": current.generation } } });
       if (result.error) throw new Error("Could not confirm cloud sign-out. Drip is locked on this device; try again online.");
     }
@@ -34,12 +34,14 @@ export async function finishDeviceSignOut(): Promise<void> {
   try { await promise; } finally { if (ending?.promise === promise) ending = undefined; }
 }
 export async function signOutDevice() {
-  // Lock first, including offline. Keep accounts, recovery verifier and queued revisions.
-  await setItem("deviceSession", { signedOut: true, remotePending: true, generation: crypto.randomUUID() } satisfies DeviceSession);
+  // Finish edits already accepted by the UI before dropping their encryption key.
+  await prepareLocalSignOut();
+  try { await setItem("deviceSession", { signedOut: true, remotePending: true, generation: crypto.randomUUID() } satisfies DeviceSession); }
+  catch (error) { cancelLocalSignOut(); throw error; }
   notifyDeviceSession();
   await finishDeviceSignOut();
 }
-export async function resumeDevice(code: string, verifier: { salt: string; hash: string }, data: AppData) {
+export async function resumeDevice(code: string, verifier: { salt: string; hash: string }, _data?: AppData) {
   const current = await readDeviceSession();
   if (!current?.signedOut) throw new Error("Device session changed. Try signing in again.");
   const root = await resolveRecoveryCode(code);
@@ -52,7 +54,7 @@ export async function resumeDevice(code: string, verifier: { salt: string; hash:
   if (!(await completeDeviceSession(current.generation, claimed))) throw new Error("Sign-out changed in another tab. Try signing in again.");
   notifyDeviceSession();
   try {
-    const cloud = await readCloudState();
+    const { data, state: cloud } = await unlockLocalVault(root);
     if (cloud && navigator.onLine) {
       const account = await connect(root, data, false, claimed.generation);
       if (account.user.id !== cloud.userId) throw new Error("That is not the connected cloud account.");
@@ -60,9 +62,23 @@ export async function resumeDevice(code: string, verifier: { salt: string; hash:
     if (!(await completeDeviceSession(claimed.generation, { ...claimed, signedOut: false }))) throw new Error("Sign-out changed in another tab. Try signing in again.");
     notifyDeviceSession();
   } catch (error) {
+    lockLocalVault();
     if (await completeDeviceSession(claimed.generation, { ...claimed, remotePending: true })) notifyDeviceSession();
     throw error;
   }
+}
+
+/** Unlock a fresh page without restoring over unsynced local records. */
+export async function unlockDevice(code: string) {
+  const verifier = await getItem<{ salt: string; hash: string }>("verifier");
+  const session = await readDeviceSession();
+  if (session?.signedOut) {
+    if (!verifier) throw new Error("Local recovery information is missing. Restore your cloud copy or encrypted backup.");
+    await resumeDevice(code, verifier); return;
+  }
+  const root = await resolveRecoveryCode(code);
+  await unlockLocalVault(root);
+  notifyDeviceSession();
 }
 
 /** Explicitly replace this device from another cloud account, only after UI confirmation. */

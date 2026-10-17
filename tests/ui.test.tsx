@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
+import { seedVault } from "./storage-fixtures";
 import Drip from "@/app/Drip";
 import Page from "@/app/page";
 import RootLayout, { metadata, viewport } from "@/app/layout";
@@ -20,8 +21,7 @@ function acct(o: Partial<Account> = {}): Account {
 }
 
 async function seed(d: Partial<AppData>, code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF") {
-  await saveData({ ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "devo", createdAt: "2026-10-15T00:00:00Z" }, ...d });
-  await setItem("verifier", await C.codeVerifier(code));
+  await seedVault({ ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "devo", createdAt: "2026-10-15T00:00:00Z" }, ...d }, code);
   return code;
 }
 
@@ -89,8 +89,7 @@ describe("onboarding", () => {
 
 describe("migration", () => {
   it("asks an existing install for a gamertag", async () => {
-    await saveData(emptyData());
-    await setItem("verifier", await C.codeVerifier("AAAA-BBBB-CCCC-DDDD-EEEE-FFFF"));
+    await seedVault(emptyData());
     render(<Drip />);
     expect(await screen.findByRole("heading", { name: "Pick your gamertag" })).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save gamertag" });
@@ -220,7 +219,7 @@ describe("backup", () => {
     expect(clickSpy).toHaveBeenCalled();
     const file = JSON.parse(await blob!.text());
     expect(file.app).toBe("drip");
-    expect((await loadData()).lastBackupAt).not.toBeNull();
+    await waitFor(async () => expect((await loadData()).lastBackupAt).not.toBeNull());
 
     // restore a different backup over it
     const other = await C.encryptBackup({ ...emptyData(), accounts: [acct({ provider: "Plum", label: "From backup" })] }, code, 100_000);
@@ -303,7 +302,7 @@ describe("app lock", () => {
     click("Turn on app lock");
     expect(await screen.findByText("App lock is on.")).toBeInTheDocument();
     expect((create.mock.calls[0] as any)[0].publicKey.user.name).toBe("devo");
-    expect((await loadData()).lock?.credentialId).toBe(credId);
+    await waitFor(async () => expect((await loadData()).lock?.credentialId).toBe(credId));
     click("Turn off app lock");
     expect(await screen.findByText("App lock is off.")).toBeInTheDocument();
   });

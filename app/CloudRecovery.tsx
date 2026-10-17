@@ -28,7 +28,7 @@ export function CloudSync({ hasData = false }: { hasData?: boolean }) {
   return message ? <p className="muted" role="status">{message}</p> : null;
 }
 
-export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false }: { onRestored: (d: AppData, code: string) => void; replaceExisting?: boolean; fromSignedOut?: boolean }) {
+export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false, codeLabel }: { onRestored: (d: AppData, code: string) => void; replaceExisting?: boolean; fromSignedOut?: boolean; codeLabel?: string }) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const [userId, setUserId] = useState<string>();
   async function run(passkey: boolean) {
@@ -52,7 +52,7 @@ export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut
     <h2>Already use Drip?</h2>
     <p className="muted">If you enabled cloud recovery, restore your encrypted accounts here. Your gamertag alone cannot recover them.</p>
     {!fromSignedOut && <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>}
-    <label htmlFor="cloud-return-code">{fromSignedOut ? "Other account recovery code" : "Recovery code"}</label>
+    <label htmlFor="cloud-return-code">{codeLabel ?? (fromSignedOut ? "Other account recovery code" : "Recovery code")}</label>
     <input id="cloud-return-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
     <p className="muted">{fromSignedOut ? "Use a code for the account you want to restore. This replaces the local accounts on this device." : "Your code is needed to decrypt your data on a new device, even after passkey sign-in. It can also recover your account without a passkey."}</p>
     <button className="btn" disabled={busy || !C.isValidCode(code)} onClick={() => run(false)}>{busy ? "Connecting…" : "Restore cloud accounts"}</button>
@@ -104,6 +104,18 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
       setCode(""); setMessage(await syncNow());
     } catch(e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
+  async function disconnect() {
+    setBusy(true); setMessage("");
+    try {
+      const device = await getItem<{ generation: string }>("deviceSession");
+      const state = await readCloudState();
+      if (!state) throw new Error("Cloud connection changed. Check its status before disconnecting.");
+      const result = await authClient.signOut({ fetchOptions: { headers: { "X-Drip-Disconnect": device?.generation ?? "initial", "X-Drip-Owner": state.userId } } });
+      if (result.error) throw new Error("Could not disconnect cloud recovery. Your connection and unsynced changes are kept; retry online.");
+      await writeCloudState(undefined, { generation: device?.generation, connectionGeneration: state.generation });
+      setEnabled(false); setMessage("Cloud disconnected on this device. Its encrypted local accounts and the saved cloud copy are kept.");
+    } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
+  }
   return <>
     <section className="panel" aria-label="Cloud recovery">
       <h2>Cloud recovery</h2>
@@ -116,7 +128,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
         </div>
         <details className="cloud-options"><summary>Device sign-in options</summary><div className="row-gap">
           <button className="btn ghost" disabled={busy || !available} onClick={addPasskey}>Add cloud sign-in passkey</button>
-          <button className="btn ghost" disabled={busy} onClick={async () => { const device = await getItem<{ generation: string }>("deviceSession"); await writeCloudState(undefined, { generation: device?.generation }); setEnabled(false); await authClient.signOut({ fetchOptions: { headers: { "X-Drip-Disconnect": device?.generation ?? "initial" } } }); setMessage("Cloud disconnected on this device. Its local accounts and the saved cloud copy are kept."); }}>Disconnect this device</button>
+          <button className="btn ghost" disabled={busy} onClick={disconnect}>Disconnect this device</button>
         </div>
         <label htmlFor="cloud-resume-code">Recovery code to renew sign-in</label>
         <input id="cloud-resume-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
@@ -125,7 +137,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
       </> : <>
         <label htmlFor="cloud-enable-code">Your saved recovery code</label>
         <input id="cloud-enable-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
-        <p className="muted">Enable cloud recovery only on a trusted device. This browser will retain a non-exportable encryption key so future changes can sync automatically.</p>
+        <p className="muted">Enable cloud recovery only on a trusted device. Keys stay in memory while Drip is unlocked. Reopening the app needs a recovery code; sync pauses while locked.</p>
         <button className="btn" disabled={busy || !available || !C.isValidCode(code)} onClick={enable}>{busy ? "Saving…" : "Enable encrypted cloud recovery"}</button>
       </>}
       {message && <p className="muted" role="status">{message}</p>}

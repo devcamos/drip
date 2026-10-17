@@ -69,7 +69,18 @@ describe("cloud recovery settings", () => {
     click("Sync now"); await screen.findByText("Encrypted cloud copy saved.");
     click("Disconnect this device");
     expect(await screen.findByText(/Cloud disconnected on this device/)).toBeInTheDocument();
-    expect(cloud.writeCloudState).toHaveBeenLastCalledWith(undefined, { generation: undefined });
+    expect(cloud.writeCloudState).toHaveBeenLastCalledWith(undefined, { generation: undefined, connectionGeneration: undefined });
+  });
+  it.each(["error-result", "rejected-request"])("keeps the connection when disconnect fails with %s", async failure => {
+    cloud.readCloudState.mockResolvedValue({ userId: "user", generation: "connected", dirty: true });
+    if (failure === "error-result") cloud.authClient.signOut.mockResolvedValue({ error: { message: "offline" } });
+    else cloud.authClient.signOut.mockRejectedValue(new Error("Network unavailable"));
+    await panel(); await screen.findByText(/Cloud recovery is connected/);
+    fireEvent.click(screen.getByText("Device sign-in options")); click("Disconnect this device");
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expect(cloud.writeCloudState).not.toHaveBeenCalled();
+    expect(screen.getByText(/Cloud recovery is connected/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cloud disconnected on this device/)).toBeNull();
   });
   it.each(["wrong-code", "remote-exists", "offline"])("handles %s without overwriting a cloud copy", async failure => {
     if (failure === "remote-exists") cloud.vault.mockResolvedValue({ version: 2 });

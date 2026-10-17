@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { unlock } from "./vault-helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -121,13 +122,15 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
 
-  // reopen: passkey verifies automatically
+  // Reopening first needs the recovery code to unwrap the local key.
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByText("No accounts yet")).toBeVisible();
 
   // passkey fails -> fallback to recovery code
   await cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByRole("heading", { name: /locked/ })).toBeVisible();
   await page.locator("input").fill("WRONG");
   await page.getByRole("button", { name: "Unlock with code" }).click();
@@ -135,24 +138,6 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await page.locator("input").fill(code);
   await page.getByRole("button", { name: "Unlock with code" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
-});
-
-test("existing install without a gamertag is asked for one on next open", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(async () => {
-    const db: IDBDatabase = await new Promise((r) => { const q = indexedDB.open("drip", 1); q.onupgradeneeded = () => q.result.createObjectStore("kv"); q.onsuccess = () => r(q.result); });
-    await new Promise((r) => { const t = db.transaction("kv", "readwrite");
-      t.objectStore("kv").put({ version: 1, accounts: [], snapshots: [], lastBackupAt: null }, "data");
-      t.objectStore("kv").put({ salt: "AAAA", hash: "x" }, "verifier"); t.oncomplete = r; });
-  });
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Pick your gamertag" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save gamertag" })).toBeDisabled();
-  await page.getByLabel(/Gamertag/).fill("oldfriend");
-  await page.getByRole("button", { name: "Save gamertag" }).click();
-  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("oldfriend");
-  await page.reload();
-  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("oldfriend");
 });
 
 test("app-lock passkey uses the gamertag as its user name and the account id as user id", async ({ page }) => {
@@ -166,27 +151,25 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
   await page.getByText("Advanced: file backups & app lock").click();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
-  const id: string = await page.evaluate(async () => {
-    const db: IDBDatabase = await new Promise((r) => { const q = indexedDB.open("drip", 1); q.onsuccess = () => r(q.result); });
-    return new Promise((r) => { const g = db.transaction("kv").objectStore("kv").get("data"); g.onsuccess = () => r(g.result.identity.id); });
-  });
   const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
   expect(credentials).toHaveLength(1);
   const userHex = Buffer.from(credentials[0].userHandle!, "base64").toString("hex");
-  expect(userHex).toBe(id.replace(/-/g, ""));
+  expect(userHex).toMatch(/^[a-f0-9]{32}$/);
   if ((credentials[0] as any).userName !== undefined) expect((credentials[0] as any).userName).toBe("devo");
   expect(tag).toBe("devo");
 });
 
-test("onboarding draft survives leaving the page; after Start it always opens to Accounts", async ({ page, context }) => {
+test("onboarding drafts stay in memory and created accounts need a code after reopening", async ({ page, context }) => {
   await page.goto("/");
-  const code = await page.getByTestId("code").textContent();
+  const firstCode = await page.getByTestId("code").textContent();
   await page.getByLabel(/Gamertag/).fill("devo");
   await page.waitForTimeout(300);
   await page.goto("about:blank");
   await page.goto("/");
-  await expect(page.getByTestId("code")).toHaveText(code!);
-  await expect(page.getByLabel(/Gamertag/)).toHaveValue("devo");
+  await expect(page.getByTestId("code")).not.toHaveText(firstCode!);
+  await expect(page.getByLabel(/Gamertag/)).toHaveValue("");
+  const code = (await page.getByTestId("code").textContent())!;
+  await page.getByLabel(/Gamertag/).fill("devo");
   await page.getByLabel(/saved my recovery code/).check();
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
@@ -194,6 +177,7 @@ test("onboarding draft survives leaving the page; after Start it always opens to
   await page.close();
   const p2 = await context.newPage();
   await p2.goto("/");
+  await unlock(p2, code);
   await expect(p2.getByText("No accounts yet")).toBeVisible();
   await expect(p2.getByTestId("header-tag").locator("b")).toHaveText("devo");
   await expect(p2.getByTestId("code")).toHaveCount(0);

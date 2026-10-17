@@ -43,6 +43,12 @@ async function deriveKey(code: string, salt: Uint8Array, iterations: number): Pr
 
 export interface BackupFile { app: "drip"; v: 1; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
 
+/** Shared by cloud recovery and the memory-only cloud key restored at local unlock. */
+export async function deriveCloudEncryptionKey(code: string): Promise<CryptoKey> {
+  if (!isValidCode(code)) throw new Error("Enter your complete recovery code.");
+  return deriveKey(code, enc.encode("drip-cloud-encryption-v1"), KDF_ITERATIONS);
+}
+
 export async function encryptBackup(data: unknown, code: string, iterations = KDF_ITERATIONS): Promise<BackupFile> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));

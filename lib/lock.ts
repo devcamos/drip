@@ -1,7 +1,7 @@
 /**
  * Optional app lock. A UI gate only: it stops casual access to the screens,
- * but data in IndexedDB is NOT encrypted by it. Anyone with device access and
- * developer tools could still read local data.
+ * and does not unwrap the local encryption key. The separate local vault needs
+ * a recovery code on a fresh page; this extra screen gate keeps its key in memory.
  */
 export const LOCK_AFTER_MS = 5 * 60 * 1000;
 
