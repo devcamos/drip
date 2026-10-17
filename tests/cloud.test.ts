@@ -3,7 +3,7 @@ const api = vi.hoisted(() => ({ getSession: vi.fn(), signIn: { email: vi.fn() },
 vi.mock("better-auth/client", () => ({ createAuthClient: () => api }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
 import * as cloud from "../lib/cloud";
-import { emptyData, getItem, loadData, saveData, cloudSnapshot, acknowledgeCloudUpload } from "../lib/db";
+import { emptyData, getItem, loadData, saveData, cloudSnapshot, acknowledgeCloudUpload, setItem } from "../lib/db";
 import { generateRecoveryCode } from "../lib/crypto";
 import type { AppData } from "../lib/types";
 
@@ -93,6 +93,14 @@ describe("versioned offline sync", () => {
     expect((await cloud.readCloudState())?.generation).toBe("new");
     await cloud.writeCloudState(undefined);
     expect(await acknowledgeCloudUpload(snapshot.state!, 2, "now")).toBe("changed");
+  });
+  it("pauses sync while signed out and does not upload if sign-out starts during encryption", async () => {
+    await configured(); await setItem("deviceSession", { signedOut: true, generation: "out" });
+    expect(await cloud.syncNow()).toContain("paused"); expect(api.getSession).not.toHaveBeenCalled();
+    await setItem("deviceSession", { signedOut: false, generation: "in" });
+    vi.stubGlobal("fetch", vi.fn(async () => { await setItem("deviceSession", { signedOut: true, generation: "out-again" }); return response({ version: 1 }); }));
+    expect(await cloud.syncNow()).toContain("paused"); expect(fetch).toHaveBeenCalledOnce();
+    await expect(cloud.restoreCloud(code)).rejects.toThrow(/Sign in before restoring/);
   });
   it("uploads an encrypted copy with its base version, then records success", async () => {
     await configured();

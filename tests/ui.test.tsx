@@ -408,3 +408,36 @@ describe("daily interest accounts", () => {
     click("By week");
   });
 });
+
+describe("sign-out", () => {
+  it("keeps accounts hidden across remount and reopens the local copy only with its code", async () => {
+    const code = await seed({ accounts: [acct()] });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
+    const first = render(<Drip />); await screen.findByText("Total balance");
+    click("Sign out");
+    expect(await screen.findByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(screen.queryByText("Rainy day pot")).toBeNull();
+    first.unmount(); render(<Drip />);
+    await screen.findByRole("heading", { name: "Drip is signed out" });
+    type(screen.getByLabelText("Recovery code"), "wrong"); click("Sign in");
+    expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
+    type(screen.getByLabelText("Recovery code"), code); click("Sign in");
+    expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
+    expect((await loadData()).accounts[0].balance).toBe(3000);
+  });
+  it("does not let delayed startup overwrite a sign-out from another tab", async () => {
+    await seed({ accounts: [acct()] });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
+    const db = await import("../lib/db"); const saved = await loadData();
+    let release!: (value: AppData) => void;
+    const spy = vi.spyOn(db, "loadData").mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    render(<Drip />);
+    await waitFor(() => expect(release).toBeDefined());
+    await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "from-another-tab" });
+    await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: "drip-session-notify" })); });
+    await screen.findByRole("heading", { name: "Drip is signed out" });
+    await act(async () => { release(saved); });
+    expect(screen.getByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(screen.queryByText("Rainy day pot")).toBeNull(); spy.mockRestore();
+  });
+});

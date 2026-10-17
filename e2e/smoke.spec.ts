@@ -37,7 +37,7 @@ test("onboarding shows a recovery code and gates Start", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Reroll/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · devo_1");
+  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("devo_1");
   await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByTestId("settings-tag")).toHaveText("devo_1");
@@ -150,9 +150,9 @@ test("existing install without a gamertag is asked for one on next open", async 
   await expect(page.getByRole("button", { name: "Save gamertag" })).toBeDisabled();
   await page.getByLabel(/Gamertag/).fill("oldfriend");
   await page.getByRole("button", { name: "Save gamertag" }).click();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · oldfriend");
+  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("oldfriend");
   await page.reload();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · oldfriend");
+  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("oldfriend");
 });
 
 test("app-lock passkey uses the gamertag as its user name and the account id as user id", async ({ page }) => {
@@ -195,7 +195,7 @@ test("onboarding draft survives leaving the page; after Start it always opens to
   const p2 = await context.newPage();
   await p2.goto("/");
   await expect(p2.getByText("No accounts yet")).toBeVisible();
-  await expect(p2.getByTestId("header-tag")).toHaveText("💧 Drip · devo");
+  await expect(p2.getByTestId("header-tag").locator("b")).toHaveText("devo");
   await expect(p2.getByTestId("code")).toHaveCount(0);
 });
 

@@ -36,9 +36,13 @@ export async function saveData(d: AppData): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const store = t.objectStore(STORE);
-    store.put(d, KEY);
-    const request = store.get("cloudState");
-    request.onsuccess = () => { if (request.result) store.put({ ...request.result, dirty: true, revision: request.result.revision + 1 }, "cloudState"); };
+    const gate = store.get("deviceSession");
+    gate.onsuccess = () => {
+      if (gate.result?.signedOut) return;
+      store.put(d, KEY);
+      const request = store.get("cloudState");
+      request.onsuccess = () => { if (request.result) store.put({ ...request.result, dirty: true, revision: request.result.revision + 1 }, "cloudState"); };
+    };
     t.oncomplete = () => { db.close(); resolve(); };
     t.onerror = () => { db.close(); reject(t.error); };
     t.onabort = () => { db.close(); reject(t.error); };
@@ -47,12 +51,12 @@ export async function saveData(d: AppData): Promise<void> {
 }
 
 /** Read account data and its upload revision from one consistent transaction. */
-export async function cloudSnapshot(): Promise<{ data: AppData; state: CloudState | undefined }> {
+export async function cloudSnapshot(): Promise<{ data: AppData; state: CloudState | undefined; signedOut: boolean }> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly"); const store = tx.objectStore(STORE);
-    const data = store.get(KEY); const state = store.get("cloudState");
-    tx.oncomplete = () => { db.close(); resolve({ data: data.result ?? emptyData(), state: state.result }); };
+    const data = store.get(KEY); const state = store.get("cloudState"); const gate = store.get("deviceSession");
+    tx.oncomplete = () => { db.close(); resolve({ data: data.result ?? emptyData(), state: state.result, signedOut: gate.result?.signedOut === true }); };
     tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
@@ -77,13 +81,19 @@ export async function acknowledgeCloudUpload(expected: CloudState, version: numb
 }
 
 /** A crash during recovery must not leave accounts without their verifier/key. */
-export async function commitCloudRestore(data: AppData, state: unknown, verifier: { salt: string; hash: string }): Promise<void> {
+export async function commitCloudRestore(data: AppData, state: unknown, verifier: { salt: string; hash: string }, expectedGeneration?: string, resumeGeneration?: string): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite"); const store = tx.objectStore(STORE);
-    store.put(data, KEY); store.put(state, "cloudState"); store.put(verifier, "verifier"); store.delete("onboardingDraft");
+    let failure: Error | undefined;
+    const gate = store.get("deviceSession");
+    gate.onsuccess = () => {
+      if ((gate.result?.signedOut && gate.result.generation !== resumeGeneration) || gate.result?.generation !== expectedGeneration) { failure = new Error("Device session changed. Sign in again before restoring."); tx.abort(); return; }
+      store.put(data, KEY); store.put(state, "cloudState"); store.put(verifier, "verifier"); store.delete("onboardingDraft");
+      if (resumeGeneration) store.put({ signedOut: false, remotePending: false, generation: crypto.randomUUID() }, "deviceSession");
+    };
     tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(failure ?? tx.error); };
   });
 }
 
@@ -93,4 +103,31 @@ export function isAppData(x: unknown): x is AppData {
   return !!d && d.version === 1 && Array.isArray(d.accounts) && Array.isArray(d.snapshots) &&
     (d.projection === undefined || (!!d.projection && Number.isFinite(d.projection.monthlyDeposit) && d.projection.monthlyDeposit >= 0 && d.projection.monthlyDeposit <= 1_000_000 && [1, 3, 5].includes(d.projection.years))) &&
     (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => typeof a.id === "string" && typeof a.balance === "number" && typeof a.ratePct === "number");
+}
+
+/** A delayed sign-out/sign-in must not overwrite a newer device session. */
+export async function completeDeviceSession(generation: string, value: unknown): Promise<boolean> {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite"); const store = tx.objectStore(STORE); let changed = false;
+    const request = store.get("deviceSession");
+    request.onsuccess = () => { if (request.result?.generation === generation) { store.put(value, "deviceSession"); changed = true; } };
+    tx.oncomplete = () => { db.close(); resolve(changed); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+  });
+}
+
+/** Prevent delayed connection setup/disconnect from crossing sign-out or resume. */
+export async function storeCloudConnection(state: CloudState | undefined, expectedGeneration?: string): Promise<void> {
+  const db = await open();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite"); const store = tx.objectStore(STORE); let failure: Error | undefined;
+    const gate = store.get("deviceSession");
+    gate.onsuccess = () => {
+      if (gate.result?.signedOut || gate.result?.generation !== expectedGeneration) { failure = new Error("Device session changed. Sign in again before connecting cloud recovery."); tx.abort(); return; }
+      store.put(state, "cloudState");
+    };
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(failure ?? tx.error); };
+  });
 }

@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { AppData } from "@/lib/types";
+import { restoreOtherAccount } from "@/lib/device-session";
+import { getItem } from "@/lib/db";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
 import * as C from "@/lib/crypto";
 import { authClient, connect, readCloudState, restoreCloud, syncNow, vault, writeCloudState } from "@/lib/cloud";
@@ -26,7 +28,7 @@ export function CloudSync({ hasData = false }: { hasData?: boolean }) {
   return message ? <p className="muted" role="status">{message}</p> : null;
 }
 
-export function CloudReturn({ onRestored, replaceExisting = false }: { onRestored: (d: AppData, code: string) => void; replaceExisting?: boolean }) {
+export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false }: { onRestored: (d: AppData, code: string) => void; replaceExisting?: boolean; fromSignedOut?: boolean }) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const [userId, setUserId] = useState<string>();
   async function run(passkey: boolean) {
@@ -41,7 +43,7 @@ export function CloudReturn({ onRestored, replaceExisting = false }: { onRestore
       } else {
         if (replaceExisting && !confirm("Replace this device's accounts with the cloud copy? Export a local backup first if you have unsynced changes.")) return;
         const root = await resolveRecoveryCode(code);
-        const data = await restoreCloud(root, userId);
+        const data = fromSignedOut ? await restoreOtherAccount(root) : await restoreCloud(root, userId);
         await onRestored(data, root); setCode("");
       }
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
@@ -49,10 +51,10 @@ export function CloudReturn({ onRestored, replaceExisting = false }: { onRestore
   return <section className="panel" aria-label="Return to your cloud account">
     <h2>Already use Drip?</h2>
     <p className="muted">If you enabled cloud recovery, restore your encrypted accounts here. Your gamertag alone cannot recover them.</p>
-    <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>
-    <label htmlFor="cloud-return-code">Recovery code</label>
+    {!fromSignedOut && <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>}
+    <label htmlFor="cloud-return-code">{fromSignedOut ? "Other account recovery code" : "Recovery code"}</label>
     <input id="cloud-return-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
-    <p className="muted">Your code is needed to decrypt your data on a new device, even after passkey sign-in. It can also recover your account without a passkey.</p>
+    <p className="muted">{fromSignedOut ? "Use a code for the account you want to restore. This replaces the local accounts on this device." : "Your code is needed to decrypt your data on a new device, even after passkey sign-in. It can also recover your account without a passkey."}</p>
     <button className="btn" disabled={busy || !C.isValidCode(code)} onClick={() => run(false)}>{busy ? "Connecting…" : "Restore cloud accounts"}</button>
     {message && <p role="status" className="muted">{message}</p>}
   </section>;
@@ -71,12 +73,13 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
   async function enable() {
     setBusy(true); setMessage("");
     try {
+      const device = await getItem<{ generation: string }>("deviceSession");
       const root = await resolveRecoveryCode(code);
       if (!(await C.checkCode(root, verifier))) throw new Error("That isn't your recovery code.");
       const account = await connect(root, data, true);
       const remote = await vault("GET", undefined, account.user.id);
       if (remote.version > 0) throw new Error("This account already has a cloud copy. Export your local backup, then restore the cloud copy below to avoid overwriting it.");
-      await writeCloudState({ userId: account.user.id, identityId: data.identity!.id, key: account.key, version: 0, dirty: true, lastSyncAt: null, generation: crypto.randomUUID(), revision: 0 });
+      await writeCloudState({ userId: account.user.id, identityId: data.identity!.id, key: account.key, version: 0, dirty: true, lastSyncAt: null, generation: crypto.randomUUID(), revision: 0 }, { generation: device?.generation });
       setEnabled(true);
       setMessage(await syncNow()); setCode("");
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
@@ -113,7 +116,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
         </div>
         <details className="cloud-options"><summary>Device sign-in options</summary><div className="row-gap">
           <button className="btn ghost" disabled={busy || !available} onClick={addPasskey}>Add cloud sign-in passkey</button>
-          <button className="btn ghost" disabled={busy} onClick={async () => { await writeCloudState(undefined); setEnabled(false); await authClient.signOut(); setMessage("Cloud disconnected on this device. Its local accounts and the saved cloud copy are kept."); }}>Disconnect this device</button>
+          <button className="btn ghost" disabled={busy} onClick={async () => { const device = await getItem<{ generation: string }>("deviceSession"); await writeCloudState(undefined, { generation: device?.generation }); setEnabled(false); await authClient.signOut({ fetchOptions: { headers: { "X-Drip-Disconnect": device?.generation ?? "initial" } } }); setMessage("Cloud disconnected on this device. Its local accounts and the saved cloud copy are kept."); }}>Disconnect this device</button>
         </div>
         <label htmlFor="cloud-resume-code">Recovery code to renew sign-in</label>
         <input id="cloud-resume-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />

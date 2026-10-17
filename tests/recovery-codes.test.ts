@@ -41,7 +41,7 @@ describe("six alternative recovery codes", () => {
     expect(await getItem("recoveryRecords")).toEqual(records);
     vi.mocked(fetch).mockResolvedValue(Response.json({ saved: true }));
     expect(await registerRecoveryCodes([], "owner")).toBe(true);
-    expect(await getItem("recoveryRecords")).toEqual([]);
+    expect(await getItem("recoveryRecords")).toEqual(records);
     vi.spyOn(db, "setItem").mockRejectedValueOnce(new Error("quota"));
     expect(await registerRecoveryCodes([], "owner")).toBe(false);
     expect(vi.mocked(fetch).mock.lastCall![1]?.headers).toMatchObject({ "X-Drip-Owner": "owner" });

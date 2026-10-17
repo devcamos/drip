@@ -24,3 +24,45 @@ it("permits verified workers and rechecks after the controller changes", async (
   await expect(safeFetch("/api/cloud")).rejects.toThrow();
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+
+it("blocks private requests when signed out and permits only explicit recovery-code resume", async () => {
+  const { setItem } = await import("../lib/db");
+  await setItem("deviceSession", { signedOut: true, generation: "out" });
+  const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  await expect(safeFetch("/api/cloud")).rejects.toThrow(/signed out/);
+  await expect(safeFetch("/api/auth/sign-in/email", { method: "POST" })).rejects.toThrow(/signed out/);
+  await safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Resume": "out" } });
+  await safeFetch(new Request("http://drip.local/api/auth/sign-out", { method: "POST" }));
+  await safeFetch(new URL("http://drip.local/api/cloud/status"));
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+it("serializes private requests with sign-out through the browser's shared lock", async () => {
+  const { setItem } = await import("../lib/db");
+  let tail: Promise<unknown> = Promise.resolve();
+  const request = vi.fn((_name: string, run: () => Promise<Response>) => { const next = tail.then(run, run); tail = next.catch(() => {}); return next; });
+  vi.stubGlobal("navigator", { locks: { request } });
+  let finish!: (response: Response) => void;
+  const fetcher = vi.fn().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue(new Response("out"));
+  vi.stubGlobal("fetch", fetcher);
+  const signingIn = safeFetch("/api/auth/sign-in/email", { method: "POST" });
+  await vi.waitFor(() => expect(finish).toBeDefined());
+  await setItem("deviceSession", { signedOut: true, generation: "out" });
+  const signingOut = safeFetch("/api/auth/sign-out", { method: "POST" });
+  expect(fetcher).toHaveBeenCalledOnce();
+  finish(new Response("in")); await signingIn; await signingOut;
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenCalledWith("drip-private-session", expect.any(Function));
+});
+
+it("ignores delayed sign-out from an old tab after another tab has resumed", async () => {
+  const { setItem } = await import("../lib/db");
+  await setItem("deviceSession", { signedOut: false, generation: "new" });
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const response = await safeFetch("/api/auth/sign-out", { method: "POST", headers: { "X-Drip-Signout": "old" } });
+  expect(await response.json()).toMatchObject({ stale: true });
+  await setItem("deviceSession", { signedOut: true, generation: "claimed-before-auth" });
+  await safeFetch("/api/auth/sign-out", { method: "POST", headers: { "X-Drip-Signout": "old" } });
+  await safeFetch("/api/auth/sign-out", { method: "POST", headers: { "X-Drip-Disconnect": "old" } });
+  await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Resume": "old" } })).rejects.toThrow(/session changed/);
+  expect(fetcher).not.toHaveBeenCalled();
+});

@@ -62,14 +62,14 @@ describe("cloud recovery settings", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Enable encrypted cloud recovery" })).toBeEnabled());
     click("Enable encrypted cloud recovery");
     expect(await screen.findByText("Encrypted cloud copy saved.")).toBeInTheDocument();
-    expect(cloud.writeCloudState).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", dirty: true }));
+    expect(cloud.writeCloudState).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", dirty: true }), { generation: undefined });
     cloud.readCloudState.mockResolvedValue({ userId: "user" });
     fireEvent.click(screen.getByText("Device sign-in options")); click("Add cloud sign-in passkey");
     expect(await screen.findByText(/Cloud sign-in passkey saved/)).toBeInTheDocument();
     click("Sync now"); await screen.findByText("Encrypted cloud copy saved.");
     click("Disconnect this device");
     expect(await screen.findByText(/Cloud disconnected on this device/)).toBeInTheDocument();
-    expect(cloud.writeCloudState).toHaveBeenLastCalledWith(undefined);
+    expect(cloud.writeCloudState).toHaveBeenLastCalledWith(undefined, { generation: undefined });
   });
   it.each(["wrong-code", "remote-exists", "offline"])("handles %s without overwriting a cloud copy", async failure => {
     if (failure === "remote-exists") cloud.vault.mockResolvedValue({ version: 2 });

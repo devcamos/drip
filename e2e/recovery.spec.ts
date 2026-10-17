@@ -19,10 +19,10 @@ async function withAuthRetry(page: Page, action: () => Promise<void>, success: L
   } finally { page.off("response", observe); }
 }
 
-async function setup(page: Page) {
+async function setup(page: Page, handle = "recoverytest") {
   await page.goto("/");
   const code = (await page.getByTestId("code").textContent())!.trim();
-  await page.getByLabel(/Gamertag/).fill("recoverytest");
+  await page.getByLabel(/Gamertag/).fill(handle);
   await page.getByLabel(/saved my recovery code/).check();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.getByRole("button", { name: "Add account", exact: true }).click();
@@ -178,4 +178,80 @@ test("mobile Trends shows recorded and estimated balances with editable assumpti
   await page.getByText("View chart figures").click();
   await expect(page.getByRole("table")).toBeVisible();
   await expect(page.getByRole("cell", { name: "Estimate", exact: true })).toHaveCount(0);
+});
+
+test("sign-out survives reload, locks other tabs and preserves local-only accounts", async ({ page, context }) => {
+  const code = await setup(page);
+  const other = await context.newPage(); await other.goto("/");
+  await expect(other.getByText("Total balance")).toBeVisible();
+  page.on("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(other.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(page.getByText("£3,000.00")).toHaveCount(0);
+  await page.getByLabel("Recovery code", { exact: true }).fill("wrong");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
+  await page.getByLabel("Recovery code", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByText("£3,000.00").first()).toBeVisible();
+  await expect(other.getByText("Total balance")).toBeVisible(); await other.close();
+});
+
+test("offline sign-out keeps queued top-ups and online sign-out revokes the server session", async ({ page, context }) => {
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  test.setTimeout(120_000);
+  const code = await setup(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByLabel("Your saved recovery code").fill(code);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("button", { name: /Zopa/ }).click();
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Top up", exact: true }).click();
+  await page.getByLabel("amount", { exact: true }).fill("200");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".bal")).toHaveText("£3,200.00");
+  let warned = false;
+  page.on("dialog", async dialog => { warned ||= dialog.message().includes("unsynced changes"); await dialog.accept(); });
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  expect(warned).toBe(true);
+  await expect(page.getByText(/not yet confirmed/)).toBeVisible();
+  await page.reload();
+  await page.getByLabel("Recovery code", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("£3,200.00").first()).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  await page.getByLabel("Recovery code", { exact: true }).fill(code);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Sign in", exact: true }).click(), page.getByText("Total balance"));
+  await expect(page.getByText("£3,200.00").first()).toBeVisible();
+});
+
+test("signed-out users can restore rampage201 instead of reopening the current profile", async ({ page, browser }) => {
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  test.setTimeout(120_000);
+  const original = await browser.newContext(); let recovery: string;
+  try {
+    const originalPage = await original.newPage(); recovery = await setup(originalPage, "rampage201");
+    await originalPage.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+    await originalPage.getByLabel("Your saved recovery code").fill(recovery);
+    await withAuthRetry(originalPage, () => originalPage.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), originalPage.getByText("Encrypted cloud copy saved.").first());
+  } finally { await original.close(); }
+  await setup(page, "newprofile");
+  page.on("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByText("Use another account", { exact: true }).click();
+  await page.getByLabel("Other account recovery code", { exact: true }).fill(recovery!);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByText("Total balance"));
+  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
+  await expect(page.getByText("£3,000.00").first()).toBeVisible();
+  await page.reload(); await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
 });

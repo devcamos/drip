@@ -1,18 +1,19 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, AppData, Frequency, RateType } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
-import { emptyData, getItem, isAppData, loadData, saveData, setItem } from "@/lib/db";
+import { commitCloudRestore, emptyData, getItem, isAppData, loadData, saveData } from "@/lib/db";
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
-import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
+import { loadDraft, saveDraft } from "@/lib/draft";
 import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
 import { PwaStatus } from "./PwaStatus";
+import { SignOutButton, SignedOut } from "./DeviceSession";
+import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
 import { Trends } from "./Trends";
 import { downloadRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
-import { writeCloudState } from "@/lib/cloud";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -30,6 +31,9 @@ export default function Drip() {
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
   const [deferred, setDeferred] = useState<any>(null);
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
+  const [signedOut, setSignedOut] = useState<boolean | null>(null);
+  const loadSequence = useRef(0);
+  const signedOutRef = useRef<boolean | null>(null);
   const [locked, setLocked] = useState(false);
   const lockOn = !!data?.lock?.credentialId;
   useEffect(() => {
@@ -44,14 +48,19 @@ export default function Drip() {
   }, [data, lockOn]);
 
   useEffect(() => {
+    const sequence = ++loadSequence.current;
     (async () => {
+      const session = await readDeviceSession();
       let loaded = await loadData();
       const t0 = today();
       const accrued = loaded.accounts.map((a) => M.applyDailyAccrual(a, t0));
-      if (accrued.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts: accrued }; await saveData(loaded); }
-      setData(loaded);
-      if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
-      setVerifier((await getItem<Verifier>("verifier")) ?? null);
+      if (!session?.signedOut && accrued.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts: accrued }; await saveData(loaded); }
+      const savedVerifier = (await getItem<Verifier>("verifier")) ?? null;
+      const latest = await readDeviceSession();
+      if (sequence === loadSequence.current) {
+        setData(loaded); signedOutRef.current = !!latest?.signedOut; setSignedOut(!!latest?.signedOut); setVerifier(savedVerifier);
+        if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
+      }
       if (navigator.storage?.persist) {
         const already = await navigator.storage.persisted?.();
         if (!already) await navigator.storage.persist();
@@ -65,6 +74,33 @@ export default function Drip() {
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const session = await readDeviceSession();
+      const next = !!session?.signedOut;
+      if (!active || next === signedOutRef.current) return;
+      signedOutRef.current = next;
+      const sequence = ++loadSequence.current;
+      if (next) {
+        setSignedOut(true); setView({ name: "home" });
+        const [loaded, savedVerifier] = await Promise.all([loadData(), getItem<Verifier>("verifier")]);
+        if (active && sequence === loadSequence.current) { setData(loaded); setVerifier(savedVerifier ?? null); }
+        return;
+      }
+      let loaded = await loadData();
+      const accounts = loaded.accounts.map(a => M.applyDailyAccrual(a, today()));
+      if (accounts.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts }; await saveData(loaded); }
+      const savedVerifier = (await getItem<Verifier>("verifier")) ?? null;
+      if (active && sequence === loadSequence.current && signedOutRef.current === false) { setData(loaded); setVerifier(savedVerifier); setSignedOut(false); setView({ name: "home" }); }
+
+    };
+    const stored = (event: StorageEvent) => { if (event.key === "drip-session-notify") refresh(); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("drip-session-changed", refresh); window.addEventListener("storage", stored); document.addEventListener("visibilitychange", visible);
+    return () => { active = false; window.removeEventListener("drip-session-changed", refresh); window.removeEventListener("storage", stored); document.removeEventListener("visibilitychange", visible); };
+  }, []);
+
   const update = useCallback(async (fn: (d: AppData) => AppData) => {
     setData((prev) => {
       const next = fn(prev ?? emptyData());
@@ -74,12 +110,13 @@ export default function Drip() {
     });
   }, []);
 
-  if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
-  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud = false) => {
-    await setItem("verifier", v); await clearDraft(); setVerifier(v); setView({ name: "home" });
+  if (!data || verifier === undefined || signedOut === null) return <main><p className="muted">Loading…</p></main>;
+  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud = false, expectedGeneration) => {
     const d = restored ? fromCloud ? restored : { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
-    if (!fromCloud) { await writeCloudState(undefined); await saveData(d); } setData(d);
+    if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration);
+    setVerifier(v); setView({ name: "home" }); setData(d);
   }} />;
+  if (signedOut) return <SignedOut data={data} verifier={verifier} onSignedIn={() => setLocked(false)} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
     <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); setData(d); }} cta="Save gamertag" /></div></main>;
@@ -116,15 +153,15 @@ export default function Drip() {
     }} />;
   } else if (view.name === "trends") body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
   else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
-    onCloudRestored={async (d, code) => { const v = await C.codeVerifier(code); await setItem("verifier", v); setVerifier(v); setData(d); }}
+    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); setData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d, code) => { await writeCloudState(undefined); const v = await C.codeVerifier(code); await setItem("verifier", v); setVerifier(v); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await saveData(n); setData(n); }} />;
+    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); setData(n); }} />;
   else body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
 
   return (
     <>
-      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -152,7 +189,7 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Iden
   );
 }
 
-function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean) => void }) {
+function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string) => void | Promise<void> }) {
   const [draft, setDraft] = useState<{ handle: string; code: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
   useEffect(() => {
@@ -183,13 +220,13 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
             <input type="checkbox" style={{ width: "auto" }} checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I&apos;ve saved my recovery code somewhere safe
           </label>
           <div className="row-gap">
-            <button className="btn" disabled={!saved || !identity} onClick={async () => onDone(await C.codeVerifier(code), undefined, identity!)}>Start</button>
+            <button className="btn" disabled={!saved || !identity} onClick={async () => { const device = await readDeviceSession(); await onDone(await C.codeVerifier(code), undefined, identity!, false, device?.generation); }}>Start</button>
             <button className="btn ghost" onClick={() => setMode("restore")}>Restore a backup</button>
           </div>
         </div>
       ) : (
         <div className="panel"><h2>Restore a backup</h2>
-          <Restore onRestored={async (d, c) => onDone(await C.codeVerifier(c), d)} />
+          <Restore onRestored={async (d, c, g) => onDone(await C.codeVerifier(c), d, undefined, false, g)} />
           <div className="row-gap"><button className="btn ghost" onClick={() => setMode("new")}>Back</button></div>
         </div>
       )}
@@ -373,7 +410,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string) => void; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void }) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void }) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (
@@ -422,7 +459,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
       <div className="panel"><h2 style={{ marginTop: 0 }}>Restore</h2>
         <p className="muted">Replaces everything on this device with the backup.</p>
         <p className="muted">Importing a file disconnects cloud recovery on this device to prevent uploading a different account&apos;s data.</p>
-        <Restore onRestored={(d, c) => { if (confirm("Replace all data on this device with this backup? Cloud recovery will be disconnected on this device.")) onRestore(d, c); }} />
+        <Restore onRestored={async (d, c, g) => { if (confirm("Replace all data on this device with this backup? Cloud recovery will be disconnected on this device.")) await onRestore(d, c, g); }} />
       </div>
       {lockPanel}
       </details>
@@ -437,7 +474,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   );
 }
 
-function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => void }) {
+function Restore({ onRestored }: { onRestored: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void> }) {
   const [file, setFile] = useState<File | null>(null); const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   return (
     <>
@@ -446,10 +483,12 @@ function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => voi
       <div className="row-gap"><button className="btn" disabled={!file || !code || busy} onClick={async () => {
         setBusy(true); setErr("");
         try {
+          const device = await readDeviceSession();
+          if (device?.signedOut) throw new Error("Sign in before restoring accounts.");
           const root = await resolveRecoveryCode(code);
           const d = await C.decryptBackup(JSON.parse(await file!.text()), root);
           if (!isAppData(d)) throw new C.BackupError("The backup's contents aren't valid.");
-          onRestored(M.migrateData(d, today()), root);
+          await onRestored(M.migrateData(d, today()), root, device?.generation);
         } catch (e) { setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
         finally { setBusy(false); }
       }}>{busy ? "Decrypting…" : "Restore"}</button></div>

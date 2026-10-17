@@ -40,3 +40,11 @@ Replacing a set atomically removes its server lookups; this is not key revocatio
 The old storage/fortnightly backup nags are replaced with local-only, queued or cloud-saved status. File backups, imports and app lock remain under Advanced. The onboarding original code also has a download action.
 
 Trends plots recorded month-end snapshots, a Today marker, and dashed future estimates. No history is invented. The 3m/6m/1y/Max/Future controls filter the chart. Projection assumptions (monthly top-up and 1/3/5-year horizon) are saved with account data and included in encrypted recovery. Existing balances compound at their current annual rate divided by twelve; planned month-end top-ups use the current weighted rate. The baseline shows today's balance plus planned top-ups, not historical cost basis. Labels explain tax/fee/return limits; an accessible table provides the chart values.
+
+## Sign out
+
+Use **Sign out** beside your gamertag. It locks Drip on this device, pauses cloud sync and ends the cloud session when connected. Local accounts, encryption keys and queued revisions are retained; this is a screen gate, not encryption or removal of the local database. Enter an original or previously cached recovery code to reopen local data offline. Online return renews the matching cloud session without restoring over pending changes. Newly used alternative codes require online lookup.
+
+Offline/failed cloud revocation stays visibly pending, retries on reconnect, and offers Retry cloud sign-out. Reload and other tabs keep the gate. Private requests and sign-out use the browser's shared Web Lock where available (per-tab queue fallback); generation checks reject stale sign-in/sign-out and restore completion. File/cloud restores commit data, verifier and connection atomically only while the initiating device session remains active. Sign-out does not delete the cloud account or cloud copy.
+
+From the signed-out screen, **Use another account** restores an existing cloud account using its recovery code, after confirmation that this replaces the local accounts. A failed restore keeps the previous copy intact. The new account's data, verifier, encryption key and active device generation commit together. Cancelling the prompt leaves the device signed out.

@@ -33,7 +33,7 @@ export async function resolveRecoveryCode(code: string): Promise<string> {
 export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: string) {
   const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }) });
   if (!response.ok) throw new Error("Could not save recovery codes. Your existing codes still work. Sign in again and retry.");
-  try { await setItem("recoveryRecords", records); return true; } catch { return false; }
+  try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !records.some(record => record.locator === old.locator)), ...records].slice(-12)); return true; } catch { return false; }
 }
 export function downloadRecoveryCodes(codes: string[], handle?: string) {
   const content = `DRIP RECOVERY CODES\n${handle ? `Gamertag: ${handle}\n` : ""}\n${codes.map((code, i) => `${i + 1}. ${code}`).join("\n")}\n\nKeep this file private, away from your device. Anyone with one code can recover your encrypted cloud accounts.\nEach code can be reused. Your gamertag alone cannot recover your data.\nCloud recovery must be enabled first. Otherwise your original code only unlocks encrypted file backups. Codes recover the latest successfully synced cloud copy; offline changes must sync first.\n`;
