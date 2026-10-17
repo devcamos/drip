@@ -1,4 +1,5 @@
 import type { Identity } from "./identity";
+export interface CloudState { userId: string; key: CryptoKey; version: number; dirty: boolean; lastSyncAt: string | null; identityId: string; generation: string; revision: number }
 export type Frequency = "daily" | "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
 

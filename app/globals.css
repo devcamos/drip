@@ -25,7 +25,9 @@ h1 { font-size: 28px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 20px 0 
 .btn:disabled { opacity:.5; }
 label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
 input, select { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; }
-.grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+input, select { min-width:0; }
+summary { cursor:pointer; font-weight:700; }
 .stat { background:var(--panel); border-radius:14px; padding:14px; } .stat .v { font-size:20px; font-weight:700; margin-top:4px; }
 .bars { display:flex; align-items:flex-end; gap:4px; height:140px; margin-top:12px; }
 .bars div { flex:1; background: var(--accent); border-radius:4px 4px 0 0; min-height:2px; opacity:.85; }

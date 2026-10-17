@@ -95,12 +95,12 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   await p2.goto("/");
   await p2.getByRole("button", { name: "Restore a backup" }).click();
   await p2.locator('input[type="file"]').setInputFiles(file);
-  const codeInput = p2.locator("input").nth(1);
+  const codeInput = p2.getByLabel("Restore recovery code");
   await codeInput.fill(code.slice(0, -1) + (code.endsWith("A") ? "B" : "A"));
-  await p2.getByRole("button", { name: "Restore" }).click();
+  await p2.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(p2.getByText(/Wrong recovery code/)).toBeVisible();
   await codeInput.fill(code);
-  await p2.getByRole("button", { name: "Restore" }).click();
+  await p2.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(p2.getByText("Rainy day pot")).toBeVisible();
   await expect(p2.getByTestId("header-tag")).toContainText(tag!); // gamertag restored from backup
   await expect(p2.getByText("£3,300.00").first()).toBeVisible();

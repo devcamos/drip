@@ -7,6 +7,9 @@ import { emptyData, getItem, isAppData, loadData, saveData, setItem } from "@/li
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
+import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
+import { PwaStatus } from "./PwaStatus";
+import { writeCloudState } from "@/lib/cloud";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -52,7 +55,6 @@ export default function Drip() {
         setPersisted(already || (await navigator.storage.persist()));
       }
     })();
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (!standalone && ios) setInstallHint("ios");
@@ -71,10 +73,10 @@ export default function Drip() {
   }, []);
 
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
-  if (verifier === null) return <Onboarding onDone={async (v, restored, identity) => {
+  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud = false) => {
     await setItem("verifier", v); await clearDraft(); setVerifier(v); setView({ name: "home" });
-    const d = restored ? { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
-    await saveData(d); setData(d);
+    const d = restored ? fromCloud ? restored : { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
+    if (!fromCloud) { await writeCloudState(undefined); await saveData(d); } setData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
@@ -87,7 +89,7 @@ export default function Drip() {
       {installHint && !dismissed.install && (
         <div className="banner info">
           {installHint === "ios"
-            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. This also stops Safari clearing your data.</span>
+            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. Keep cloud recovery or exported backups too; installation alone doesn&apos;t guarantee data retention.</span>
             : <span>Install Drip on this device to keep your data safe.</span>}
           {installHint === "android" && deferred && <button className="btn small" onClick={async () => { deferred.prompt(); setDeferred(null); setInstallHint(null); }}>Install</button>}
           <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, install: true })}>✕</button>
@@ -98,7 +100,7 @@ export default function Drip() {
           <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, persist: true })}>✕</button></div>
       )}
       {M.backupDue(data.lastBackupAt, data.accounts.length > 0, new Date()) && !dismissed.backup && (
-        <div className="banner warn"><span>{data.lastBackupAt ? "It's been over 2 weeks since your last backup." : "You haven't backed up yet."} Your data only lives on this device.</span>
+        <div className="banner warn"><span>{data.lastBackupAt ? "It's been over 2 weeks since your last backup." : "You haven't backed up yet."} Keep an exported backup as well as any cloud copy.</span>
           <button className="btn small" onClick={() => setView({ name: "settings" })}>Back up</button></div>
       )}
     </>
@@ -119,14 +121,15 @@ export default function Drip() {
     }} />;
   } else if (view.name === "trends") body = <Trends data={data} />;
   else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
+    onCloudRestored={async (d, code) => { const v = await C.codeVerifier(code); await setItem("verifier", v); setVerifier(v); setData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d) => { const n = { ...d, lastBackupAt: new Date().toISOString() }; await saveData(n); setData(n); }} />;
+    onRestore={async (d, code) => { await writeCloudState(undefined); const v = await C.codeVerifier(code); await setItem("verifier", v); setVerifier(v); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await saveData(n); setData(n); }} />;
   else body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
 
   return (
     <>
-      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div>{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div><PwaStatus /><CloudSync />{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -154,7 +157,7 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Iden
   );
 }
 
-function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity) => void }) {
+function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean) => void }) {
   const [draft, setDraft] = useState<{ handle: string; code: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
   useEffect(() => {
@@ -170,7 +173,9 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
   return (
     <main>
       <h1>Welcome to Drip 💧</h1>
-      <p className="muted">See what your savings and investments earn, and when it lands. Everything stays on this device. No email, no sign-up.</p>
+      <PwaStatus />
+      <p className="muted">See what your savings and investments earn, and when it lands. Start on this device, then enable encrypted cloud recovery in Backup. No real name or email needed.</p>
+      <CloudReturn onRestored={async (d, c) => onDone(await C.codeVerifier(c), d, undefined, true)} />
       {mode === "new" ? (
         <div className="panel">
           <h2>Your gamertag</h2>
@@ -413,7 +418,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData) => void; onLock: (l: AppData["lock"]) => void }) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string) => void; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void }) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (
@@ -435,7 +440,8 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
   return (
     <>
       <h1>Backup &amp; security</h1>
-      <p className="muted">Your data lives only on this device. A backup is an encrypted file locked with your recovery code. Save it to Files or iCloud Drive.</p>
+      <p className="muted">Local accounts work offline. Enable cloud recovery for a copy you can restore on another device, and keep an encrypted file backup too.</p>
+      <CloudPanel data={data} verifier={verifier} onRestored={onCloudRestored} />
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
         <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
@@ -457,7 +463,8 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
       </div>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Restore</h2>
         <p className="muted">Replaces everything on this device with the backup.</p>
-        <Restore onRestored={(d) => { if (confirm("Replace all data on this device with this backup?")) onRestore(d); }} />
+        <p className="muted">Importing a file disconnects cloud recovery on this device to prevent uploading a different account&apos;s data.</p>
+        <Restore onRestored={(d, c) => { if (confirm("Replace all data on this device with this backup? Cloud recovery will be disconnected on this device.")) onRestore(d, c); }} />
       </div>
       {lockPanel}
       {data.identity && (

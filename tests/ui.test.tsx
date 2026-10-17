@@ -50,7 +50,7 @@ describe("onboarding", () => {
     expect(screen.getByText("Only letters, numbers and underscore.")).toBeInTheDocument();
     type(handle, "devo");
     expect(screen.getByTestId("tag-preview")).toHaveTextContent("You'll be devo");
-    vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { clipboard: { writeText: vi.fn() } }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn() } });
     click("Copy");
     click("Start");
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();

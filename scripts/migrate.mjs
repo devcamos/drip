@@ -1,0 +1,25 @@
+import { getMigrations } from "better-auth/db/migration";
+import { passkey } from "@better-auth/passkey";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import WebSocket from "ws";
+import { HttpsProxyAgent } from "https-proxy-agent";
+
+if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET || !process.env.BETTER_AUTH_URL) throw new Error("Configure the target environment before migrating.");
+neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
+  ? class extends WebSocket { constructor(address, protocols) { super(address, protocols, { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) }); } }
+  : WebSocket;
+const db = new Pool({ connectionString: process.env.DATABASE_URL });
+const options = {
+  database: db, secret: process.env.BETTER_AUTH_SECRET, baseURL: process.env.BETTER_AUTH_URL,
+  emailAndPassword: { enabled: true }, rateLimit: { enabled: true, storage: "database" }, plugins: [passkey()],
+};
+const migration = await getMigrations(options);
+await migration.runMigrations();
+await db.query(`CREATE TABLE IF NOT EXISTS drip_vault (
+  user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
+  version integer NOT NULL CHECK (version > 0), envelope jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+)`);
+await db.query(`CREATE TABLE IF NOT EXISTS drip_vault_limits (user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE, bucket timestamptz NOT NULL, hits integer NOT NULL)`);
+await db.end();
+console.log("Auth and encrypted vault schema ready.");
