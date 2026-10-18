@@ -1,4 +1,4 @@
-import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut } from "./db";
+import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut, type VaultBinding } from "./db";
 import { authClient, connect, restoreCloud } from "./cloud";
 import { checkCode } from "./crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -60,9 +60,10 @@ async function renewCloudAfterUnlock(root: string, data: AppData, expected: Clou
   }
 }
 
-export async function resumeDevice(code: string, verifier: { salt: string; hash: string }, _data?: AppData) {
+export async function resumeDevice(code: string, verifier: { salt: string; hash: string }, _data?: AppData, expected?: VaultBinding) {
   const current = await readDeviceSession();
   if (!current?.signedOut) throw new Error("Device session changed. Try signing in again.");
+  if (expected && current.generation !== expected.generation) throw new Error("Device session changed. Try signing in again.");
   const root = await resolveRecoveryCode(code);
   if (!(await checkCode(root, verifier))) throw new Error("That isn't your recovery code.");
   // Do not let an earlier sign-out response erase the session we are about to create.
@@ -73,7 +74,7 @@ export async function resumeDevice(code: string, verifier: { salt: string; hash:
   if (!(await completeDeviceSession(current.generation, claimed))) throw new Error("Sign-out changed in another tab. Try signing in again.");
   notifyDeviceSession();
   try {
-    const { data, state: cloud } = await unlockLocalVault(root);
+    const { data, state: cloud } = await unlockLocalVault(root, expected ? { ...expected, generation: claimed.generation } : undefined);
     if (!(await completeDeviceSession(claimed.generation, { ...claimed, signedOut: false }))) throw new Error("Sign-out changed in another tab. Try signing in again.");
     notifyDeviceSession();
     if (cloud && navigator.onLine) void renewCloudAfterUnlock(root, data, cloud, claimed.generation);
@@ -85,15 +86,15 @@ export async function resumeDevice(code: string, verifier: { salt: string; hash:
 }
 
 /** Unlock a fresh page without restoring over unsynced local records. */
-export async function unlockDevice(code: string) {
+export async function unlockDevice(code: string, expected?: VaultBinding) {
   const verifier = await getItem<{ salt: string; hash: string }>("verifier");
   const session = await readDeviceSession();
   if (session?.signedOut) {
     if (!verifier) throw new Error("Local recovery information is missing. Restore your cloud copy or encrypted backup.");
-    await resumeDevice(code, verifier); return;
+    await resumeDevice(code, verifier, undefined, expected); return;
   }
   const root = await resolveRecoveryCode(code);
-  await unlockLocalVault(root);
+  await unlockLocalVault(root, expected);
   notifyDeviceSession();
 }
 
