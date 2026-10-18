@@ -29,7 +29,7 @@ describe("encrypted sign-out and return", () => {
     await expect(resumeDevice(generateRecoveryCode(), verifier)).rejects.toThrow(/isn't your recovery/);
     await resumeDevice(code, verifier);
     expect((await readDeviceSession())?.signedOut).toBe(false);
-    expect(cloud.connect).toHaveBeenCalledWith(code, data, false, expect.any(String));
+    await vi.waitFor(() => expect(cloud.connect).toHaveBeenCalledWith(code, data, false, undefined, expect.any(String)));
     expect(await loadData()).toEqual(data);
     expect((await rawStore()).cloudState).not.toHaveProperty("key");
   });
@@ -55,29 +55,44 @@ describe("encrypted sign-out and return", () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
     await expect(signOutDevice()).rejects.toThrow(/Could not confirm/);
   });
-  it("waits for sign-out before authenticating; wrong owner leaves the vault locked", async () => {
+  it("waits for sign-out before authenticating; a failed cloud renewal keeps local accounts usable", async () => {
     let finish!: (value: unknown) => void;
     cloud.authClient.signOut.mockReturnValue(new Promise(resolve => { finish = resolve; }));
     const pending = signOutDevice();
     await vi.waitFor(() => expect(cloud.authClient.signOut).toHaveBeenCalledOnce());
     const resume = unlockDevice(code); expect(cloud.connect).not.toHaveBeenCalled();
     finish({ error: null }); await pending; await resume;
+    await vi.waitFor(() => expect(cloud.connect).toHaveBeenCalledOnce());
     cloud.authClient.signOut.mockResolvedValue({ error: null }); await signOutDevice();
     cloud.connect.mockResolvedValue({ user: { id: "other" } });
-    await expect(unlockDevice(code)).rejects.toThrow(/connected cloud account/);
-    await expect(loadData()).rejects.toThrow(/Unlock/);
+    await unlockDevice(code);
+    await vi.waitFor(() => expect(cloud.connect).toHaveBeenCalledTimes(2));
+    expect(await loadData()).toEqual(data);
+    expect(await getItem("cloudState")).toMatchObject({ userId: "owner", dirty: true });
   });
-  it("claims a new device generation before sign-in finishes", async () => {
+  it("opens local accounts before a slow cloud sign-in finishes", async () => {
     await signOutDevice(); const old = (await readDeviceSession())!;
     let finish!: (value: unknown) => void;
     cloud.connect.mockReturnValue(new Promise(resolve => { finish = resolve; }));
-    const resume = unlockDevice(code);
+    await unlockDevice(code);
     await vi.waitFor(() => expect(cloud.connect).toHaveBeenCalledOnce());
     const claimed = (await readDeviceSession())!;
-    expect(claimed.signedOut).toBe(true); expect(claimed.generation).not.toBe(old.generation);
+    expect(claimed.signedOut).toBe(false); expect(claimed.generation).not.toBe(old.generation);
     expect(await completeDeviceSession(old.generation, old)).toBe(false);
-    finish({ user: { id: "owner" } }); await resume;
     expect(await loadData()).toEqual(data);
+    finish({ user: { id: "owner" } });
+    expect(await loadData()).toEqual(data);
+  });
+  it("unlocks with a valid code during an online authentication outage and retains queued edits", async () => {
+    await signOutDevice();
+    cloud.connect.mockRejectedValue(new Error("Authentication database unavailable"));
+    await unlockDevice(code);
+    await vi.waitFor(() => expect(cloud.connect).toHaveBeenCalledOnce());
+    expect((await readDeviceSession())?.signedOut).toBe(false);
+    expect(await loadData()).toEqual(data);
+    await saveData({ ...data, lastBackupAt: "saved-during-outage" });
+    expect((await loadData()).lastBackupAt).toBe("saved-during-outage");
+    expect(await getItem("cloudState")).toMatchObject({ userId: "owner", dirty: true });
   });
   it("restores another encrypted account atomically and retains ciphertext on failure", async () => {
     await signOutDevice(); const retained = (await rawStore()).data;

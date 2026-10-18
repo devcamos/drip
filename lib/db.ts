@@ -123,15 +123,20 @@ export async function unlockLocalVault(root: string): Promise<{ data: AppData; s
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, allowSignedOut = false): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, allowSignedOut = false, requireUnchangedRecords = false): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
     const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState");
     cloud.onsuccess = () => {
       if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!allowSignedOut && gate.result?.signedOut) ||
-        vault.result?.id !== before.vault?.id || (!before.vault && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud)))) {
+        vault.result?.id !== before.vault?.id) {
         failure = new Error("Device session changed. Unlock Drip again before continuing."); t.abort(); return;
+      }
+      // Replacing a vault must not discard an edit or sync result committed while
+      // asynchronous key derivation/encryption was running, including in other tabs.
+      if ((!before.vault || requireUnchangedRecords) && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud))) {
+        failure = new Error("Local data changed while preparing the replacement. Your current copy is kept; review it and retry."); t.abort(); return;
       }
       try { write(s, cloud.result); }
       catch (error) { failure = error instanceof Error ? error : new Error("Local storage write failed."); t.abort(); }
@@ -188,7 +193,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   await guardedWrite(before, stamp, s => {
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
-  }, !!resumeGeneration);
+  }, !!resumeGeneration, true);
   if (stamp !== epoch) throw new VaultLockedError();
   epoch++; // Pending writes belong to the copy the user just replaced.
   unlocked = { keys, generation };

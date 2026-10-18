@@ -54,9 +54,10 @@ export async function vault(method = "GET", body?: unknown, ownerId?: string, re
   if (!response.ok) throw new Error(response.status === 409 ? "Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again." : response.status === 401 ? "Sign in again to sync. Your local data is safe." : "Cloud is unavailable. Your local data is safe; try again online.");
   return response.json() as Promise<{ version: number; envelope: Envelope | null; updated_at?: string }>;
 }
-export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string) {
+export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string, reconnectGeneration?: string) {
   const credentials = await recoveryCredentials(code);
-  let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email(resumeGeneration ? { ...credentials, fetchOptions: { headers: { "X-Drip-Resume": resumeGeneration } } } : credentials);
+  const headers = resumeGeneration ? { "X-Drip-Resume": resumeGeneration } : reconnectGeneration ? { "X-Drip-Reconnect": reconnectGeneration } : undefined;
+  let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email({ ...credentials, ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
   if ((result.error as { status?: number } | null)?.status === 429) throw new Error("Too many sign-in attempts. Wait a few seconds, then try again.");
   if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user" });
   if (result.error || !result.data?.user) throw new Error("Could not sign in. Check your recovery code and connection.");

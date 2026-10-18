@@ -253,6 +253,44 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
 });
 
+test("an online cloud authentication outage does not block local unlock or queued top-ups", async ({ page }) => {
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  const code = await setup(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByLabel("Your saved recovery code").fill(code);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  page.on("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  // The browser remains online; only cloud authentication is unavailable.
+  let attempted = false;
+  await page.route("**/api/auth/sign-in/email", route => {
+    attempted = true;
+    return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Test authentication outage" }) });
+  });
+  await page.getByLabel("Recovery code", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Total balance")).toBeVisible();
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+  await expect.poll(() => attempted).toBe(true);
+  await page.getByRole("button", { name: /Zopa/ }).click();
+  await page.getByRole("button", { name: "Top up", exact: true }).click();
+  await page.getByLabel("amount", { exact: true }).fill("200");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".bal")).toHaveText("£3,200.00");
+  await expect(page.getByText("Sign in again to sync. Your local data is safe.")).toBeVisible({ timeout: 15_000 });
+  await page.reload(); await unlock(page, code);
+  await expect(page.getByText("£3,200.00").first()).toBeVisible();
+  await page.unroute("**/api/auth/sign-in/email");
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByText("Device sign-in options").click();
+  await page.getByLabel("Recovery code to renew sign-in").fill(code);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Sign in without replacing local data" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
+  await expect(page.getByText("£3,200.00").first()).toBeVisible();
+});
+
 test("signed-out users can restore rampage201 instead of reopening the current profile", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
   test.setTimeout(120_000);

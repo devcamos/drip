@@ -90,6 +90,33 @@ describe("encrypted local storage", () => {
 });
 
 describe("replacement and migration races", () => {
+  it.each(["same-tab edit", "other-tab edit", "sync acknowledgement"])("rejects restore when a %s commits while its replacement key is being encrypted", async change => {
+    await seedVault(data);
+    const before = await rawStore();
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    let release!: () => void; let reached!: () => void;
+    const started = new Promise<void>(resolve => { reached = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(crypto.subtle, "encrypt").mockImplementationOnce(async (...args) => {
+      const result = await encrypt(...args); reached(); await hold; return result;
+    });
+    const restoring = commitCloudRestore({ ...data, lastBackupAt: "older-cloud-copy" }, undefined, await codeVerifier(code), undefined, undefined, code);
+    const result = restoring.catch(error => error);
+    await started;
+    const edited = { ...data, lastBackupAt: "accepted-local-edit" };
+    if (change === "same-tab edit") await saveData(edited);
+    else if (change === "other-tab edit") {
+      // Another tab can commit with this vault's key without changing this runtime's epoch.
+      const { openVault, encryptLocal } = await import("../lib/local-vault");
+      await rawStore({ data: await encryptLocal(edited, await openVault(before.localVault, code)) });
+    } else await rawStore({ cloudState: { version: 2, revision: 1 } });
+    const committed = await rawStore();
+    release();
+    expect(await result).toBeInstanceOf(Error);
+    expect(await rawStore()).toEqual(committed);
+    expect(await loadData()).toEqual(change === "sync acknowledgement" ? data : edited);
+  });
+
   it("invalidates both in-flight and queued writes when a restore replaces the local vault", async () => {
     await seedVault(data);
     const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);

@@ -2,9 +2,9 @@ import { expect, it, vi } from "vitest";
 import { requireSafeWorker, safeFetch } from "../lib/worker-safety";
 
 it("does not require a worker in server or fresh browser contexts", async () => {
-  await requireSafeWorker();
-  vi.stubGlobal("window", {}); vi.stubGlobal("navigator", {}); await requireSafeWorker();
-  vi.stubGlobal("navigator", { serviceWorker: { controller: null } }); await requireSafeWorker();
+  await expect(requireSafeWorker()).resolves.toBeUndefined();
+  vi.stubGlobal("window", {}); vi.stubGlobal("navigator", {}); await expect(requireSafeWorker()).resolves.toBeUndefined();
+  vi.stubGlobal("navigator", { serviceWorker: { controller: null } }); await expect(requireSafeWorker()).resolves.toBeUndefined();
 });
 it("blocks auth/private fetches under a legacy cache-everything worker", async () => {
   vi.stubGlobal("window", {}); vi.stubGlobal("navigator", { serviceWorker: { controller: { postMessage() {} } } });
@@ -64,5 +64,35 @@ it("ignores delayed sign-out from an old tab after another tab has resumed", asy
   await safeFetch("/api/auth/sign-out", { method: "POST", headers: { "X-Drip-Signout": "old" } });
   await safeFetch("/api/auth/sign-out", { method: "POST", headers: { "X-Drip-Disconnect": "old" } });
   await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Resume": "old" } })).rejects.toThrow(/session changed/);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("binds queued cloud renewal to the locally unlocked device generation", async () => {
+  const { setItem } = await import("../lib/db");
+  const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  await setItem("deviceSession", { signedOut: false, generation: "unlocked" });
+  await safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } });
+  expect(fetcher).toHaveBeenCalledOnce();
+  await setItem("deviceSession", { signedOut: true, generation: "signed-out" });
+  await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } })).rejects.toThrow(/session changed/);
+  await setItem("deviceSession", { signedOut: false, generation: "other-account" });
+  await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } })).rejects.toThrow(/session changed/);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it("rechecks a cloud renewal after waiting for the shared request lock", async () => {
+  const { setItem } = await import("../lib/db");
+  await setItem("deviceSession", { signedOut: false, generation: "unlocked" });
+  let release!: () => void;
+  vi.stubGlobal("navigator", { locks: { request: (_name: string, run: () => Promise<Response>) => new Promise<Response>((resolve, reject) => {
+    release = () => { run().then(resolve, reject); };
+  }) } });
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const queued = safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } });
+  const result = queued.catch(error => error);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  await setItem("deviceSession", { signedOut: true, generation: "later-sign-out" });
+  release();
+  expect(await result).toEqual(expect.objectContaining({ message: expect.stringMatching(/session changed/) }));
   expect(fetcher).not.toHaveBeenCalled();
 });

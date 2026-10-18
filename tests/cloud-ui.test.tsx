@@ -50,6 +50,17 @@ describe("returning users", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Restore cloud accounts" })).toBeEnabled());
     expect(cloud.restoreCloud).not.toHaveBeenCalled();
   });
+  it("waits for asynchronous restore completion and reports a rejected callback", async () => {
+    let reject!: (error: Error) => void;
+    const restored = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
+    render(<CloudReturn onRestored={restored} />);
+    fill("Recovery code", code); click("Restore cloud accounts");
+    await waitFor(() => expect(restored).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+    await act(async () => { reject(new Error("Local data changed during restore")); });
+    expect(await screen.findByText("Local data changed during restore")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore cloud accounts" })).toBeEnabled();
+  });
 });
 
 describe("cloud recovery settings", () => {
@@ -105,6 +116,13 @@ describe("cloud recovery settings", () => {
   it("keeps local recovery available when the backend status cannot be fetched", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     await panel(); expect(screen.getByText(/Cloud is unavailable here/)).toBeInTheDocument();
+  });
+  it("propagates asynchronous restore errors through the settings callback", async () => {
+    const restored = vi.fn().mockRejectedValue(new Error("Could not refresh restored accounts"));
+    render(<CloudPanel data={data} verifier={await codeVerifier(code)} onRestored={restored} />);
+    fireEvent.click(screen.getByText("Restore an existing cloud copy")); fill("Recovery code", code); click("Restore cloud accounts");
+    expect(await screen.findByText("Could not refresh restored accounts")).toBeInTheDocument();
+    expect(screen.queryByText("Cloud recovery is connected on this device.")).toBeNull();
   });
   it("renews an expired sign-in without restoring or replacing queued local data", async () => {
     cloud.readCloudState.mockResolvedValue({ userId: "user" });

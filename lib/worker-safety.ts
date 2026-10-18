@@ -27,9 +27,11 @@ export const safeFetch: typeof fetch = async (input, init) => {
     const gate = await getItem<{ signedOut: boolean; generation: string }>("deviceSession");
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
     const resumeGeneration = headers.get("X-Drip-Resume");
+    const reconnectGeneration = headers.get("X-Drip-Reconnect");
     const signoutGeneration = headers.get("X-Drip-Signout");
     const disconnectGeneration = headers.get("X-Drip-Disconnect");
     if (resumeGeneration && (!gate?.signedOut || gate.generation !== resumeGeneration)) throw new Error("Device session changed. Try signing in again.");
+    if (reconnectGeneration && (gate?.signedOut || gate?.generation !== reconnectGeneration)) throw new Error("Device session changed. Try signing in again.");
     // An old tab must not revoke a session that another tab has already resumed.
     if (url.pathname === "/api/auth/sign-out" && (
       (signoutGeneration && (!gate?.signedOut || gate.generation !== signoutGeneration)) ||

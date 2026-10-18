@@ -416,7 +416,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void }) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void> }) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (

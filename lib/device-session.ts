@@ -2,7 +2,7 @@ import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLoca
 import { authClient, connect, restoreCloud } from "./cloud";
 import { checkCode } from "./crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
-import type { AppData } from "./types";
+import type { AppData, CloudState } from "./types";
 
 export interface DeviceSession { signedOut: boolean; remotePending: boolean; generation: string }
 export const readDeviceSession = () => getItem<DeviceSession>("deviceSession");
@@ -41,6 +41,25 @@ export async function signOutDevice() {
   notifyDeviceSession();
   await finishDeviceSignOut();
 }
+
+/** Best-effort cloud renewal must never decide whether a verified local key works. */
+async function renewCloudAfterUnlock(root: string, data: AppData, expected: CloudState, generation: string) {
+  try {
+    const device = await readDeviceSession();
+    const cloud = await getItem<CloudState>("cloudState");
+    if (device?.signedOut || device?.generation !== generation || cloud?.userId !== expected.userId || cloud?.generation !== expected.generation) return;
+    // safeFetch checks this generation again under the private-request lock,
+    // so a delayed renewal cannot authenticate after a later sign-out.
+    const account = await connect(root, data, false, undefined, generation);
+    if (account.user.id !== expected.userId) return;
+  } catch {
+    // Keep the local vault and queued edits. Sync reports its own auth/network
+    // status; Recovery can renew sign-in later without replacing local data.
+  } finally {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
+  }
+}
+
 export async function resumeDevice(code: string, verifier: { salt: string; hash: string }, _data?: AppData) {
   const current = await readDeviceSession();
   if (!current?.signedOut) throw new Error("Device session changed. Try signing in again.");
@@ -48,19 +67,16 @@ export async function resumeDevice(code: string, verifier: { salt: string; hash:
   if (!(await checkCode(root, verifier))) throw new Error("That isn't your recovery code.");
   // Do not let an earlier sign-out response erase the session we are about to create.
   try { await ending?.promise; } catch { /* Offline resume still protects unsynced local data. */ }
-  // Claim the new generation before authentication. Other tabs' old sign-out
-  // requests must already be stale when the new cookie is issued.
+  // Claim the new generation before unlocking. Other tabs' old sign-out
+  // requests must already be stale when a new cookie can be issued.
   const claimed = { signedOut: true, remotePending: false, generation: crypto.randomUUID() };
   if (!(await completeDeviceSession(current.generation, claimed))) throw new Error("Sign-out changed in another tab. Try signing in again.");
   notifyDeviceSession();
   try {
     const { data, state: cloud } = await unlockLocalVault(root);
-    if (cloud && navigator.onLine) {
-      const account = await connect(root, data, false, claimed.generation);
-      if (account.user.id !== cloud.userId) throw new Error("That is not the connected cloud account.");
-    }
     if (!(await completeDeviceSession(claimed.generation, { ...claimed, signedOut: false }))) throw new Error("Sign-out changed in another tab. Try signing in again.");
     notifyDeviceSession();
+    if (cloud && navigator.onLine) void renewCloudAfterUnlock(root, data, cloud, claimed.generation);
   } catch (error) {
     lockLocalVault();
     if (await completeDeviceSession(claimed.generation, { ...claimed, remotePending: true })) notifyDeviceSession();

@@ -6,6 +6,7 @@ import { getItem } from "@/lib/db";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
 import * as C from "@/lib/crypto";
 import { authClient, connect, readCloudState, restoreCloud, syncNow, vault, writeCloudState } from "@/lib/cloud";
+type OnRestored = (data: AppData, code: string) => void | Promise<void>;
 
 export function CloudSync({ hasData = false }: { hasData?: boolean }) {
   const [message, setMessage] = useState("");
@@ -28,7 +29,7 @@ export function CloudSync({ hasData = false }: { hasData?: boolean }) {
   return message ? <p className="muted" role="status">{message}</p> : null;
 }
 
-export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false, codeLabel }: { onRestored: (d: AppData, code: string) => void; replaceExisting?: boolean; fromSignedOut?: boolean; codeLabel?: string }) {
+export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false, codeLabel }: { onRestored: OnRestored; replaceExisting?: boolean; fromSignedOut?: boolean; codeLabel?: string }) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const [userId, setUserId] = useState<string>();
   async function run(passkey: boolean) {
@@ -60,7 +61,7 @@ export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut
   </section>;
 }
 
-export function CloudPanel({ data, verifier, onRestored }: { data: AppData; verifier: { salt: string; hash: string }; onRestored: (d: AppData, code: string) => void }) {
+export function CloudPanel({ data, verifier, onRestored }: { data: AppData; verifier: { salt: string; hash: string }; onRestored: OnRestored }) {
   const [available, setAvailable] = useState(false); const [enabled, setEnabled] = useState(false);
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -144,7 +145,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
     </section>
     <details className="panel"><summary>Restore an existing cloud copy</summary>
       <p className="muted">This replaces this device&apos;s accounts. Export a local backup first if you have unsynced changes.</p>
-      <CloudReturn replaceExisting onRestored={(d, c) => { onRestored(d, c); setEnabled(true); }} />
+      <CloudReturn replaceExisting onRestored={async (d, c) => { await onRestored(d, c); setEnabled(true); }} />
     </details>
   </>;
 }

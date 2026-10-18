@@ -1,5 +1,5 @@
 // Public app-shell assets only. Never cache authentication, session or vault APIs.
-const CACHE = 'drip-shell-v6';
+const CACHE = 'drip-shell-v7';
 const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/fonts/DM-Sans.ttf'];
 const isAsset = path => path.startsWith('/_next/static/') || path.startsWith('/fonts/') || SHELL.includes(path);
 self.addEventListener('install', event => {
@@ -14,6 +14,7 @@ self.addEventListener('install', event => {
   })());
 });
 self.addEventListener('message', event => {
+  if (event.origin !== self.location.origin) return;
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data?.type === 'DRIP_WORKER_VERSION') event.ports[0]?.postMessage({ version: 3 });
 });
