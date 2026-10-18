@@ -5,6 +5,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { AccountForm } from "../app/AccountForm";
 import { AccountDetail } from "../app/AccountDetail";
 import type { Account } from "../lib/types";
+import { addMonths } from "../lib/maths";
 const today = new Date().toISOString().slice(0, 10);
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const a: Account = { id: "a", provider: "MoneyFarm", label: "", productCategory: "cash-isa", taxWrapper: "cash-isa", balance: 3000, ratePct: 4, rateType: "interest", frequency: "daily", nextPayoutDate: today, payouts: [], events: [], colour: "", createdAt: today, bonus: { amount: 15.44, expectedDate: "2030-05-06" } };
@@ -17,6 +18,7 @@ describe("category-driven accounts", () => {
     const save = vi.fn(); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
     change("Product category", "stocks-funds");
     expect(screen.getByLabelText("Paid")).toHaveValue("quarterly");
+    expect(screen.getByLabelText("Next payout date")).toHaveValue(addMonths(today, 3));
     expect(screen.getByLabelText("Reinvest predicted income")).not.toBeChecked();
     fireEvent.click(screen.getByLabelText("Held in a Stocks & Shares ISA"));
     change("Provider", "Other"); change("Provider name", "Any Broker"); change("Balance", "1000"); change("Rate", "5");
@@ -27,6 +29,7 @@ describe("category-driven accounts", () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "Any Broker", productCategory: "stocks-funds", taxWrapper: "stocks-shares-isa", rateType: "dividend", frequency: "annually", reinvestIncome: false, bonus: { amount: 15.44, expectedDate: "2030-05-06" } }));
     for (const category of ["regular-saver", "current-account", "easy-access", "cash-isa"]) {
       change("Product category", category); expect(screen.getByLabelText("Reinvest predicted income")).toBeChecked();
+      expect(screen.getByLabelText("Next payout date")).toHaveValue(addMonths(today, category === "regular-saver" ? 12 : 1));
     }
     change("Paid", "daily"); expect(screen.queryByLabelText("Next payout date")).toBeNull();
     expect(screen.queryByText(/eligibility checks/i)).toBeNull();

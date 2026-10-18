@@ -4,6 +4,11 @@ import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "
 import { PRODUCTS, PROVIDERS, validDate } from "@/lib/products";
 import * as M from "@/lib/maths";
 const today = () => M.ymd(new Date());
+const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
+function customProviderName(provider?: string) {
+  if (!provider || Object.hasOwn(PROVIDERS, provider)) return "";
+  return provider;
+}
 type FormInputs = { balance: string; rate: string; frequency: Frequency; next: string; provider: string; rateFrom?: string; bonus?: { amount: string; date: string } };
 function validForm(input: FormInputs) {
   const balance = Number(input.balance), rate = Number(input.rate);
@@ -16,7 +21,7 @@ function validForm(input: FormInputs) {
 
 export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void; onCancel: () => void }>) {
   const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
-  const [custom, setCustom] = useState(existing && !(existing.provider in PROVIDERS) ? existing.provider : "");
+  const [custom, setCustom] = useState(customProviderName(existing?.provider));
   const [category, setCategory] = useState<ProductCategory>(existing?.productCategory ?? (existing ? "other" : "easy-access"));
   const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? (existing?.productCategory === "cash-isa" ? "cash-isa" : "none"));
   const [label, setLabel] = useState(existing?.label ?? "");
@@ -38,6 +43,7 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
     setFrequency(defaults.frequency); setReinvest(defaults.reinvestIncome);
+    setNext(M.addMonths(today(), payoutMonths[defaults.frequency]));
   };
   return <>
     <h1>{existing ? "Edit account" : "Add account"}</h1>
