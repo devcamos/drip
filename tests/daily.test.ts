@@ -9,26 +9,14 @@ const acct = (o: Partial<Account> = {}): Account => ({ id: "d", provider: "Money
   frequency: "daily", nextPayoutDate: "2026-10-01", colour: "", payouts: [], events: [], createdAt: "2026-10-01T09:00:00Z", ...o });
 
 describe("daily interest", () => {
-  it("compounds daily into the balance and logs per-day interest", () => {
-    const a = M.applyDailyAccrual(acct(), "2026-10-11");
-    const d = 0.0365 / 365;
-    expect(a.balance).toBe(M.round2(10000 * Math.pow(1 + d, 10)));
-    expect(a.accruedThrough).toBe("2026-10-11");
-    expect(a.events!.filter((e) => e.type === "interest")).toHaveLength(10);
-    expect(a.events![0]).toEqual({ type: "interest", date: "2026-10-01", amount: 1 });
-    // idempotent for the same day, continues next day
-    expect(M.applyDailyAccrual(a, "2026-10-11")).toBe(a);
-    expect(M.applyDailyAccrual(a, "2026-10-12").events).toHaveLength(11);
-  });
-  it("uses the rate in force each day, ignores non-daily accounts, handles new accounts", () => {
-    const a = M.applyDailyAccrual(acct({ rateHistory: [{ from: "2026-10-01", ratePct: 3.65 }, { from: "2026-10-02", ratePct: 0 }] }), "2026-10-04");
-    expect(a.events).toHaveLength(1);
-    const m = acct({ frequency: "monthly" });
-    expect(M.applyDailyAccrual(m, "2026-12-01")).toBe(m);
-    const fresh = M.applyDailyAccrual(acct({ createdAt: "2026-10-15T10:00:00Z" }), "2026-10-15");
-    expect(fresh.accruedThrough).toBe("2026-10-15");
-    expect(M.applyDailyAccrual(acct({ createdAt: "" }), "2026-10-15").accruedThrough).toBe("2026-10-15");
-    expect(M.applyDailyAccrual(acct({ balance: -5 }), "2026-10-03").balance).toBe(0);
+  it("predicts daily income without crediting the saved balance or creating payments", () => {
+    const a = acct();
+    expect(M.payoutAmount(a)).toBeCloseTo(1);
+    expect(M.projection([a], 12).at(-1)!.income).toBeGreaterThan(365);
+    expect(a.balance).toBe(10000);
+    expect(a.events).toEqual([]);
+    expect(a.payouts).toEqual([]);
+    expect(M.recordedIncome([a])).toBe(0);
   });
   it("daily accounts: per-day amount, no payout date, skipped from upcoming", () => {
     expect(M.payoutAmount(acct())).toBeCloseTo(1);

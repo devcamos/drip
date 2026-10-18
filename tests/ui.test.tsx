@@ -111,6 +111,7 @@ describe("accounts", () => {
     type(screen.getByLabelText("Nickname"), "Pot");
     type(screen.getByLabelText("Balance"), "1200");
     type(screen.getByLabelText("Rate"), "5");
+    fireEvent.change(screen.getByLabelText("Product category"), { target: { value: "other" } });
     fireEvent.change(screen.getByLabelText("Type"), { target: { value: "dividend" } });
     fireEvent.change(screen.getByLabelText("Paid"), { target: { value: "quarterly" } });
     type(screen.getByLabelText("Next payout date"), today);
@@ -119,7 +120,7 @@ describe("accounts", () => {
 
     // detail
     expect(await screen.findByText("My Bank")).toBeInTheDocument();
-    expect(screen.getByText("Expected (quarterly)")).toBeInTheDocument();
+    expect(screen.getByText("Estimated next payment")).toBeInTheDocument();
 
     click("Top up");
     type(screen.getByLabelText("amount"), "300");
@@ -143,10 +144,10 @@ describe("accounts", () => {
 
     click("Withdraw"); click("Cancel");
 
-    type(screen.getByLabelText("Payout amount"), "20");
-    type(screen.getByLabelText("Payout date"), today);
-    click("Log payout");
-    expect(await screen.findByText(/expected £18\.13/)).toBeInTheDocument();
+    type(screen.getByLabelText("Income amount"), "20");
+    type(screen.getByLabelText("Income date"), today);
+    click("Record income");
+    expect(await screen.findByTestId("income-history")).toHaveTextContent("£20.00");
 
     // edit with rate change -> rate history
     click("Edit");
@@ -170,9 +171,9 @@ describe("accounts", () => {
     await seed({ accounts: [acct(), acct({ id: "a2", provider: "Chip", label: "", balance: 1000, ratePct: 3 })] });
     render(<Drip />);
     expect(await screen.findByText("£4,000.00")).toBeInTheDocument();
-    expect(screen.getByText("Upcoming payouts")).toBeInTheDocument();
+    expect(screen.getByText("Upcoming estimated payments")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Chip/ }));
-    expect(await screen.findByText("No payouts logged yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
     expect(screen.getByText("Total balance")).toBeInTheDocument();
   });
@@ -384,27 +385,22 @@ describe("daily interest accounts", () => {
     expect(screen.getByText(/no payout date/)).toBeInTheDocument();
     click("Save");
     expect(await screen.findByText("Per day (est.)")).toBeInTheDocument();
-    expect(screen.getByText("Interest shows here from tomorrow.")).toBeInTheDocument();
+    expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
-    expect(screen.getByText(/Daily interest/)).toBeInTheDocument();
-    const up = screen.getByText("Upcoming payouts").closest(".panel")!;
+    expect(screen.getByText(/Daily payments/)).toBeInTheDocument();
+    const up = screen.getByText("Upcoming estimated payments").closest(".panel")!;
     expect(within(up as HTMLElement).queryByText("MoneyFarm")).toBeNull();
   });
-  it("accrues on open and shows interest history by week and month", async () => {
+  it("keeps an older daily balance authoritative on open and separates legacy estimates", async () => {
     const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
-    await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, frequency: "daily", accruedThrough: past, rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
+    await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, frequency: "daily", accruedThrough: past, events: [{ type: "interest", date: past, amount: 12 }], rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
     render(<Drip />);
     await screen.findByText("Total balance");
-    const saved = await loadData();
-    expect(saved.accounts[0].balance).toBeGreaterThan(10019);
-    expect(saved.accounts[0].accruedThrough).toBe(today);
+    expect((await loadData()).accounts[0]).toMatchObject({ balance: 10000, accruedThrough: past });
     fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
-    const list = await screen.findByTestId("interest-history");
-    expect(list.textContent).toMatch(/Week of/);
-    expect(screen.queryByTestId("events")).toBeNull(); // interest isn't listed as a top-up/withdrawal
-    click("By month");
-    expect(screen.getByTestId("interest-history").textContent).toMatch(/20\d\d/);
-    click("By week");
+    expect(await screen.findByText("Previous interest estimates")).toBeInTheDocument();
+    expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
+    expect(screen.getByText(/Your saved balance has been preserved/)).toBeInTheDocument();
   });
 });
 

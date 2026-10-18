@@ -1,4 +1,5 @@
-import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot } from "./types";
+import { validDate } from "./products";
+import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -40,18 +41,46 @@ export function momGrowth(snaps: Snapshot[]): number | null {
   return ((cur - prev) / prev) * 100;
 }
 
-/** 12-month projection, compounding each account monthly, interest reinvested. */
-export function projection(accts: Pick<Account, "balance" | "ratePct">[], months = 12): { month: number; balance: number }[] {
-  const out: { month: number; balance: number }[] = [];
-  for (let m = 1; m <= months; m++) {
-    const b = accts.reduce((s, a) => {
-      if (!(a.balance > 0)) return s;
-      const r = Math.max(a.ratePct, 0) / 100 / 12;
-      return s + a.balance * Math.pow(1 + r, m);
-    }, 0);
-    out.push({ month: m, balance: b });
+type ForecastAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
+/** Monthly forecast only: never writes estimates into saved accounts or recorded income. */
+export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = ymd(new Date())) {
+  const total = totalBalance(accts);
+  const holdings = accts.map(a => ({ account: a, balance: Math.max(a.balance, 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
+  const out: { month: number; balance: number; income: number }[] = [];
+  let cash = 0, income = 0;
+  for (let month = 1; month <= months; month++) {
+    const end = addMonths(today, month);
+    for (const holding of holdings) {
+      const a = holding.account;
+      let earned = monthlyIncome(holding.balance, a.ratePct);
+      if (a.bonus && !holding.bonusApplied && a.bonus.expectedDate >= today && a.bonus.expectedDate <= end) {
+        earned += a.bonus.amount; holding.bonusApplied = true;
+      }
+      income += earned;
+      if (a.reinvestIncome ?? a.rateType !== "dividend") holding.balance += earned;
+      holding.balance += monthlyDeposit * holding.share;
+    }
+    if (total === 0) cash += monthlyDeposit;
+    out.push({ month, balance: holdings.reduce((sum, h) => sum + h.balance, cash), income });
   }
   return out;
+}
+
+/** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
+export function recordedIncome(accts: Pick<Account, "payouts">[], month?: string, asOf = ymd(new Date())): number {
+  return accts.reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
+}
+
+export function pendingBonuses(accts: Pick<Account, "bonus">[]): number {
+  return accts.reduce((sum, a) => sum + (a.bonus?.amount ?? 0), 0);
+}
+
+/** Recording a payment does not assume it is missing from the user's confirmed balance. */
+export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType): Account {
+  if (!Number.isFinite(amount) || round2(amount) <= 0) throw new Error("Income must be at least £0.01.");
+  if (!validDate(date)) throw new Error("Enter a valid payment date.");
+  const payout: Payout = { date, amount: round2(amount), kind: "actual", incomeType };
+  return { ...a, payouts: [...a.payouts, payout], bonus: incomeType === "bonus" ? undefined : a.bonus };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -196,25 +225,6 @@ export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: num
   const change = cur.totalBalance - prev.totalBalance, deposits = cur.deposits ?? 0, withdrawals = cur.withdrawals ?? 0;
   const growth = change - deposits + withdrawals;
   return { change, deposits, withdrawals, growth, growthPct: (growth / prev.totalBalance) * 100 };
-}
-
-/**
- * Daily accounts: credit estimated interest for each day from `accruedThrough` up to (not including)
- * `today`, compounding into the balance at the rate in force that day. Logs one "interest" event per day.
- */
-export function applyDailyAccrual(a: Account, today: string): Account {
-  if (a.frequency !== "daily") return a;
-  const from = a.accruedThrough ?? (a.createdAt || today).slice(0, 10);
-  if (from >= today) return a.accruedThrough ? a : { ...a, accruedThrough: from };
-  const hist = a.rateHistory?.length ? a.rateHistory : [{ from: "0000-01-01", ratePct: a.ratePct }];
-  let bal = Math.max(a.balance, 0); const evs: BalanceEvent[] = [];
-  for (let day = t(from); day < t(today); day += DAY) {
-    const d = ymd(new Date(day));
-    const inc = bal * (Math.max(rateOn(hist, d), 0) / 100 / 365);
-    bal += inc;
-    if (inc > 0) evs.push({ type: "interest", date: d, amount: Math.round(inc * 10000) / 10000 });
-  }
-  return { ...a, balance: round2(bal), accruedThrough: today, events: [...(a.events ?? []), ...evs] };
 }
 
 /** Monday (UTC) of the week containing `date`. */

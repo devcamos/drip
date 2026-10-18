@@ -205,6 +205,17 @@ async function legacyEnvelope(value: AppData, encryptionKey = key): Promise<clou
   return { app: "drip-cloud", v: 1, iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...new Uint8Array(ct))) };
 }
 describe("device-only nickname boundary", () => {
+  it("round-trips financial product and income fields while excluding new nested private fields", async () => {
+    const input = { ...labelled, accounts: [{ ...privateAccount, productCategory: "cash-isa" as const, taxWrapper: "cash-isa" as const, reinvestIncome: true,
+      bonus: { amount: 15.44, expectedDate: "2030-05-06", note: "PRIVATE_BONUS_NOTE" },
+      payouts: [{ date: "2026-09-30", amount: 22.65, kind: "actual" as const, incomeType: "interest" as const, note: "PRIVATE_RECEIPT_NOTE" }] }] };
+    const envelope = await cloud.seal(input, key);
+    const portable = await rawCloudPayload(envelope);
+    expect(JSON.stringify(portable)).not.toMatch(/PRIVATE_|DEVICE_PRIVATE|"label"|"note"/);
+    const restored = await cloud.unseal(envelope, key);
+    expect(restored.accounts[0]).toMatchObject({ productCategory: "cash-isa", taxWrapper: "cash-isa", reinvestIncome: true,
+      bonus: { amount: 15.44, expectedDate: "2030-05-06" }, payouts: [{ date: "2026-09-30", amount: 22.65, kind: "actual", incomeType: "interest" }], label: "" });
+  });
   it("omits nicknames, locks and unknown local fields from the actual encrypted payload without changing local data", async () => {
     const input = { ...labelled, localNote: "PRIVATE_ROOT_NOTE", lock: { credentialId: "PRIVATE_CREDENTIAL", enabledAt: "now" }, accounts: [{ ...privateAccount, localNote: "PRIVATE_ACCOUNT_NOTE", events: [{ ...privateAccount.events[0], note: "PRIVATE_EVENT_NOTE" }] }] };
     const envelope = await cloud.seal(input, key); const portable = await rawCloudPayload(envelope);
