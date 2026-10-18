@@ -18,8 +18,9 @@ async function secretFor(creds: Credentials, wrap: Pick<PasskeyWrap, "salt" | "c
   } }) as PublicKeyCredential | null;
   if (!credential || encode(new Uint8Array(credential.rawId)) !== wrap.credentialId) throw new Error("That passkey does not match this device's encrypted accounts. Use a recovery code.");
   const result = credential.getClientExtensionResults() as PRFResult;
-  if (!result.prf?.results?.first || result.prf.results.first.byteLength !== 32) throw unsupported();
-  return new Uint8Array(result.prf.results.first);
+  const secret = result.prf?.results?.first;
+  if (secret?.byteLength !== 32) throw unsupported();
+  return new Uint8Array(secret);
 }
 
 export async function hasPasskeyUnlock() {

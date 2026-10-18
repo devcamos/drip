@@ -4,8 +4,8 @@ export interface PasskeyWrap {
   app: "drip-passkey-unlock"; v: 1; vaultId: string; origin: string; rpId: string;
   credentialId: string; salt: string; iv: string; ct: string;
 }
-export const encode = (bytes: Uint8Array) => btoa(String.fromCodePoint(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-export const decode = (value: string) => Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0));
+export const encode = (bytes: Uint8Array) => btoa(String.fromCodePoint(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/={1,2}$/, "");
+export const decode = (value: string) => Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.codePointAt(0)!);
 const text = new TextEncoder();
 type Header = Omit<PasskeyWrap, "iv" | "ct">;
 const aad = (h: Header) => text.encode(JSON.stringify([h.app, h.v, h.vaultId, h.origin, h.rpId, h.credentialId, h.salt]));
