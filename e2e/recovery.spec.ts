@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { unlock } from "./vault-helpers";
+import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
 import { withAuthRetry } from "./auth-helpers";
 
@@ -44,6 +44,7 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
   const second = await browser.newContext(); const returning = await second.newPage();
   try {
     await returning.goto("http://localhost:4321");
+    await showCloudRecovery(returning);
     await returning.getByLabel("Recovery code", { exact: true }).fill(code);
     await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
     await expect(returning.getByText("£3,000.00").first()).toBeVisible();
@@ -95,6 +96,7 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   await context.clearCookies();
   await page.evaluate(() => new Promise<void>((resolve, reject) => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }));
   await page.reload();
+  await showCloudRecovery(page);
   await page.getByRole("button", { name: "Sign in with passkey" }).click();
   await expect(page.getByText(/Signed in. Enter your recovery code/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Restore cloud accounts" })).toBeDisabled();
@@ -132,6 +134,7 @@ test("downloaded set of six codes independently restores the same cloud account"
     const fresh = await browser.newContext();
     try {
       const returning = await fresh.newPage(); await returning.goto("http://localhost:4321");
+    await showCloudRecovery(returning);
       await returning.getByLabel("Recovery code", { exact: true }).fill(code);
       await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
       await expect(returning.getByText("£3,000.00").first()).toBeVisible();
@@ -182,9 +185,11 @@ test("sign-out survives reload, locks other tabs and preserves local-only accoun
   await page.reload();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await expect(page.getByText("£3,000.00")).toHaveCount(0);
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill("wrong");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Total balance")).toBeVisible();
@@ -222,6 +227,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   expect(warned).toBe(true);
   await expect(page.getByText(/not yet confirmed/)).toBeVisible();
   await page.reload();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
@@ -230,6 +236,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Sign in", exact: true }).click(), page.getByText("Total balance"));
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
@@ -251,6 +258,7 @@ test("an online cloud authentication outage does not block local unlock or queue
     attempted = true;
     return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Test authentication outage" }) });
   });
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Total balance")).toBeVisible();

@@ -397,7 +397,7 @@ describe("app lock", () => {
     tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(screen.getByText(/screen lock only/)).toBeInTheDocument();
     expect(screen.getByTestId("settings-tag")).toHaveTextContent("devo");
-    expect(screen.getByText(/does not need to be unique/)).toBeInTheDocument();
+    expect(screen.getByText(/unique gamertag saved/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("App lock is on.")).toBeInTheDocument();

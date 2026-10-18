@@ -81,7 +81,7 @@ export async function restoreCloud(code: string, userId?: string, resumeGenerati
   const device = await getItem<{ signedOut: boolean; generation: string }>("deviceSession");
   if (device?.signedOut && device.generation !== resumeGeneration) throw new Error("Sign in before restoring accounts.");
   const credentials = await recoveryCredentials(code);
-  const session = userId ? await authClient.getSession() : { data: null };
+  const session = userId ? await authClient.getSession(resumeGeneration ? { fetchOptions: { headers: { "X-Drip-Resume": resumeGeneration } } } : undefined) : { data: null };
   // A passkey session must match the recovery code's account, not merely any session.
   if (userId && (session.data?.user.id !== userId || session.data?.user.email !== credentials.email)) throw new Error("That recovery code belongs to a different account.");
   const account = userId ? { user: session.data!.user, key: await cloudKey(code) } : await connect(code, {} as AppData, false, resumeGeneration);

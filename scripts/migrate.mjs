@@ -24,5 +24,11 @@ await db.query(`CREATE TABLE IF NOT EXISTS drip_vault_limits (user_id text PRIMA
 await db.query(`CREATE TABLE IF NOT EXISTS drip_recovery_codes (user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE, records jsonb NOT NULL)`);
 await db.query(`CREATE INDEX IF NOT EXISTS drip_recovery_codes_lookup ON drip_recovery_codes USING gin (records jsonb_path_ops)`);
 await db.query(`CREATE TABLE IF NOT EXISTS drip_recovery_limits (key text PRIMARY KEY, bucket timestamptz NOT NULL, hits integer NOT NULL)`);
+await db.query(`CREATE TABLE IF NOT EXISTS drip_password_login (
+  user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
+  username text NOT NULL UNIQUE CHECK (username ~ '^[a-z0-9_]{3,16}$'),
+  password_hash text NOT NULL, envelope jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+)`);
 await db.end();
 console.log("Auth and encrypted vault schema ready.");

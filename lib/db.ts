@@ -5,16 +5,18 @@ import { validProductFields } from "./products";
 import { checkCode, codeVerifier } from "./crypto";
 import { createVault, openVault, encryptLocal, decryptLocal, type LocalKeys, type VaultHeader, type LocalEnvelope } from "./local-vault";
 import type { PasskeyWrap } from "./passkey-crypto";
+import type { PasswordWrap } from "./password-crypto";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
 type Device = { signedOut: boolean; generation: string };
 type Metadata = Omit<CloudState, "key">;
-type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap };
-export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null }
+type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap } };
+export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null; passwordCiphertext?: string | null }
 function checkBinding(value: Stored, expected: VaultBinding) {
   if (value.vault?.id !== expected.vaultId || value.gate?.generation !== expected.generation ||
-    (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext)) throw new Error("Device session changed. Unlock Drip again before continuing.");
+    (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext) ||
+    (expected.passwordCiphertext !== undefined && (value.password?.envelope.ct ?? null) !== expected.passwordCiphertext)) throw new Error("Device session changed. Unlock Drip again before continuing.");
 }
 let unlocked: { keys: LocalKeys; generation?: string } | undefined;
 let epoch = 0;
@@ -48,8 +50,8 @@ async function stored(): Promise<Stored> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const t = db.transaction(STORE, "readonly"); const s = t.objectStore(STORE);
-    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock");
-    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result }); };
+    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
+    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result, password: password.result }); };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not read local storage.", { cause: t.error })); };
   });
 }
@@ -81,7 +83,7 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
   return tx("readonly", s => s.get(key));
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
-  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
+  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
   await tx("readwrite", s => s.put(value, key));
   if (key === "deviceSession" && (value as Device)?.signedOut) lockLocalVault(true);
 }
@@ -119,7 +121,7 @@ export async function unlockLocalVault(root: string, expected?: VaultBinding): P
       s.put(metadata(before.cloud as CloudState | undefined), "cloudState");
     }
     s.delete("onboardingDraft");
-  }, true, false, expected?.passkeyCiphertext !== undefined);
+  }, { allowSignedOut: true, passkey: expected?.passkeyCiphertext !== undefined, password: expected?.passwordCiphertext !== undefined });
   if (stamp !== epoch) throw new VaultLockedError();
   unlocked = { keys, generation: before.gate?.generation };
   closing = false;
@@ -141,26 +143,39 @@ export async function savePasskeyUnlock(wrap: PasskeyWrap | undefined, expected:
   const before = await stored(); const stamp = epoch;
   checkBinding(before, expected); current(before);
   if (wrap && wrap.vaultId !== expected.vaultId) throw new Error("Passkey belongs to another local vault.");
-  await guardedWrite(before, stamp, s => { if (wrap) s.put(wrap, "passkeyUnlock"); else s.delete("passkeyUnlock"); }, false, false, true);
+  await guardedWrite(before, stamp, s => { if (wrap) s.put(wrap, "passkeyUnlock"); else s.delete("passkeyUnlock"); }, { passkey: true });
+}
+
+export async function passwordUnlockContext() {
+  const value = await stored();
+  return {
+    binding: value.vault ? { vaultId: value.vault.id, generation: value.gate?.generation, passwordCiphertext: value.password?.envelope.ct ?? null } satisfies VaultBinding : undefined,
+    envelope: value.password?.vaultId === value.vault?.id ? value.password?.envelope : undefined,
+  };
+}
+export async function savePasswordUnlock(envelope: PasswordWrap, expected: VaultBinding) {
+  const before = await stored(); const stamp = epoch; checkBinding(before, expected); current(before);
+  await guardedWrite(before, stamp, s => { s.put({ vaultId: expected.vaultId, envelope }, "passwordUnlock"); }, { password: true });
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, allowSignedOut = false, requireUnchangedRecords = false, requireUnchangedPasskey = false): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean } = {}): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
-    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock");
-    passkey.onsuccess = () => {
-      if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!allowSignedOut && gate.result?.signedOut) ||
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
+    password.onsuccess = () => {
+      if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!options.allowSignedOut && gate.result?.signedOut) ||
         vault.result?.id !== before.vault?.id) {
         failure = new Error("Device session changed. Unlock Drip again before continuing."); t.abort(); return;
       }
-      if (requireUnchangedPasskey && JSON.stringify(passkey.result) !== JSON.stringify(before.passkey)) {
+      if ((options.passkey && JSON.stringify(passkey.result) !== JSON.stringify(before.passkey)) ||
+        (options.password && JSON.stringify(password.result) !== JSON.stringify(before.password))) {
         failure = new Error("Passkey setup changed. Unlock Drip again before continuing."); t.abort(); return;
       }
       // Replacing a vault must not discard an edit or sync result committed while
       // asynchronous key derivation/encryption was running, including in other tabs.
-      if ((!before.vault || requireUnchangedRecords) && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud))) {
+      if ((!before.vault || options.records) && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud))) {
         failure = new Error("Local data changed while preparing the replacement. Your current copy is kept; review it and retry."); t.abort(); return;
       }
       try { write(s, cloud.result); }
@@ -218,8 +233,9 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   await guardedWrite(before, stamp, s => {
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");
     if (keys.header.id !== before.vault?.id) s.delete("passkeyUnlock");
+    if (keys.header.id !== before.vault?.id) s.delete("passwordUnlock");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
-  }, !!resumeGeneration, true);
+  }, { allowSignedOut: !!resumeGeneration, records: true });
   if (stamp !== epoch) throw new VaultLockedError();
   epoch++; // Pending writes belong to the copy the user just replaced.
   unlocked = { keys, generation };
@@ -242,6 +258,21 @@ export async function completeDeviceSession(generation: string, value: unknown):
     request.onsuccess = () => { if (request.result?.generation === generation) { s.put(value, "deviceSession"); changed = true; } };
     t.oncomplete = () => { db.close(); resolve(changed); };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not update the device session.", { cause: t.error })); };
+  });
+}
+
+/** Reserve a fresh browser for password recovery without racing another onboarding. */
+export async function claimEmptyPasswordDevice(expectedGeneration?: string): Promise<string> {
+  const db = await open(); const generation = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failed = false;
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), verifier = s.get("verifier");
+    verifier.onsuccess = () => {
+      if (gate.result?.generation !== expectedGeneration || vault.result || verifier.result) { failed = true; t.abort(); return; }
+      s.put({ signedOut: true, remotePending: false, generation }, "deviceSession");
+    };
+    t.oncomplete = () => { db.close(); lockLocalVault(true); resolve(generation); };
+    t.onabort = t.onerror = () => { db.close(); reject(new Error(failed ? "Device session changed. Try again." : "Could not reserve this device.")); };
   });
 }
 export async function storeCloudConnection(state: CloudState | undefined, expectedGeneration?: string, expectedConnectionGeneration?: string): Promise<void> {

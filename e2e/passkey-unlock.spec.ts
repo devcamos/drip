@@ -48,6 +48,7 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
   await expect(page.getByText(/removed from this browser/)).toBeVisible();
   await page.reload(); await expect(page.getByRole("heading", { name: "Unlock Drip" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
+  await page.getByText("Forgot password? Recover with a code", { exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
@@ -68,6 +69,7 @@ test("ordinary saved passkeys without PRF do not enable encrypted unlock", async
   await page.getByRole("button", { name: "Set up passkey unlock" }).click();
   await expect(page.getByText(/does not support encrypted passkey unlock/)).toBeVisible();
   await page.reload(); await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
+  await page.getByText("Forgot password? Recover with a code", { exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("fallbacktester");

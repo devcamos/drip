@@ -5,6 +5,7 @@ import { readCloudState } from "@/lib/cloud";
 import { finishDeviceSignOut, readDeviceSession, resumeDevice, signOutDevice, unlockDevice } from "@/lib/device-session";
 import type { AppData } from "@/lib/types";
 import { hasPasskeyUnlock, unlockWithPasskey } from "@/lib/passkey-unlock";
+import { PasswordSignIn } from "./PasswordSignIn";
 
 export function SignOutButton() {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -13,7 +14,7 @@ export function SignOutButton() {
     try {
       const state = await readCloudState();
       const pending = state?.dirty ? "You have unsynced changes. They will stay on this device and can sync after you sign back in. " : "";
-      if (!confirm(`${pending}Sign out and lock Drip on this device? Your local accounts are kept. Use your configured passkey or a recovery code to sign back in.`)) return;
+      if (!confirm(`${pending}Sign out and lock Drip on this device? Your local accounts are kept. Sign back in with your gamertag and password or configured passkey. Recovery codes are available if you forgot your password.`)) return;
       await signOutDevice();
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
@@ -48,7 +49,8 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
   const submitText = busy ? "Unlocking…" : copy.action;
   return <main>
     <h1>{copy.title}</h1>
-    <p className="muted">{mode === "migration" ? "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified." : "Your accounts and unsynced changes stay encrypted on this device. Unlock them with your configured passkey or a recovery code. Cloud sync is paused while locked."}</p>
+    <p className="muted">{mode === "migration" ? "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified." : "Sign in with your gamertag and password, or use your configured passkey. Your accounts stay encrypted while signed out."}</p>
+    {mode !== "migration" && <PasswordSignIn onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />}
     {passkey && mode !== "migration" && <section className="panel" aria-label="Unlock with your passkey">
       <button className="btn" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
@@ -65,7 +67,8 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
       catch (error) { setRemoteMessage((error as Error).message); }
       finally { setBusy(false); }
     }}>Retry cloud sign-out</button>}
-    <form className="panel" onSubmit={async e => {
+    <details className="panel" open={mode === "migration" || undefined}><summary>Forgot password? Recover with a code</summary>
+    <form onSubmit={async e => {
       e.preventDefault(); setBusy(true); setMessage("");
       try {
         if (verifier) { await resumeDevice(code, verifier, data); }
@@ -74,14 +77,15 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
       } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
     }}>
       <h2>{copy.section}</h2>
-      {!passkey && mode !== "migration" && <p className="muted">Want faster access? Sign in once, then set up passkey unlock in Recovery.</p>}
+      {mode !== "migration" && <p className="muted">Use a recovery code to regain access, then set a new password in Recovery → Sign-in &amp; password. Existing accounts need this once to set their first password.</p>}
       <label htmlFor="device-sign-in-code">Recovery code</label>
       <input id="device-sign-in-code" type="password" autoComplete="off" autoCapitalize="characters" value={code} onChange={e => setCode(e.target.value)} />
       <p className="muted">Use your original code or one of your downloaded codes. Your gamertag alone cannot sign you in.</p>
       <button type="submit" className="btn" disabled={busy || !code}>{submitText}</button>
-    </form>
+    </form></details>
     <details className="panel"><summary>Use another account</summary>
       <p className="muted">Restore an account with cloud recovery enabled. This replaces the accounts kept here; export any unsynced data first.</p>
+      <PasswordSignIn onSignedIn={onSignedIn} replaceExisting disabled={busy} onBusyChange={setBusy} />
       <CloudReturn fromSignedOut={mode === "signedOut"} replaceExisting codeLabel="Other account recovery code" onRestored={() => onSignedIn()} />
     </details>
     {remoteMessage && <output className="muted">{remoteMessage}</output>}

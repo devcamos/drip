@@ -36,6 +36,15 @@ it("blocks private requests when signed out and permits only explicit recovery-c
   await safeFetch(new URL("http://drip.local/api/cloud/status"));
   expect(fetcher).toHaveBeenCalledTimes(3);
 });
+it("binds password sign-in to the signed-out generation and rejects stale password attempts", async () => {
+  const { setItem } = await import("../lib/db");
+  await setItem("deviceSession", { signedOut: true, generation: "out" });
+  const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  await expect(safeFetch("/api/auth/sign-in/gamertag", { method: "POST" })).rejects.toThrow(/signed out/);
+  await expect(safeFetch("/api/auth/sign-in/gamertag", { method: "POST", headers: { "X-Drip-Resume": "old" } })).rejects.toThrow(/changed/);
+  await safeFetch("/api/auth/sign-in/gamertag", { method: "POST", headers: { "X-Drip-Resume": "out" } });
+  expect(fetcher).toHaveBeenCalledOnce();
+});
 it("serializes private requests with sign-out through the browser's shared lock", async () => {
   const { setItem } = await import("../lib/db");
   let tail: Promise<unknown> = Promise.resolve();

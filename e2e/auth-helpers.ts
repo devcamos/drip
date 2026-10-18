@@ -12,7 +12,7 @@ export async function withAuthRetry(page: Page, action: () => Promise<void>, suc
     await action();
     await expect.poll(async () => {
       if (await success.isVisible()) return "saved";
-      if (await page.getByText(/Too many sign-in attempts/).isVisible()) return "limited";
+      if (await page.getByText(/Too many sign-in attempts/).first().isVisible()) return "limited";
       return "pending";
     }, { timeout: 30_000 }).not.toBe("pending");
     if (await success.isVisible()) return;

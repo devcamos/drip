@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { unlock } from "./vault-helpers";
+import { unlock, showCloudRecovery } from "./vault-helpers";
 import { withAuthRetry } from "./auth-helpers";
 
 async function createCashIsa(page: Page) {
@@ -53,6 +53,7 @@ test("categories, income and bonus predictions survive reload and encrypted back
   const fresh = await browser.newContext();
   try {
     const restored = await fresh.newPage(); await restored.goto("http://localhost:4321");
+    await showCloudRecovery(restored);
     await restored.getByRole("button", { name: "Restore a backup", exact: true }).click();
     await restored.getByLabel("Backup file", { exact: true }).setInputFiles((await backup.path())!);
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code);

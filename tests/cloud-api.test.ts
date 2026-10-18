@@ -15,6 +15,14 @@ beforeEach(() => {
   vi.stubEnv("BETTER_AUTH_URL", origin);
 });
 describe("vault authorization and version contract", () => {
+  it("bounds custom password auth bodies and rejects cross-origin requests before invoking auth", async () => {
+    const url = origin + "/api/auth/sign-in/gamertag";
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" }))).status).toBe(403);
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin } }))).status).toBe(400);
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin }, body: "x".repeat(5000) }))).status).toBe(413);
+    expect(backend.handler).not.toHaveBeenCalled();
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin }, body: "{}" }))).status).toBe(200);
+  });
   it("binds passkey registration to the connected owner, not a newly switched session", async () => {
     const request = new Request(origin + "/api/auth/passkey/verify-registration", { method: "POST", headers: { "X-Drip-Owner": "owner-1" } });
     backend.user = "owner-2";

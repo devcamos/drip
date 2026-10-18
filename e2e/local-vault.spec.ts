@@ -57,6 +57,6 @@ test("new accounts never persist usable keys and sign-out retains only encrypted
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   const raw = await storage(page); expect(raw.data.app).toBe("drip-local-data"); expect(raw.hasKey).toBe(false);
   expect(JSON.stringify(raw)).not.toContain("vaulttester");
-  await page.reload(); await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.reload(); await page.getByText("Forgot password? Recover with a code", { exact: true }).click(); await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("vaulttester");
 });
