@@ -45,7 +45,8 @@ export default function Drip() {
   }, [refresh]);
   if (error) return <main><p role="alert">{error}</p><button className="btn" onClick={refresh}>Try again</button></main>;
   if (!gate) return <main><p className="muted">Loading…</p></main>;
-  if (gate.signedOut || gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.signedOut ? "signedOut" : gate.status === "migration" ? "migration" : "locked"} onSignedIn={refresh} />;
+  if (gate.signedOut) return <SignedOut mode="signedOut" onSignedIn={refresh} />;
+  if (gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.status} onSignedIn={refresh} />;
   return <UnlockedDrip />;
 }
 
@@ -110,8 +111,9 @@ function UnlockedDrip() {
 
   if (loadError) return <main><p role="alert">{loadError}</p></main>;
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
-  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud = false, expectedGeneration, root) => {
-    const d = restored ? fromCloud ? restored : { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
+  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud, expectedGeneration, root) => {
+    let d = restored ?? { ...data, identity };
+    if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
     if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
     await clearDraft();
     setVerifier(v); setView({ name: "home" }); setData(d);
@@ -183,7 +185,7 @@ function UnlockedDrip() {
   );
 }
 
-function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Identity | null) => void; cta?: string; initial?: string; onRaw?: (h: string) => void }) {
+function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (i: I.Identity | null) => void; cta?: string; initial?: string; onRaw?: (h: string) => void }>) {
   const [handle, setHandle] = useState(initial);
   const err = handle ? I.handleError(handle) : null;
   const ok = !!handle && !err;
@@ -199,7 +201,7 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Iden
   );
 }
 
-function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string) => void | Promise<void> }) {
+function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string) => void | Promise<void> }>) {
   const [draft, setDraft] = useState<{ handle: string; code: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
   useEffect(() => {
@@ -251,7 +253,7 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
   );
 }
 
-function Home({ data, open, add }: { data: AppData; open: (id: string) => void; add: () => void }) {
+function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) => void; add: () => void }>) {
   const t = today();
   const up = M.upcoming(data.accounts, t);
   return (
@@ -284,7 +286,7 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
   );
 }
 
-function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }) {
+function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }>) {
   const [amt, setAmt] = useState(""); const [date, setDate] = useState(today());
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null); const [verr, setVerr] = useState(""); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
   const [by, setBy] = useState<"week" | "month">("week");
@@ -365,7 +367,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
   );
 }
 
-function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (a: Account) => void; onCancel: () => void }) {
+function AddForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void; onCancel: () => void }>) {
   const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
   const [custom, setCustom] = useState(existing && !(existing.provider in PROVIDERS) ? existing.provider : "");
   const [label, setLabel] = useState(existing?.label ?? "");
@@ -381,10 +383,10 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   return (
     <>
       <h1>{existing ? "Edit account" : "Add account"}</h1>
-      <label>Provider</label>
-      <select aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
-      {isOther && <><label>Provider name</label><input aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
-      <label>Nickname (optional, never synced to cloud)</label><input aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
+      <label htmlFor="account-provider">Provider</label>
+      <select id="account-provider" aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
+      {isOther && <><label htmlFor="custom-provider">Provider name</label><input id="custom-provider" aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
+      <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
       <div className="grid">
         <div><label>Balance £</label><input inputMode="decimal" aria-label="Balance" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
         <div><label>Rate % a year</label><input inputMode="decimal" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
@@ -410,7 +412,7 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   );
 }
 
-function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string; verifier: Verifier; onUnlock: () => void }) {
+function LockScreen({ credentialId, verifier, onUnlock }: Readonly<{ credentialId: string; verifier: Verifier; onUnlock: () => void }>) {
   const [code, setCode] = useState(""); const [err, setErr] = useState("");
   const tryPasskey = async () => { setErr(""); if (await L.verifyPasskey(navigator.credentials, credentialId, location.hostname)) onUnlock(); else setErr("Face ID didn't work. Try again or use your recovery code."); };
   useEffect(() => { tryPasskey(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -427,7 +429,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void> }) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: Readonly<{ data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void> }>) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (
@@ -492,7 +494,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   );
 }
 
-function Restore({ onRestored }: { onRestored: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void> }) {
+function Restore({ onRestored }: Readonly<{ onRestored: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void> }>) {
   const [file, setFile] = useState<File | null>(null); const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   return (
     <>

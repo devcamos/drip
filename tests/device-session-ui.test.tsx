@@ -50,4 +50,15 @@ describe("visible sign-out and code return", () => {
     await act(async () => { window.dispatchEvent(new Event("online")); });
     await waitFor(() => expect(screen.queryByText(/not yet confirmed/)).toBeNull());
   });
+  it("reports failed session reads and keeps the retry action usable", async () => {
+    actions.readDeviceSession.mockResolvedValue({ remotePending: true });
+    render(<SignedOut data={emptyData()} verifier={{ salt: "s", hash: "h" }} onSignedIn={vi.fn()} />);
+    const retry = await screen.findByRole("button", { name: "Retry cloud sign-out" });
+    actions.readDeviceSession.mockRejectedValue(new Error("Local session storage unavailable"));
+    await act(async () => { window.dispatchEvent(new Event("drip-session-changed")); });
+    expect(await screen.findByText("Local session storage unavailable")).toBeInTheDocument();
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(screen.getByText("Local session storage unavailable")).toBeInTheDocument();
+  });
 });

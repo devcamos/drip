@@ -27,7 +27,7 @@ export function PwaStatus() {
     return () => { active = false; window.removeEventListener("online", online); window.removeEventListener("offline", online); window.removeEventListener("drip-accept-update", accept); registration?.removeEventListener("updatefound", found); navigator.serviceWorker?.removeEventListener("controllerchange", changed); };
   }, []);
   return <>
-    {offline && <p className="banner warn" role="status">Offline — Drip is using this device&apos;s saved accounts. Cloud recovery resumes online.</p>}
+    {offline && <output className="banner warn">Offline — Drip is using this device&apos;s saved accounts. Cloud recovery resumes online.</output>}
     {waiting && <div className="banner info"><span>Drip update ready. Finish editing before reloading.</span><button className="btn small" onClick={() => { window.dispatchEvent(new Event("drip-accept-update")); waiting.postMessage({ type: "SKIP_WAITING" }); }}>Reload update</button></div>}
   </>;
 }

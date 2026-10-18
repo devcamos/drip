@@ -1,5 +1,5 @@
 // Public app-shell assets only. Never cache authentication, session or vault APIs.
-const CACHE = 'drip-shell-v8';
+const CACHE = 'drip-shell-v9';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png', '/fonts/DM-Sans.ttf'];
 const isAsset = path => path.startsWith('/_next/static/') || path.startsWith('/fonts/') || SHELL.includes(path);
 self.addEventListener('install', event => {

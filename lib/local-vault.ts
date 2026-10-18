@@ -4,7 +4,7 @@ export interface VaultHeader { app: "drip-local-vault"; v: 1; id: string; wrappe
 export interface LocalEnvelope { app: "drip-local-data"; v: 1; iv: string; ct: string }
 export interface LocalKeys { header: VaultHeader; dataKey: CryptoKey; cloudKey: CryptoKey }
 const enc = new TextEncoder();
-const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const b64 = (bytes: Uint8Array) => btoa(String.fromCodePoint(...bytes));
 const unb64 = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
 const importKey = (bytes: Uint8Array) => crypto.subtle.importKey("raw", bytes as BufferSource, "AES-GCM", false, ["encrypt", "decrypt"]);
 
@@ -33,7 +33,8 @@ export async function encryptLocal(value: unknown, keys: LocalKeys): Promise<Loc
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(`drip-local-data-v1:${keys.header.id}`) }, keys.dataKey, enc.encode(JSON.stringify(value)));
   // Avoid spreading account-sized arrays into a function call.
-  let encoded = ""; for (const byte of new Uint8Array(ct)) encoded += String.fromCharCode(byte);
+  let encoded = "";
+  for (const byte of new Uint8Array(ct)) { encoded += String.fromCodePoint(byte); }
   return { app: "drip-local-data", v: 1, iv: b64(iv), ct: btoa(encoded) };
 }
 

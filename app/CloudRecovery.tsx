@@ -8,17 +8,28 @@ import * as C from "@/lib/crypto";
 import { authClient, connect, readCloudState, restoreCloud, syncNow, vault, writeCloudState } from "@/lib/cloud";
 type OnRestored = (data: AppData, code: string) => void | Promise<void>;
 
-export function CloudSync({ hasData = false }: { hasData?: boolean }) {
+export function CloudSync({ hasData = false }: Readonly<{ hasData?: boolean }>) {
   const [message, setMessage] = useState("");
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     let active = true;
     const run = async () => {
-      if (!(await readCloudState())) { if (active) setMessage(hasData ? "Saved on this device only. Enable cloud recovery to keep a copy if this browser is cleared." : ""); return; }
-      if (!navigator.onLine) { if (active) setMessage("Offline — changes are saved on this device and waiting to sync."); return; }
-      try { const m = await syncNow(); if (active) setMessage(m); } catch (e) { if (active) setMessage((e as Error).message); }
+      if (!active) return;
+      try {
+        const state = await readCloudState();
+        if (!active) return;
+        if (!state) {
+          setMessage(hasData ? "Saved on this device only. Enable cloud recovery to keep a copy if this browser is cleared." : "");
+          return;
+        }
+        if (!navigator.onLine) {
+          setMessage("Offline — changes are saved on this device and waiting to sync.");
+          return;
+        }
+        const m = await syncNow(); if (active) setMessage(m);
+      } catch (e) { if (active) setMessage((e as Error).message); }
     };
-    const schedule = () => { clearTimeout(timer); timer = setTimeout(run, 1000); };
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(() => { void run(); }, 1000); };
     const onVisible = () => { if (document.visibilityState === "visible") schedule(); };
     schedule();
     window.addEventListener("drip-data-saved", schedule); window.addEventListener("drip-cloud-changed", schedule); window.addEventListener("online", schedule); window.addEventListener("offline", schedule);
@@ -26,10 +37,10 @@ export function CloudSync({ hasData = false }: { hasData?: boolean }) {
     const retry = setInterval(schedule, 60_000);
     return () => { active = false; clearTimeout(timer); clearInterval(retry); window.removeEventListener("drip-data-saved", schedule); window.removeEventListener("drip-cloud-changed", schedule); window.removeEventListener("online", schedule); window.removeEventListener("offline", schedule); document.removeEventListener("visibilitychange", onVisible); };
   }, [hasData]);
-  return message ? <p className="muted" role="status">{message}</p> : null;
+  return message ? <output className="muted">{message}</output> : null;
 }
 
-export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false, codeLabel }: { onRestored: OnRestored; replaceExisting?: boolean; fromSignedOut?: boolean; codeLabel?: string }) {
+export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut = false, codeLabel }: Readonly<{ onRestored: OnRestored; replaceExisting?: boolean; fromSignedOut?: boolean; codeLabel?: string }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const [userId, setUserId] = useState<string>();
   async function run(passkey: boolean) {
@@ -57,17 +68,19 @@ export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut
     <input id="cloud-return-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
     <p className="muted">{fromSignedOut ? "Use a code for the account you want to restore. This replaces the local accounts on this device." : "Your code is needed to decrypt your data on a new device, even after passkey sign-in. It can also recover your account without a passkey."}</p>
     <button className="btn" disabled={busy || !C.isValidCode(code)} onClick={() => run(false)}>{busy ? "Connecting…" : "Restore cloud accounts"}</button>
-    {message && <p role="status" className="muted">{message}</p>}
+    {message && <output className="muted">{message}</output>}
   </section>;
 }
 
-export function CloudPanel({ data, verifier, onRestored }: { data: AppData; verifier: { salt: string; hash: string }; onRestored: OnRestored }) {
+export function CloudPanel({ data, verifier, onRestored }: Readonly<{ data: AppData; verifier: { salt: string; hash: string }; onRestored: OnRestored }>) {
   const [available, setAvailable] = useState(false); const [enabled, setEnabled] = useState(false);
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
     fetch("/api/cloud/status", { cache: "no-store" }).then(r => r.json()).then(v => { if (active) setAvailable(v.available === true); }).catch(() => {});
-    const refresh = () => readCloudState().then(s => { if (active) setEnabled(!!s); });
+    const refresh = () => {
+      readCloudState().then(s => { if (active) setEnabled(!!s); }).catch(error => { if (active) setMessage((error as Error).message); });
+    };
     refresh(); window.addEventListener("drip-cloud-changed", refresh);
     return () => { active = false; window.removeEventListener("drip-cloud-changed", refresh); };
   }, []);
@@ -101,7 +114,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
       const root = await resolveRecoveryCode(code);
       if (!(await C.checkCode(root, verifier))) throw new Error("That isn't your recovery code.");
       const state = await readCloudState(); const account = await connect(root, data);
-      if (!state || state.userId !== account.user.id) throw new Error("That is not the connected cloud account. Local data has not changed.");
+      if (state?.userId !== account.user.id) throw new Error("That is not the connected cloud account. Local data has not changed.");
       setCode(""); setMessage(await syncNow());
     } catch(e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
@@ -141,7 +154,7 @@ export function CloudPanel({ data, verifier, onRestored }: { data: AppData; veri
         <p className="muted">Enable cloud recovery only on a trusted device. Keys stay in memory while Drip is unlocked. Reopening the app needs a recovery code; sync pauses while locked.</p>
         <button className="btn" disabled={busy || !available || !C.isValidCode(code)} onClick={enable}>{busy ? "Saving…" : "Enable encrypted cloud recovery"}</button>
       </>}
-      {message && <p className="muted" role="status">{message}</p>}
+      {message && <output className="muted">{message}</output>}
     </section>
     <details className="panel"><summary>Restore an existing cloud copy</summary>
       <p className="muted">This replaces this device&apos;s accounts. Export a local backup first if you have unsynced changes.</p>

@@ -16,45 +16,62 @@ export function SignOutButton() {
       await signOutDevice();
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
-  return <><button className="btn ghost small" disabled={busy} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{message && <p role="status" className="err">{message}</p>}</>;
+  return <><button className="btn ghost small" disabled={busy} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{message && <output className="err">{message}</output>}</>;
 }
 
-export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: { data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void; mode?: "signedOut" | "locked" | "migration" }) {
+export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [remoteMessage, setRemoteMessage] = useState(""); const [pending, setPending] = useState(false); const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
-    const refresh = async () => { const session = await readDeviceSession(); if (active) setPending(!!session?.remotePending); };
+    const refresh = async () => {
+      try { const session = await readDeviceSession(); if (active) setPending(!!session?.remotePending); }
+      catch (error) { if (active) setRemoteMessage((error as Error).message); }
+    };
     const finish = async () => {
       try { await finishDeviceSignOut(); if (active) setRemoteMessage(""); } catch (e) { if (active) setRemoteMessage((e as Error).message); }
       await refresh();
     };
-    refresh(); finish(); window.addEventListener("online", finish); window.addEventListener("drip-session-changed", refresh);
-    return () => { active = false; window.removeEventListener("online", finish); window.removeEventListener("drip-session-changed", refresh); };
+    const onOnline = () => { void finish(); };
+    const onChange = () => { void refresh(); };
+    onChange(); onOnline();
+    window.addEventListener("online", onOnline); window.addEventListener("drip-session-changed", onChange);
+    return () => { active = false; window.removeEventListener("online", onOnline); window.removeEventListener("drip-session-changed", onChange); };
   }, []);
+  const copy = {
+    signedOut: { title: "Drip is signed out", section: "Sign back in", action: "Sign in" },
+    locked: { title: "Unlock Drip", section: "Open your accounts", action: "Unlock Drip" },
+    migration: { title: "Encrypt this device", section: "Protect local accounts", action: "Encrypt local data" },
+  }[mode];
+  const submitText = busy ? "Unlocking…" : copy.action;
   return <main>
-    <h1>{mode === "signedOut" ? "Drip is signed out" : mode === "migration" ? "Encrypt this device" : "Unlock Drip"}</h1>
+    <h1>{copy.title}</h1>
     <p className="muted">{mode === "migration" ? "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified." : "Your accounts and unsynced changes stay encrypted on this device. Enter a recovery code to unlock them. Cloud sync is paused while locked."}</p>
-    {pending && <p className="banner warn" role="status">Drip is locked here. Cloud session sign-out is not yet confirmed; it will retry when you reconnect.</p>}
+    {pending && <output className="banner warn">Drip is locked here. Cloud session sign-out is not yet confirmed; it will retry when you reconnect.</output>}
     {pending && <button className="btn ghost small" disabled={busy} onClick={async () => {
       setBusy(true);
-      try { await finishDeviceSignOut(); setRemoteMessage(""); } catch (error) { setRemoteMessage((error as Error).message); }
-      finally { setPending(!!(await readDeviceSession())?.remotePending); setBusy(false); }
+      try { await finishDeviceSignOut(); setPending(!!(await readDeviceSession())?.remotePending); setRemoteMessage(""); }
+      catch (error) { setRemoteMessage((error as Error).message); }
+      finally { setBusy(false); }
     }}>Retry cloud sign-out</button>}
     <form className="panel" onSubmit={async e => {
       e.preventDefault(); setBusy(true); setMessage("");
-      try { if (verifier) await resumeDevice(code, verifier, data); else await unlockDevice(code); setCode(""); onSignedIn(); } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
+      try {
+        if (verifier) { await resumeDevice(code, verifier, data); }
+        else { await unlockDevice(code); }
+        setCode(""); await onSignedIn();
+      } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
     }}>
-      <h2>{mode === "migration" ? "Protect local accounts" : mode === "locked" ? "Open your accounts" : "Sign back in"}</h2>
+      <h2>{copy.section}</h2>
       <label htmlFor="device-sign-in-code">Recovery code</label>
       <input id="device-sign-in-code" type="password" autoComplete="off" autoCapitalize="characters" value={code} onChange={e => setCode(e.target.value)} />
       <p className="muted">Use your original code or one of your downloaded codes. Your gamertag alone cannot sign you in.</p>
-      <button className="btn" disabled={busy || !code}>{busy ? "Unlocking…" : mode === "migration" ? "Encrypt local data" : mode === "locked" ? "Unlock Drip" : "Sign in"}</button>
+      <button type="submit" className="btn" disabled={busy || !code}>{submitText}</button>
     </form>
     <details className="panel"><summary>Use another account</summary>
       <p className="muted">Restore an account with cloud recovery enabled. This replaces the accounts kept here; export any unsynced data first.</p>
       <CloudReturn fromSignedOut={mode === "signedOut"} replaceExisting codeLabel="Other account recovery code" onRestored={() => onSignedIn()} />
     </details>
-    {remoteMessage && <p role="status" className="muted">{remoteMessage}</p>}
-    {message && <p role="status" className="err">{message}</p>}
+    {remoteMessage && <output className="muted">{remoteMessage}</output>}
+    {message && <output className="err">{message}</output>}
   </main>;
 }

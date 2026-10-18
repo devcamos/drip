@@ -4,7 +4,7 @@ import * as C from "@/lib/crypto";
 import { authClient, connect, readCloudState } from "@/lib/cloud";
 import { createRecoveryCodes, downloadRecoveryCodes, registerRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
 import type { AppData } from "@/lib/types";
-export function RecoveryCodes({ data, verifier }: { data: AppData; verifier: { salt: string; hash: string } }) {
+export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; verifier: { salt: string; hash: string } }>) {
   const [code, setCode] = useState(""); const [codes, setCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   async function generate() {
@@ -36,6 +36,6 @@ export function RecoveryCodes({ data, verifier }: { data: AppData; verifier: { s
       <input id="create-recovery-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
       <div className="row-gap"><button className="btn" disabled={busy || !C.isValidCode(code)} onClick={generate}>{busy ? "Creating codes…" : "Create six recovery codes"}</button></div>
     </>}
-    {message && <p className="muted" role="status">{message}</p>}
+    {message && <output className="muted">{message}</output>}
   </section>;
 }

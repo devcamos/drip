@@ -7,7 +7,13 @@ const validLocator = (value: unknown): value is string => typeof value === "stri
 async function bodyOf(request: Request) {
   const reader = request.body?.getReader(); if (!reader) return null;
   const chunks: Uint8Array[] = []; let length = 0;
-  while (true) { const { value, done } = await reader.read(); if (done) break; length += value.length; if (length > 12_000) { await reader.cancel(); return null; } chunks.push(value); }
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    length += value.length;
+    if (length > 12_000) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return null; }
 }
 const sameOrigin = (request: Request) => request.headers.get("origin") === new URL(process.env.BETTER_AUTH_URL ?? request.url).origin;

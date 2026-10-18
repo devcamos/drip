@@ -36,7 +36,15 @@ export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: 
   try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !records.some(record => record.locator === old.locator)), ...records].slice(-12)); return true; } catch { return false; }
 }
 export function downloadRecoveryCodes(codes: string[], handle?: string) {
-  const content = `DRIP RECOVERY CODES\n${handle ? `Gamertag: ${handle}\n` : ""}\n${codes.map((code, i) => `${i + 1}. ${code}`).join("\n")}\n\nKeep this file private, away from your device. Anyone with one code can recover your encrypted cloud accounts.\nEach code can be reused. Your gamertag alone cannot recover your data.\nCloud recovery must be enabled first. Otherwise your original code only unlocks encrypted file backups. Codes recover the latest successfully synced cloud copy; offline changes must sync first.\n`;
+  const heading = handle ? `DRIP RECOVERY CODES\nGamertag: ${handle}` : "DRIP RECOVERY CODES";
+  const numberedCodes = codes.map((code, i) => `${i + 1}. ${code}`).join("\n");
+  const content = [
+    heading, "", numberedCodes, "",
+    "Keep this file private, away from your device. Anyone with one code can recover your encrypted cloud accounts.",
+    "Each code can be reused. Your gamertag alone cannot recover your data.",
+    "Cloud recovery must be enabled first. Otherwise your original code only unlocks encrypted file backups. Codes recover the latest successfully synced cloud copy; offline changes must sync first.",
+    "",
+  ].join("\n");
   const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
   const link = document.createElement("a"); link.href = url; link.download = "drip-recovery-codes.txt"; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);

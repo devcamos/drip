@@ -8,6 +8,7 @@ body { padding: env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-botto
 main { max-width: 480px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 28px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 20px 0 8px; }
 .muted { color: var(--muted); font-size: 14px; }
+output { display:block; margin:1em 0; }
 .big { font-size: 34px; font-weight: 700; }
 .panel { background: var(--panel); border-radius: 16px; padding: 16px; margin: 12px 0; }
 .banner { border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; background:var(--panel); display:flex; gap:10px; align-items:center; justify-content:space-between; }
@@ -24,9 +25,8 @@ h1 { font-size: 28px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 20px 0 
 .btn.danger { background: var(--bad); color:var(--on-accent); }
 .btn:disabled { opacity:.5; }
 label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
-input, select { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; }
+input, select { width:100%; min-width:0; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; }
 .grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
-input, select { min-width:0; }
 summary { cursor:pointer; font-weight:700; }
 .stat { background:var(--panel); border-radius:14px; padding:14px; } .stat .v { font-size:20px; font-weight:700; margin-top:4px; }
 nav.tabs { position:fixed; left:0; right:0; bottom:0; display:flex; background:var(--bg); border-top:1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }

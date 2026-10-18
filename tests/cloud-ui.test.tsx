@@ -117,6 +117,14 @@ describe("cloud recovery settings", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     await panel(); expect(screen.getByText(/Cloud is unavailable here/)).toBeInTheDocument();
   });
+  it("reports local storage failures during connection refresh and can recover on the next event", async () => {
+    cloud.readCloudState.mockRejectedValue(new Error("Could not read local storage"));
+    await panel();
+    expect(await screen.findByRole("status")).toHaveTextContent("Could not read local storage");
+    cloud.readCloudState.mockResolvedValue({ userId: "user" });
+    await act(async () => { window.dispatchEvent(new Event("drip-cloud-changed")); });
+    expect(await screen.findByText(/Cloud recovery is connected/)).toBeInTheDocument();
+  });
   it("propagates asynchronous restore errors through the settings callback", async () => {
     const restored = vi.fn().mockRejectedValue(new Error("Could not refresh restored accounts"));
     render(<CloudPanel data={data} verifier={await codeVerifier(code)} onRestored={restored} />);
@@ -142,6 +150,20 @@ describe("cloud recovery settings", () => {
 });
 
 describe("automatic sync", () => {
+  it("reports a failed local read without an unhandled rejection, then retries successfully", async () => {
+    vi.useFakeTimers();
+    try {
+      cloud.readCloudState.mockRejectedValue(new Error("Could not read local accounts"));
+      const view = render(<CloudSync />);
+      await act(() => vi.advanceTimersByTimeAsync(1100));
+      expect(screen.getByRole("status")).toHaveTextContent("Could not read local accounts");
+      expect(cloud.syncNow).not.toHaveBeenCalled();
+      cloud.readCloudState.mockResolvedValue({ userId: "user" });
+      await act(async () => { window.dispatchEvent(new Event("drip-data-saved")); await vi.advanceTimersByTimeAsync(1100); });
+      expect(screen.getByRole("status")).toHaveTextContent("Encrypted cloud copy saved.");
+      view.unmount();
+    } finally { vi.useRealTimers(); }
+  });
   it("schedules uploads after local changes and reconnects, and reports a conflict", async () => {
     vi.useFakeTimers(); cloud.readCloudState.mockResolvedValue({});
     const view = render(<CloudSync />);

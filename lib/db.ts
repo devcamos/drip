@@ -26,7 +26,7 @@ function open(): Promise<IDBDatabase> {
     const r = indexedDB.open(DB, 2);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
-    r.onerror = () => rej(r.error);
+    r.onerror = () => rej(new Error("Could not open local storage.", { cause: r.error }));
   });
 }
 async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -34,7 +34,7 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
   return new Promise((res, rej) => {
     const t = db.transaction(STORE, mode); const req = fn(t.objectStore(STORE));
     t.oncomplete = () => { db.close(); res(req.result); };
-    t.onerror = t.onabort = () => { db.close(); rej(t.error); };
+    t.onerror = t.onabort = () => { db.close(); rej(new Error("Local storage transaction failed.", { cause: t.error })); };
   });
 }
 async function stored(): Promise<Stored> {
@@ -43,7 +43,7 @@ async function stored(): Promise<Stored> {
     const t = db.transaction(STORE, "readonly"); const s = t.objectStore(STORE);
     const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier");
     t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result }); };
-    t.onerror = t.onabort = () => { db.close(); reject(t.error); };
+    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not read local storage.", { cause: t.error })); };
   });
 }
 function current(value: Stored, allowSignedOut = false) {
@@ -142,7 +142,7 @@ async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectS
       catch (error) { failure = error instanceof Error ? error : new Error("Local storage write failed."); t.abort(); }
     };
     t.oncomplete = () => { db.close(); resolve(); };
-    t.onerror = t.onabort = () => { db.close(); reject(failure ?? t.error); };
+    t.onerror = t.onabort = () => { db.close(); reject(failure ?? new Error("Local storage write failed.", { cause: t.error })); };
   });
 }
 export function saveData(data: AppData): Promise<void> {
@@ -176,7 +176,7 @@ export async function acknowledgeCloudUpload(expected: CloudState, version: numb
   try { current(before); } catch { return "changed"; }
   let result: "saved" | "queued" | "changed" = "changed";
   await guardedWrite(before, epoch, (s, cloud) => {
-    if (!cloud || cloud.userId !== expected.userId || cloud.generation !== expected.generation || cloud.version !== expected.version) return;
+    if (cloud?.userId !== expected.userId || cloud.generation !== expected.generation || cloud.version !== expected.version) return;
     const dirty = cloud.revision !== expected.revision;
     s.put({ ...cloud, version, dirty, lastSyncAt: at }, "cloudState"); result = dirty ? "queued" : "saved";
   });
@@ -215,7 +215,7 @@ export async function completeDeviceSession(generation: string, value: unknown):
     const request = s.get("deviceSession");
     request.onsuccess = () => { if (request.result?.generation === generation) { s.put(value, "deviceSession"); changed = true; } };
     t.oncomplete = () => { db.close(); resolve(changed); };
-    t.onerror = t.onabort = () => { db.close(); reject(t.error); };
+    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not update the device session.", { cause: t.error })); };
   });
 }
 export async function storeCloudConnection(state: CloudState | undefined, expectedGeneration?: string, expectedConnectionGeneration?: string): Promise<void> {

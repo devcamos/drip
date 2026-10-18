@@ -13,7 +13,8 @@ let instance: ReturnType<typeof createAuth> | undefined;
 let pool: Pool | undefined;
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error("Cloud recovery is not configured.");
-  return pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+  pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+  return pool;
 }
 export function authOptions() {
   const baseURL = process.env.BETTER_AUTH_URL;
@@ -29,5 +30,8 @@ export function authOptions() {
     plugins: [passkey({ rpID: new URL(baseURL).hostname, rpName: "Drip", origin })],
   };
 }
-export function getAuth() { return instance ??= createAuth(); }
+export function getAuth() {
+  instance ??= createAuth();
+  return instance;
+}
 export function cloudConfigured() { return !!(process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET && process.env.BETTER_AUTH_URL); }

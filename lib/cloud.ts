@@ -11,7 +11,11 @@ import { cloudPayload, fromCloudPayload } from "./cloud-payload";
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
 export interface Envelope { app: "drip-cloud"; v: 1; iv: string; ct: string }
 const enc = new TextEncoder();
-const b64 = (bytes: Uint8Array) => { let out = ""; for (const b of bytes) out += String.fromCharCode(b); return btoa(out); };
+const b64 = (bytes: Uint8Array) => {
+  let out = "";
+  for (const b of bytes) { out += String.fromCodePoint(b); }
+  return btoa(out);
+};
 const unb64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 async function hash(value: string) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(value)))].map(n => n.toString(16).padStart(2, "0")).join("");
@@ -19,9 +23,10 @@ async function hash(value: string) {
 export async function recoveryCredentials(code: string) {
   if (!isValidCode(code)) throw new Error("Enter your complete recovery code.");
   const normal = normaliseCode(code);
+  const locator = await hash(`drip-recovery-locator-v1:${normal}`);
   // Domain separation: the server never receives the encryption root code.
   return {
-    email: `${await hash(`drip-recovery-locator-v1:${normal}`)}@recovery.drip.invalid`,
+    email: `${locator}@recovery.drip.invalid`,
     password: await hash(`drip-recovery-auth-v1:${normal}`),
   };
 }
@@ -51,12 +56,20 @@ export async function writeCloudState(state: CloudState | undefined, expected?: 
 
 export async function vault(method = "GET", body?: unknown, ownerId?: string, resumeGeneration?: string) {
   const response = await safeFetch("/api/cloud", { method, credentials: "same-origin", cache: "no-store", headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(ownerId ? { "X-Drip-Owner": ownerId } : {}), ...(resumeGeneration ? { "X-Drip-Resume": resumeGeneration } : {}) }, body: body ? JSON.stringify(body) : undefined });
-  if (!response.ok) throw new Error(response.status === 409 ? "Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again." : response.status === 401 ? "Sign in again to sync. Your local data is safe." : "Cloud is unavailable. Your local data is safe; try again online.");
+  if (!response.ok) {
+    const messages: Record<number, string> = {
+      409: "Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.",
+      401: "Sign in again to sync. Your local data is safe.",
+    };
+    throw new Error(messages[response.status] ?? "Cloud is unavailable. Your local data is safe; try again online.");
+  }
   return response.json() as Promise<{ version: number; envelope: Envelope | null; updated_at?: string }>;
 }
 export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string, reconnectGeneration?: string) {
   const credentials = await recoveryCredentials(code);
-  const headers = resumeGeneration ? { "X-Drip-Resume": resumeGeneration } : reconnectGeneration ? { "X-Drip-Reconnect": reconnectGeneration } : undefined;
+  let headers: Record<string, string> | undefined;
+  if (resumeGeneration) headers = { "X-Drip-Resume": resumeGeneration };
+  else if (reconnectGeneration) headers = { "X-Drip-Reconnect": reconnectGeneration };
   let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email({ ...credentials, ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
   if ((result.error as { status?: number } | null)?.status === 429) throw new Error("Too many sign-in attempts. Wait a few seconds, then try again.");
   if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user" });
@@ -110,12 +123,17 @@ export async function syncNow(): Promise<string> {
     if (current.signedOut) return "Signed out. Cloud sync is paused.";
     // Encryption yields: a restore/reconnect may have replaced this snapshot even
     // when the server version is unchanged. Reject it before writing remotely.
-    if (!current.state || current.state.userId !== state.userId || current.state.identityId !== state.identityId ||
+    if (current.state?.userId !== state.userId || current.state.identityId !== state.identityId ||
       current.state.generation !== state.generation || current.state.version !== state.version) {
       return "Cloud connection changed during sync. Check its status before continuing.";
     }
     const saved = await vault("PUT", { version: state.version, envelope }, state.userId);
     const acknowledged = await acknowledgeCloudUpload(state, saved.version, saved.updated_at ?? new Date().toISOString());
-    return acknowledged === "queued" ? "Cloud copy saved; newer local changes are queued." : acknowledged === "changed" ? "Cloud connection changed during sync. Check its status before continuing." : "Encrypted cloud copy saved.";
+    const messages = {
+      queued: "Cloud copy saved; newer local changes are queued.",
+      changed: "Cloud connection changed during sync. Check its status before continuing.",
+      saved: "Encrypted cloud copy saved.",
+    };
+    return messages[acknowledged];
   } finally { syncing = false; }
 }

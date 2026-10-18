@@ -19,7 +19,12 @@ let privateQueue: Promise<unknown> = Promise.resolve();
 /** Serialize private requests with sign-out, including across tabs on supporting browsers. */
 export const safeFetch: typeof fetch = async (input, init) => {
   await requireSafeWorker();
-  const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://drip.local");
+  let address: string;
+  if (typeof input === "string") address = input;
+  else if (input instanceof URL) address = input.href;
+  else address = input.url;
+  // Parsing base only: fetch still receives the caller's original input.
+  const url = new URL(address, "https://drip.invalid");
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || (url.pathname === "/api/recovery-codes" && method === "PUT");
   if (!privateRequest) return fetch(input, init);
