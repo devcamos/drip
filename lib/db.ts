@@ -1,6 +1,7 @@
 import type { AppData, CloudState } from "./types";
 import { migrateData } from "./maths";
 import { isIdentity } from "./identity";
+import { validProductFields } from "./products";
 import { checkCode, codeVerifier } from "./crypto";
 import { createVault, openVault, encryptLocal, decryptLocal, type LocalKeys, type VaultHeader, type LocalEnvelope } from "./local-vault";
 
@@ -206,7 +207,7 @@ export function isAppData(x: unknown): x is AppData {
   const d = x as AppData;
   return !!d && d.version === 1 && Array.isArray(d.accounts) && Array.isArray(d.snapshots) &&
     (d.projection === undefined || (!!d.projection && Number.isFinite(d.projection.monthlyDeposit) && d.projection.monthlyDeposit >= 0 && d.projection.monthlyDeposit <= 1_000_000 && [1, 3, 5].includes(d.projection.years))) &&
-    (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => typeof a.id === "string" && typeof a.balance === "number" && typeof a.ratePct === "number");
+    (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => !!a && typeof a.id === "string" && Number.isFinite(a.balance) && Number.isFinite(a.ratePct) && validProductFields(a));
 }
 export async function completeDeviceSession(generation: string, value: unknown): Promise<boolean> {
   const db = await open();

@@ -15,7 +15,7 @@ async function onboard(page: Page) {
 
 async function addZopa(page: Page) {
   await page.getByRole("navigation").getByRole("button", { name: "Add" }).click();
-  await page.locator("select").first().selectOption("Zopa");
+  await page.getByLabel("Provider", { exact: true }).selectOption("Zopa");
   await page.getByPlaceholder("e.g. Rainy day pot").fill("Rainy day pot");
   await page.getByPlaceholder("3000").fill("3000");
   await page.getByPlaceholder("7").fill("7");
@@ -194,8 +194,8 @@ test("daily-interest account has no payout date and skips upcoming payouts", asy
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Per day (est.)")).toBeVisible();
   await page.getByRole("button", { name: "← Accounts" }).click();
-  await expect(page.getByText(/Daily interest/)).toBeVisible();
-  await expect(page.getByText("Upcoming payouts")).toHaveCount(0);
+  await expect(page.getByText(/Daily payments/)).toBeVisible();
+  await expect(page.getByText("Upcoming estimated payments")).toHaveCount(0);
 });
 
 test("PWA assets: manifest icons incl. maskable, apple-touch-icon 180, favicon, iOS meta", async ({ page, request }) => {

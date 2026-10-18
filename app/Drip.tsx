@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Account, AppData, Frequency, RateType } from "@/lib/types";
+import type { AppData } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
-import { commitCloudRestore, emptyData, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
+import { commitCloudRestore, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
@@ -13,15 +13,15 @@ import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
 import { Trends } from "./Trends";
+import { AccountForm } from "./AccountForm";
+import { AccountDetail } from "./AccountDetail";
+import { IncomeSummary } from "./IncomeSummary";
+import { productLabel } from "@/lib/products";
 import { downloadRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
 
-const PROVIDERS: Record<string, string> = {
-  Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
-  Vanguard: "#96151d", Marcus: "#1d2f4f", "Premium Bonds": "#3c6e47", Other: "#4a5070",
-};
 const today = () => M.ymd(new Date());
 
 export default function Drip() {
@@ -52,6 +52,11 @@ export default function Drip() {
 
 function UnlockedDrip() {
   const [data, setData] = useState<AppData | null>(null);
+  const latestData = useRef<AppData | null>(null);
+  const dataGeneration = useRef(0);
+  const edits = useRef<Promise<unknown>>(Promise.resolve());
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
@@ -76,15 +81,11 @@ function UnlockedDrip() {
   useEffect(() => {
     const sequence = ++loadSequence.current;
     (async () => {
-      const session = await readDeviceSession();
-      let loaded = await loadData();
-      const t0 = today();
-      const accrued = loaded.accounts.map((a) => M.applyDailyAccrual(a, t0));
-      if (!session?.signedOut && accrued.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts: accrued }; await saveData(loaded); }
+      const loaded = await loadData();
       const savedVerifier = (await getItem<Verifier>("verifier")) ?? null;
       const latest = await readDeviceSession();
       if (sequence === loadSequence.current && !latest?.signedOut) {
-        setData(loaded); setVerifier(savedVerifier);
+        replaceData(loaded); setVerifier(savedVerifier);
         if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
       }
       if (navigator.storage?.persist) {
@@ -100,13 +101,28 @@ function UnlockedDrip() {
     return () => { loadSequence.current++; window.removeEventListener("beforeinstallprompt", onPrompt); };
   }, []);
 
-  const update = useCallback(async (fn: (d: AppData) => AppData) => {
-    setData((prev) => {
-      const next = fn(prev ?? emptyData());
-      const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
-      saveData(withSnap).catch(() => setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."));
-      return withSnap;
+  const update = useCallback((fn: (d: AppData) => AppData) => {
+    const generation = dataGeneration.current;
+    setPendingSaves(n => n + 1);
+    // Derive each edit from the last confirmed snapshot, after earlier edits settle.
+    // A failed action must never become the input to a retry or another edit.
+    const operation = edits.current.then(async () => {
+      try {
+        const previous = latestData.current;
+        if (!previous || generation !== dataGeneration.current) return false;
+        const next = fn(previous);
+        const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
+        await saveData(withSnap);
+        if (latestData.current !== previous || generation !== dataGeneration.current) return false;
+        latestData.current = withSnap; setData(withSnap); setSaveError("");
+        return true;
+      } catch {
+        setSaveError("Changes could not be saved. Your saved data is unchanged; retry the action.");
+        return false;
+      } finally { setPendingSaves(n => n - 1); }
     });
+    edits.current = operation;
+    return operation;
   }, []);
 
   if (loadError) return <main><p role="alert">{loadError}</p></main>;
@@ -116,11 +132,16 @@ function UnlockedDrip() {
     if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
     if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
     await clearDraft();
-    setVerifier(v); setView({ name: "home" }); setData(d);
+    setVerifier(v); setView({ name: "home" }); replaceData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
-    <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); setData(d); }} cta="Save gamertag" /></div></main>;
+    <div className="panel"><HandlePicker onPick={async (identity) => {
+      if (!identity) return;
+      const d = { ...data, identity };
+      await saveData(d);
+      replaceData(d);
+    }} cta="Save gamertag" /></div></main>;
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
@@ -143,17 +164,17 @@ function UnlockedDrip() {
   switch (view.name) {
   case "detail": {
     const a = data.accounts.find((x) => x.id === view.id);
-    body = a ? <Detail a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
-      onLog={(p) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? { ...x, payouts: [...x.payouts, p] } : x) }))}
+    body = a ? <AccountDetail key={a.id} a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
       onChange={(fn) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) }))}
       onDelete={() => { if (confirm(`Delete ${a.provider}?`)) { update((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) })); setView({ name: "home" }); } }} /> : null;
     break;
   }
   case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
-    body = <AddForm existing={existing} onCancel={() => setView({ name: "home" })} onSave={(a) => {
-      update((d) => ({ ...d, accounts: existing ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
-      setView({ name: "detail", id: a.id });
+    body = <AccountForm key={view.id ?? "new"} existing={existing} onCancel={() => setView({ name: "home" })} onSave={async (a) => {
+      const saved = await update((d) => ({ ...d, accounts: d.accounts.some(x => x.id === a.id) ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
+      if (saved) setView({ name: "detail", id: a.id });
+      return saved;
     }} />;
     break;
   }
@@ -162,10 +183,10 @@ function UnlockedDrip() {
     break;
   case "settings":
     body = <Settings data={data} verifier={verifier}
-    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); setData(d); }}
+    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); replaceData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); setData(n); }} />;
+    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); replaceData(n); }} />;
     break;
   default:
     body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
@@ -173,7 +194,7 @@ function UnlockedDrip() {
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -260,7 +281,8 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
     <>
       <p className="muted">Total balance</p>
       <div className="big">{M.gbp(M.totalBalance(data.accounts))}</div>
-      <p className="muted">≈ {M.gbp(M.totalMonthlyIncome(data.accounts))} a month · {M.weightedYield(data.accounts).toFixed(2)}% average</p>
+      <p className="muted">Estimated ≈ {M.gbp(M.totalMonthlyIncome(data.accounts))} a month · {M.weightedYield(data.accounts).toFixed(2)}% average</p>
+      {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
       {data.accounts.length === 0 ? (
         <div className="panel"><p>No accounts yet. Add your first savings or investment account to see what it earns.</p><button className="btn" onClick={add}>Add account</button></div>
       ) : (
@@ -270,144 +292,18 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
             return (
               <button key={a.id} className="card" onClick={() => open(a.id)}>
                 <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
-                <div className="row meta"><span>{a.label || a.rateType}</span><span>{a.ratePct}%</span></div>
-                <div className="meta" style={{ marginTop: 18 }}>≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} this month · {a.frequency === "daily" ? "Daily interest" : `paid ${fmtDate(next)}`}</div>
+                <div className="row meta"><span>{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
+                <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
               </button>
             );
           })}
         </div>
       )}
       {up.length > 0 && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming payouts</h2>
+        <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming estimated payments</h2>
           <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.provider}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
         </div>
       )}
-    </>
-  );
-}
-
-function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }>) {
-  const [amt, setAmt] = useState(""); const [date, setDate] = useState(today());
-  const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null); const [verr, setVerr] = useState(""); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
-  const [by, setBy] = useState<"week" | "month">("week");
-  const interest = M.interestHistory(a.events, by);
-  const events = [...(a.events ?? [])].filter((e) => e.type !== "interest").sort((x, y) => y.date.localeCompare(x.date));
-  const next = M.nextPayout(a.nextPayoutDate, a.frequency, today());
-  const history = [...a.payouts].sort((x, y) => y.date.localeCompare(x.date));
-  return (
-    <>
-      <button className="btn ghost small" onClick={onBack}>← Accounts</button>
-      <div className="card" style={{ marginTop: 12, cursor: "default" }}>
-        <div className="row"><span className="prov">{a.provider}</span><span>{a.rateType}</span></div>
-        {a.label && <div className="meta">{a.label}</div>}
-        <div className="bal">{M.gbp(a.balance)}</div>
-      </div>
-      <div className="grid" style={{ marginTop: 12 }}>
-        <div className="stat"><div className="muted">Rate</div><div className="v">{a.ratePct}%</div></div>
-        <div className="stat"><div className="muted">Per month</div><div className="v">{M.gbp(M.monthlyIncome(a.balance, a.ratePct))}</div></div>
-        <div className="stat"><div className="muted">Next payout</div><div className="v">{a.frequency === "daily" ? "Daily interest" : fmtDate(next)}</div></div>
-        <div className="stat"><div className="muted">{a.frequency === "daily" ? "Per day (est.)" : `Expected (${a.frequency})`}</div><div className="v">{M.gbp(M.payoutAmount(a))}</div></div>
-      </div>
-      <div className="row-gap">
-        <button className="btn" onClick={() => { setMode("topup"); setVal(""); }}>Top up</button>
-        <button className="btn ghost" onClick={() => { setMode("withdraw"); setVal(""); setVerr(""); }}>Withdraw</button>
-        <button className="btn ghost" onClick={() => { setMode("set"); setVal(String(a.balance)); }}>Update balance</button>
-      </div>
-      {mode && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>{{ topup: "Top up", withdraw: "Withdraw", set: "Update balance" }[mode]}</h2>
-          <p className="muted">{{ topup: "Adds money on this date. Interest before it uses the old balance; after it, growth continues from the new amount.",
-            withdraw: "Takes money out on this date. Interest after it is worked out on the smaller balance. Withdrawals aren't counted as negative growth.",
-            set: "Set the balance shown in your provider's app. This isn't counted as a deposit or withdrawal." }[mode]}</p>
-          <div className="grid"><input inputMode="decimal" placeholder={mode === "set" ? "New balance £" : "Amount £"} aria-label="amount" value={val} onChange={(e) => setVal(e.target.value)} /><input type="date" aria-label="date" value={vdate} onChange={(e) => setVdate(e.target.value)} /></div>
-          <div className="row-gap">
-            <button className="btn small" disabled={mode === "set" ? !(val !== "" && Number(val) >= 0) : !(Number(val) > 0)} onClick={() => {
-              const n = Number(val);
-              if (mode === "withdraw" && n > a.balance) { setVerr("You can't withdraw more than the balance."); return; }
-              onChange((x) => mode === "topup" ? M.applyTopUp(x, n, vdate) : mode === "withdraw" ? M.applyWithdraw(x, n, vdate) : M.applySetBalance(x, n, vdate)); setMode(null);
-            }}>Save</button>
-            <button className="btn ghost small" onClick={() => setMode(null)}>Cancel</button>
-          </div>
-          {verr && <p className="err">{verr}</p>}
-        </div>
-      )}
-      {events.length > 0 && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2>
-          <ul className="list" data-testid="events">{events.map((e, i) => <li key={i}><span>{{ topup: "Top up", withdraw: "Withdrawal", set: "Balance set", interest: "Interest" }[e.type]}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={e.type === "topup" ? "ok" : e.type === "withdraw" ? "err" : ""}>{e.type === "topup" ? "+" : e.type === "withdraw" ? "−" : ""}{M.gbp(e.amount)}</b></li>)}</ul>
-        </div>
-      )}
-      {a.frequency === "daily" && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>Interest earned (estimated)</h2>
-          <p className="muted">Worked out daily from your balance and rate and added to the balance. Your provider&apos;s figures may differ slightly.</p>
-          <div className="row-gap" style={{ marginTop: 0 }}>
-            <button className={`btn small ${by === "week" ? "" : "ghost"}`} onClick={() => setBy("week")}>By week</button>
-            <button className={`btn small ${by === "month" ? "" : "ghost"}`} onClick={() => setBy("month")}>By month</button>
-          </div>
-          {interest.length === 0 ? <p className="muted">Interest shows here from tomorrow.</p> :
-            <ul className="list" data-testid="interest-history">{interest.map((r) => <li key={r.period}><span>{by === "week" ? `Week of ${fmtDate(r.period)}` : new Date(r.period + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</span><b className="ok">+{M.gbp(r.amount)}</b></li>)}</ul>}
-        </div>
-      )}
-      {(a.rateHistory?.length ?? 0) > 1 && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>Rate history</h2>
-          <ul className="list">{[...a.rateHistory!].reverse().map((r) => <li key={r.from}><span>{r.from === "0000-01-01" ? "Since added" : `From ${fmtDate(r.from)} ${r.from.slice(0, 4)}`}</span><b>{r.ratePct}%</b></li>)}</ul>
-        </div>
-      )}
-      <div className="panel"><h2 style={{ marginTop: 0 }}>Payout history</h2>
-        {history.length === 0 ? <p className="muted">No payouts logged yet.</p> :
-          <ul className="list">{history.map((p, i) => {
-            const diff = p.amount - M.payoutAmount(a);
-            return <li key={i}><span>{fmtDate(p.date)}<br /><span className="muted">expected {M.gbp(M.payoutAmount(a))}</span></span>
-              <span style={{ textAlign: "right" }}><b>{M.gbp(p.amount)}</b><br /><span className={diff >= 0 ? "ok" : "err"}>{diff >= 0 ? "+" : ""}{M.gbp(diff)}</span></span></li>;
-          })}</ul>}
-        <label>Log an actual payout</label>
-        <div className="grid"><input inputMode="decimal" aria-label="Payout amount" placeholder="Amount £" value={amt} onChange={(e) => setAmt(e.target.value)} /><input type="date" aria-label="Payout date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-        <div className="row-gap"><button className="btn small" disabled={!(Number(amt) > 0)} onClick={() => { onLog({ date, amount: Number(amt), kind: "actual" }); setAmt(""); }}>Log payout</button></div>
-      </div>
-      <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button><button className="btn danger" onClick={onDelete}>Delete</button></div>
-    </>
-  );
-}
-
-function AddForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void; onCancel: () => void }>) {
-  const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
-  const [custom, setCustom] = useState(existing && !(existing.provider in PROVIDERS) ? existing.provider : "");
-  const [label, setLabel] = useState(existing?.label ?? "");
-  const [balance, setBalance] = useState(existing ? String(existing.balance) : "");
-  const [rate, setRate] = useState(existing ? String(existing.ratePct) : "");
-  const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? "interest");
-  const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? "monthly");
-  const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), 1));
-  const [rateFrom, setRateFrom] = useState(today());
-  const isOther = provider === "Other" || (existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
-  const b = Number(balance), r = Number(rate);
-  const valid = b >= 0 && balance !== "" && r >= 0 && r < 100 && rate !== "" && (frequency === "daily" || /^\d{4}-\d{2}-\d{2}$/.test(next)) && (!isOther || custom.trim());
-  return (
-    <>
-      <h1>{existing ? "Edit account" : "Add account"}</h1>
-      <label htmlFor="account-provider">Provider</label>
-      <select id="account-provider" aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
-      {isOther && <><label htmlFor="custom-provider">Provider name</label><input id="custom-provider" aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
-      <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
-      <div className="grid">
-        <div><label>Balance £</label><input inputMode="decimal" aria-label="Balance" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
-        <div><label>Rate % a year</label><input inputMode="decimal" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
-        <div><label>Type</label><select aria-label="Type" value={rateType} onChange={(e) => setRateType(e.target.value as RateType)}><option value="interest">Interest</option><option value="dividend">Dividend</option></select></div>
-        <div><label>Paid</label><select aria-label="Paid" value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}><option value="daily">Daily interest</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
-      </div>
-      {existing && rate !== "" && Number(rate) !== existing.ratePct && (<><label>New rate applies from</label><input type="date" aria-label="New rate applies from" value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} /></>)}
-      {frequency !== "daily" ? <><label>Next payout date</label><input type="date" aria-label="Next payout date" value={next} onChange={(e) => setNext(e.target.value)} /></>
-        : <p className="muted">Interest is added to the balance every day, so there&apos;s no payout date.</p>}
-      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(b, r))} a month</p>}
-      <div className="row-gap">
-        <button className="btn" disabled={!valid} onClick={() => {
-          const name = isOther ? custom.trim() : provider;
-          const createdAt = existing?.createdAt ?? new Date().toISOString();
-          const base: Account = { ...(existing ?? {}), id: existing?.id ?? crypto.randomUUID(), provider: name, label: label.trim(), balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType, frequency,
-            nextPayoutDate: frequency === "daily" ? today() : next, accruedThrough: frequency === "daily" ? (existing?.accruedThrough ?? today()) : undefined, colour: PROVIDERS[name] ?? PROVIDERS.Other, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
-            rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };
-          onSave(existing && r !== existing.ratePct ? M.applyRateChange(base, r, rateFrom, today()) : base);
-        }}>Save</button>
-        <button className="btn ghost" onClick={onCancel}>Cancel</button>
-      </div>
     </>
   );
 }

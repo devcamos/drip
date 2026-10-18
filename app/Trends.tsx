@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import type { AppData } from "@/lib/types";
 import * as M from "@/lib/maths";
+import { IncomeSummary } from "./IncomeSummary";
 type Assumptions = { monthlyDeposit: number; years: number };
 const ranges = ["3m", "6m", "1y", "Max", "Future"] as const;
 type Range = typeof ranges[number];
@@ -11,12 +12,12 @@ const compactGBP = (n: number) => new Intl.NumberFormat("en-GB", { style: "curre
 /** Keep chart calculations separate from controls and accessible rendering. */
 function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   const today = M.ymd(new Date()); const currentMonth = today.slice(0, 7);
-  const total = M.totalBalance(data.accounts); const monthlyRate = Math.max(0, M.weightedYield(data.accounts)) / 1200;
+  const total = M.totalBalance(data.accounts);
   const historical = data.snapshots.filter(s => s.month < currentMonth).toSorted((a, b) => a.month.localeCompare(b.month)).map(s => ({ date: M.ymd(new Date(Date.UTC(+s.month.slice(0, 4), +s.month.slice(5, 7), 0))), balance: s.totalBalance }));
   const since = M.addMonths(today, rangeMonths[range]);
   const actual = [...historical.filter(p => range === "Future" || range === "Max" || p.date >= since), { date: today, balance: total }];
-  const baseProjection = M.projection(data.accounts, assumptions.years * 12);
-  const forecast = [{ date: today, balance: total }, ...baseProjection.map(p => ({ date: M.addMonths(today, p.month), balance: p.balance + assumptions.monthlyDeposit * (monthlyRate ? (Math.pow(1 + monthlyRate, p.month) - 1) / monthlyRate : p.month) }))];
+  const baseProjection = M.projection(data.accounts, assumptions.years * 12, assumptions.monthlyDeposit, today);
+  const forecast = [{ date: today, balance: total, income: 0 }, ...baseProjection.map(p => ({ date: M.addMonths(today, p.month), balance: p.balance, income: p.income }))];
   const future = range === "Future"; const final = forecast.at(-1)!;
   const start = actual[0].date === today ? M.addMonths(today, -1) : actual[0].date;
   const end = future ? final.date : today;
@@ -68,7 +69,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
       <div className="chart-legend"><span><i className="legend-actual" />Recorded balance</span>{future && <><span><i className="legend-projection" />Estimated balance</span><span><i className="legend-baseline" />Today’s balance + planned top-ups</span></>}</div>
       {actual.length < 2 && <p className="muted">Your history starts today. Recorded balances will build as you use Drip.</p>}
       {future && <>
-        <p className="muted">Assumes current rates stay the same, interest is reinvested monthly, top-ups arrive at month end and no withdrawals. New top-ups use your current weighted rate. Estimates are before tax and fees; investment returns can fall.</p>
+        <p className="muted">Uses current rates or dividend yields and each account&apos;s reinvestment setting. Income is averaged monthly; future-dated pending bonuses are included once. Top-ups arrive at month end, split by today&apos;s account balances, with no withdrawals or investment price changes. Estimates are before tax and fees; actual returns can differ. Income paid out isn&apos;t added to the projected account balance.</p>
         <button className="btn ghost" aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit projection</button>
         {editing && <form onSubmit={event => { event.preventDefault(); if (validDeposit) { onAssumptions({ monthlyDeposit: Number(deposit), years }); setEditing(false); } }}>
           <label htmlFor="projection-deposit">Planned monthly top-up (£)</label><input id="projection-deposit" type="number" min="0" max="1000000" step="0.01" value={deposit} onChange={e => setDeposit(e.target.value)} />
@@ -80,11 +81,13 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
     </section>
     <div className="grid">
       <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-      <div className="stat"><div className="muted">Monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
+      <div className="stat"><div className="muted">Estimated monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
       <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
-      <div className="stat"><div className="muted">Growth excl. deposits/withdrawals</div><div className="v">{growthLabel}</div></div>
+      <div className="stat"><div className="muted">Balance change after logged transfers</div><div className="v">{growthLabel}</div></div>
     </div>
-    {br && <div className="panel"><h2>This month vs last</h2><ul className="list"><li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li><li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li><li><span>Growth from interest and returns</span><b>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li><li><span>Total change</span><b>{M.gbp(br.change)}</b></li></ul></div>}
+    {future && <p className="muted">Predicted income over {assumptions.years} {assumptions.years === 1 ? "year" : "years"}: <b>{M.gbp(final.income)}</b>. This includes income paid out and excludes your deposits.</p>}
+    <IncomeSummary accounts={data.accounts} />
+    {br && <div className="panel"><h2>This month vs last</h2><ul className="list"><li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li><li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li><li><span>Other balance movement</span><b>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li><li><span>Total change</span><b>{M.gbp(br.change)}</b></li></ul><p className="muted">Other balance movement can include returns, corrections and unlogged transfers. It isn&apos;t recorded income.</p></div>}
     {growth === null && <p className="muted">Month-on-month growth appears after Drip has two months of history.</p>}
   </>;
 }
