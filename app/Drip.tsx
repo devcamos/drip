@@ -104,9 +104,14 @@ function UnlockedDrip() {
     const next = fn(latestData.current);
     const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
     latestData.current = withSnap; setPendingSaves(n => n + 1);
-    try { await saveData(withSnap); if (latestData.current === withSnap) setData(withSnap); setSaveError(""); return true; }
+    try {
+      await saveData(withSnap);
+      if (latestData.current === withSnap) { setData(withSnap); }
+      setSaveError("");
+      return true;
+    }
     catch {
-      if (latestData.current === withSnap) setData(withSnap);
+      if (latestData.current === withSnap) { setData(withSnap); }
       setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."); return false;
     }
     finally { setPendingSaves(n => n - 1); }
@@ -123,7 +128,12 @@ function UnlockedDrip() {
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
-    <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); replaceData(d); }} cta="Save gamertag" /></div></main>;
+    <div className="panel"><HandlePicker onPick={async (identity) => {
+      if (!identity) return;
+      const d = { ...data, identity };
+      await saveData(d);
+      replaceData(d);
+    }} cta="Save gamertag" /></div></main>;
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
