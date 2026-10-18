@@ -373,7 +373,7 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
       <label>Provider</label>
       <select aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
       {isOther && <><label>Provider name</label><input aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
-      <label>Nickname (optional, stays on this device)</label><input aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
+      <label>Nickname (optional, never synced to cloud)</label><input aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
       <div className="grid">
         <div><label>Balance £</label><input inputMode="decimal" aria-label="Balance" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
         <div><label>Rate % a year</label><input inputMode="decimal" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
@@ -444,6 +444,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
       <details className="panel"><summary>Advanced: file backups &amp; app lock</summary>
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
+        <p className="muted">An exported file includes this device&apos;s nicknames. Keep the file private.</p>
         <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
         <div className="row-gap"><button className="btn" disabled={busy || !code} onClick={async () => {
           setBusy(true); setMsg(null);

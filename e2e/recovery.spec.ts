@@ -20,13 +20,14 @@ async function withAuthRetry(page: Page, action: () => Promise<void>, success: L
   } finally { page.off("response", observe); }
 }
 
-async function setup(page: Page, handle = "recoverytest") {
+async function setup(page: Page, handle = "recoverytest", nickname = "") {
   await page.goto("/");
   const code = (await page.getByTestId("code").textContent())!.trim();
   await page.getByLabel(/Gamertag/).fill(handle);
   await page.getByLabel(/saved my recovery code/).check();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.getByRole("button", { name: "Add account", exact: true }).click();
+  if (nickname) await page.getByLabel("Nickname", { exact: true }).fill(nickname);
   await page.getByLabel("Balance", { exact: true }).fill("3000");
   await page.getByLabel("Rate", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -52,7 +53,7 @@ test("offline reload keeps accounts and never caches private APIs", async ({ pag
 
 test("cloud copy survives a fresh device, offline edits queue, and stale devices cannot overwrite it", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database; no production credentials in normal CI.");
-  const code = await setup(page);
+  const code = await setup(page, "recoverytest", "PRIVATE_LOCAL_NICKNAME");
   await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
@@ -64,8 +65,10 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
     await returning.getByRole("button", { name: "Restore cloud accounts" }).click();
     await expect(returning.getByText("Total balance")).toBeVisible({ timeout: 30_000 });
     await expect(returning.getByText("£3,000.00").first()).toBeVisible();
+    await expect(returning.getByText("PRIVATE_LOCAL_NICKNAME")).toHaveCount(0);
 
     await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
+    await expect(page.getByText("PRIVATE_LOCAL_NICKNAME")).toBeVisible();
     await page.getByRole("button", { name: /Zopa/ }).click();
     await page.context().setOffline(true);
     await page.getByRole("button", { name: "Top up", exact: true }).click();

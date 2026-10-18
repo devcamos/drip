@@ -41,6 +41,12 @@ The service worker caches only the public shell, fonts and static assets. Auth/s
 
 Server auth and vault endpoints require a session, same-origin writes, bounded encrypted payloads, per-owner vault rate limits and version checks. Never put database URLs, auth secrets, recovery codes, cookies or browser traces containing them into git or public CI artifacts.
 
+## Device-only nicknames
+
+Cloud payloads use an explicit allowlist, including nested account/history fields. Account nicknames and device lock settings are excluded before encryption. New local fields are not synced by default. Cloud restores strip those fields from older copies; restoring the same account while this device is unlocked preserves its current local nicknames by account id. A new device starts with blank nicknames.
+
+The next successful sync replaces an older current cloud copy containing excluded fields even when no financial edits are queued. This does not claim to erase historical infrastructure backups. Manual encrypted file exports remain full copies of the local records, including nicknames; that is an explicit export rather than automatic cloud sync.
+
 ## Recovery codes and Trends
 
 Recovery → enable cloud recovery and sync first → enter the original saved code → Create six recovery codes → Download recovery codes. This creates a numbered text file containing six independent, reusable codes. Each random `DRIP2-` code encrypts the same original root using PBKDF2-SHA256 (600,000 iterations) and AES-GCM. Only SHA-256 locators and encrypted wrappers reach the server. Lookup returns no account data; authentication and vault decryption still happen using the recovered root in the browser. Original codes remain supported. Do not save this file alongside shared exports.

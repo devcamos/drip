@@ -11,7 +11,7 @@ export interface RatePeriod { from: string; ratePct: number } // rate in force f
 export interface Account {
   id: string;
   provider: string;      // e.g. "Zopa"
-  label: string;         // nickname, stays on device
+  label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   balance: number;       // GBP
   ratePct: number;       // annual %, e.g. 7
   rateType: RateType;

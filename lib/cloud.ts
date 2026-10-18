@@ -1,11 +1,12 @@
 import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
-import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey } from "./crypto";
+import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey, checkCode } from "./crypto";
 import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection } from "./db";
 import type { AppData, CloudState } from "./types";
 export type { CloudState } from "./types";
 import { migrateData } from "./maths";
 import { safeFetch } from "./worker-safety";
+import { cloudPayload, fromCloudPayload } from "./cloud-payload";
 
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
 export interface Envelope { app: "drip-cloud"; v: 1; iv: string; ct: string }
@@ -27,17 +28,19 @@ export async function recoveryCredentials(code: string) {
 export const cloudKey = deriveCloudEncryptionKey;
 export async function seal(data: AppData, key: CryptoKey): Promise<Envelope> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  // Device screen-lock credentials are not portable and are never restored elsewhere.
-  const safe = { ...data, lock: undefined };
+  const safe = cloudPayload(data);
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode("drip-cloud-v1") }, key, enc.encode(JSON.stringify(safe)));
   return { app: "drip-cloud", v: 1, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
 }
-export async function unseal(envelope: Envelope, key: CryptoKey): Promise<AppData> {
+async function decode(envelope: Envelope, key: CryptoKey): Promise<AppData> {
   if (envelope.app !== "drip-cloud" || envelope.v !== 1) throw new Error("Unsupported cloud copy.");
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(envelope.iv), additionalData: enc.encode("drip-cloud-v1") }, key, unb64(envelope.ct));
   const data = JSON.parse(new TextDecoder().decode(plain));
   if (!isAppData(data) || !data.identity) throw new Error("Invalid cloud copy.");
-  return { ...migrateData(data, new Date().toISOString().slice(0, 10)), lock: undefined };
+  return data;
+}
+export async function unseal(envelope: Envelope, key: CryptoKey): Promise<AppData> {
+  return migrateData(fromCloudPayload(await decode(envelope, key)), new Date().toISOString().slice(0, 10));
 }
 export const readCloudState = () => getItem<CloudState>("cloudState");
 export async function writeCloudState(state: CloudState | undefined, expected?: { generation: string | undefined; connectionGeneration?: string }) {
@@ -70,7 +73,13 @@ export async function restoreCloud(code: string, userId?: string, resumeGenerati
   const account = userId ? { user: session.data!.user, key: await cloudKey(code) } : await connect(code, {} as AppData, false, resumeGeneration);
   const remote = await vault("GET", undefined, account.user.id, resumeGeneration);
   if (!remote.envelope) throw new Error("No cloud copy exists yet. Use your exported backup or original device.");
-  const data = await unseal(remote.envelope, account.key);
+  let data = await unseal(remote.envelope, account.key);
+  const local = await cloudSnapshot();
+  const localVerifier = await getItem<{ salt: string; hash: string }>("verifier");
+  if (local.data.identity?.id === data.identity!.id && localVerifier && await checkCode(code, localVerifier)) {
+    const labels = new Map(local.data.accounts.map(a => [a.id, a.label]));
+    data = { ...data, accounts: data.accounts.map(a => ({ ...a, label: labels.get(a.id) ?? "" })) };
+  }
   await commitCloudRestore(data, { userId: account.user.id, identityId: data.identity!.id, key: account.key, version: remote.version, dirty: false, lastSyncAt: remote.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(code), device?.generation, resumeGeneration, code);
   if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
   return data;
@@ -90,7 +99,11 @@ export async function syncNow(): Promise<string> {
     if (data.identity?.id !== state.identityId) throw new Error("This local backup belongs to another account. Disconnect cloud recovery first.");
     const remote = await vault("GET", undefined, state.userId);
     if (remote.version !== state.version) throw new Error("Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.");
-    if (!state.dirty) return "Cloud copy is up to date.";
+    // Replace older cloud copies that included device-only nicknames, even when
+    // no financial edits are queued. This leaves this device's labels intact.
+    const previous = remote.envelope ? await decode(remote.envelope, state.key) : undefined;
+    const needsCleanup = previous && JSON.stringify(cloudPayload(previous)) !== JSON.stringify(previous);
+    if (!state.dirty && !needsCleanup) return "Cloud copy is up to date.";
     const envelope = await seal(data, state.key);
     const current = await cloudSnapshot();
     if (current.signedOut) return "Signed out. Cloud sync is paused.";
