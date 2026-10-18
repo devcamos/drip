@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { AccountForm } from "../app/AccountForm";
 import { AccountDetail } from "../app/AccountDetail";
 import type { Account } from "../lib/types";
@@ -43,15 +43,17 @@ describe("category-driven accounts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 3200, ratePct: 4, productCategory: "cash-isa", payouts: [], events: [{ type: "set", amount: 3200, date: today }] }));
   });
-  it("records income and a bonus without changing the balance, and allows correcting a payment", () => {
+  it("records income and a bonus without changing the balance, and allows correcting a payment", async () => {
     vi.stubGlobal("confirm", () => true); render(<DetailHarness />);
     expect(screen.getByText("Cash ISA")).toBeInTheDocument();
     change("Income amount", "22.65"); fireEvent.click(screen.getByRole("button", { name: "Record income" }));
+    await screen.findByText("Income recorded. Update your balance separately if needed.");
     expect(screen.getByTestId("income-history")).toHaveTextContent("£22.65");
     expect(document.querySelector(".bal")).toHaveTextContent("£3,000.00");
     fireEvent.click(screen.getByRole("button", { name: "By week" })); expect(screen.getByTestId("income-history")).toHaveTextContent("Week of");
     fireEvent.click(screen.getByRole("button", { name: "By month" }));
     change("Payment type", "bonus"); change("Income amount", "15.44"); fireEvent.click(screen.getByRole("button", { name: "Record income" }));
+    await screen.findByRole("button", { name: "Record income" });
     expect(screen.queryByText(/Pending bonus ·/)).toBeNull();
     const summary = within(screen.getByRole("region", { name: "Recorded income summary" }));
     expect(summary.getAllByText("£38.09")).toHaveLength(2); expect(summary.getAllByText("£0.00")).toHaveLength(2);
@@ -63,5 +65,19 @@ describe("category-driven accounts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(document.querySelector(".bal")).toHaveTextContent("£3,500.00");
     expect(screen.getByTestId("income-history")).toHaveTextContent("£15.44");
+  });
+  it("keeps the balance form open until a save finishes and retains a failed entry for retry", async () => {
+    let finish!: (saved: boolean) => void;
+    const save = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    render(<AccountDetail a={a} onBack={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onChange={save} />);
+    fireEvent.click(screen.getByRole("button", { name: "Update balance" })); change("amount", "3200");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("form", { name: "Update balance" })).toBeInTheDocument();
+    await act(async () => finish(false));
+    expect(screen.getByLabelText("amount")).toHaveValue("3200");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => finish(true));
+    expect(screen.queryByRole("form", { name: "Update balance" })).toBeNull();
   });
 });

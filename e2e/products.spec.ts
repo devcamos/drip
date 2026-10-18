@@ -21,6 +21,7 @@ async function createCashIsa(page: Page) {
   await expect(page.locator(".bal")).toHaveText("£3,000.00");
   await page.getByLabel("Income amount", { exact: true }).fill("22.65");
   await page.getByRole("button", { name: "Record income", exact: true }).click();
+  await expect(page.getByText("Income recorded. Update your balance separately if needed.")).toBeVisible();
   await expect(page.getByTestId("income-history")).toContainText("£22.65");
   return code;
 }
@@ -32,6 +33,7 @@ test("categories, income and bonus predictions survive reload and encrypted back
   await page.getByRole("button", { name: "Update balance", exact: true }).click();
   await page.getByLabel("amount", { exact: true }).fill("3200");
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("form", { name: "Update balance", exact: true })).toHaveCount(0);
   await expect(page.getByTestId("income-history")).toContainText("£22.65");
   await page.reload(); await unlock(page, code);
   await page.getByRole("button", { name: /MoneyFarm/ }).click();

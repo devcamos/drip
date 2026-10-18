@@ -6,6 +6,7 @@ import Drip from "@/app/Drip";
 import Page from "@/app/page";
 import RootLayout, { metadata, viewport } from "@/app/layout";
 import { saveData, setItem, loadData, emptyData } from "@/lib/db";
+import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
 import type { AppData, Account } from "@/lib/types";
 
@@ -101,6 +102,23 @@ describe("migration", () => {
 });
 
 describe("accounts", () => {
+  it("shows a balance change as saved only after the encrypted write completes", async () => {
+    await seed({ accounts: [acct()] });
+    const persist = DB.saveData;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(DB, "saveData").mockImplementation(async data => { await gate; await persist(data); });
+    render(<Drip />); await screen.findByText("Rainy day pot");
+    fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
+    click("Update balance"); type(screen.getByLabelText("amount"), "3200"); click("Save");
+    expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saving changes…");
+    expect(document.querySelector(".bal")).toHaveTextContent("£3,000.00");
+    expect((await loadData()).accounts[0].balance).toBe(3000);
+    await act(async () => { release(); });
+    await waitFor(() => expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saved on this device."));
+    expect(document.querySelector(".bal")).toHaveTextContent("£3,200.00");
+    expect((await loadData()).accounts[0].balance).toBe(3200);
+  });
   it("adds an account with a custom provider, then edits, tops up, withdraws, sets balance, logs payout, changes rate, deletes", async () => {
     await seed({});
     render(<Drip />);

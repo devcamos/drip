@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
-import { commitCloudRestore, emptyData, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
+import { commitCloudRestore, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
@@ -52,6 +52,9 @@ export default function Drip() {
 
 function UnlockedDrip() {
   const [data, setData] = useState<AppData | null>(null);
+  const latestData = useRef<AppData | null>(null);
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const replaceData = useCallback((next: AppData) => { latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
@@ -80,7 +83,7 @@ function UnlockedDrip() {
       const savedVerifier = (await getItem<Verifier>("verifier")) ?? null;
       const latest = await readDeviceSession();
       if (sequence === loadSequence.current && !latest?.signedOut) {
-        setData(loaded); setVerifier(savedVerifier);
+        replaceData(loaded); setVerifier(savedVerifier);
         if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
       }
       if (navigator.storage?.persist) {
@@ -97,12 +100,16 @@ function UnlockedDrip() {
   }, []);
 
   const update = useCallback(async (fn: (d: AppData) => AppData) => {
-    setData((prev) => {
-      const next = fn(prev ?? emptyData());
-      const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
-      saveData(withSnap).catch(() => setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."));
-      return withSnap;
-    });
+    if (!latestData.current) return false;
+    const next = fn(latestData.current);
+    const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
+    latestData.current = withSnap; setPendingSaves(n => n + 1);
+    try { await saveData(withSnap); if (latestData.current === withSnap) setData(withSnap); setSaveError(""); return true; }
+    catch {
+      if (latestData.current === withSnap) setData(withSnap);
+      setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."); return false;
+    }
+    finally { setPendingSaves(n => n - 1); }
   }, []);
 
   if (loadError) return <main><p role="alert">{loadError}</p></main>;
@@ -112,11 +119,11 @@ function UnlockedDrip() {
     if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
     if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
     await clearDraft();
-    setVerifier(v); setView({ name: "home" }); setData(d);
+    setVerifier(v); setView({ name: "home" }); replaceData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
-    <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); setData(d); }} cta="Save gamertag" /></div></main>;
+    <div className="panel"><HandlePicker onPick={async (identity) => { if (!identity) return; const d = { ...data, identity }; await saveData(d); replaceData(d); }} cta="Save gamertag" /></div></main>;
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
@@ -146,9 +153,10 @@ function UnlockedDrip() {
   }
   case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
-    body = <AccountForm key={view.id ?? "new"} existing={existing} onCancel={() => setView({ name: "home" })} onSave={(a) => {
-      update((d) => ({ ...d, accounts: existing ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
-      setView({ name: "detail", id: a.id });
+    body = <AccountForm key={view.id ?? "new"} existing={existing} onCancel={() => setView({ name: "home" })} onSave={async (a) => {
+      const saved = await update((d) => ({ ...d, accounts: d.accounts.some(x => x.id === a.id) ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
+      if (saved) setView({ name: "detail", id: a.id });
+      return saved;
     }} />;
     break;
   }
@@ -157,10 +165,10 @@ function UnlockedDrip() {
     break;
   case "settings":
     body = <Settings data={data} verifier={verifier}
-    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); setData(d); }}
+    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); replaceData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); setData(n); }} />;
+    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); replaceData(n); }} />;
     break;
   default:
     body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
@@ -168,7 +176,7 @@ function UnlockedDrip() {
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>

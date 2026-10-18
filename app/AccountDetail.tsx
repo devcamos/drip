@@ -12,10 +12,11 @@ const eventStyle = {
   topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
   set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
 };
-type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onChange: (fn: (x: Account) => Account) => void }>;
+type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
 
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(""); const [value, setValue] = useState(""); const [date, setDate] = useState(today());
   const labels = { topup: "Top up", withdraw: "Withdraw", set: "Update balance" };
   const descriptions = {
@@ -26,15 +27,18 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const n = Number(value);
   const valid = value.trim() !== "" && Number.isFinite(n) && (mode === "set" ? n >= 0 : M.round2(n) > 0) && validDate(date);
   return <>
-    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { setMode(action); setValue(action === "set" ? String(a.balance) : ""); setError(""); }}>{labels[action]}</button>)}</div>
-    {mode && <form className="panel" onSubmit={event => {
+    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { setMode(action); setValue(action === "set" ? String(a.balance) : ""); setError(""); }}>{labels[action]}</button>)}</div>
+    {mode && <form className="panel" aria-label={labels[mode]} onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
-      onChange(x => balanceChange[mode](x, n, date)); setMode(null);
+      setBusy(true);
+      try { if (await onChange(x => balanceChange[mode](x, n, date)) !== false) setMode(null); }
+      catch { setError("Could not save the balance. Keep Drip open and retry."); }
+      finally { setBusy(false); }
     }}>
       <h2 style={{ marginTop: 0 }}>{labels[mode]}</h2><p className="muted">{descriptions[mode]}</p>
-      <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input id="balance-date" type="date" aria-label="date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
-      <div className="row-gap"><button type="submit" className="btn small" disabled={!valid}>Save</button><button type="button" className="btn ghost small" onClick={() => setMode(null)}>Cancel</button></div>
+      <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input disabled={busy} id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input disabled={busy} id="balance-date" type="date" aria-label="date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
+      <div className="row-gap"><button type="submit" className="btn small" disabled={!valid || busy}>{busy ? "Saving…" : "Save"}</button><button type="button" className="btn ghost small" disabled={busy} onClick={() => setMode(null)}>Cancel</button></div>
       {error && <p role="alert" className="err">{error}</p>}
     </form>}
   </>;
@@ -42,6 +46,7 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
 
 function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [amount, setAmount] = useState(""); const [date, setDate] = useState(today());
+  const [busy, setBusy] = useState(false);
   const [type, setType] = useState<IncomeType>(a.rateType);
   const [by, setBy] = useState<"week" | "month">("month");
   const [message, setMessage] = useState("");
@@ -58,18 +63,28 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
     {history.length === 0 ? <p className="muted">No income logged yet.</p> : <>
       <fieldset className="row-gap"><legend>Group payments</legend><button className={`btn small ${by === "week" ? "" : "ghost"}`} aria-pressed={by === "week"} onClick={() => setBy("week")}>By week</button><button className={`btn small ${by === "month" ? "" : "ghost"}`} aria-pressed={by === "month"} onClick={() => setBy("month")}>By month</button></fieldset>
       <ul className="list" data-testid="income-history">{[...groups].map(([period, total]) => <li key={period}><span>{by === "week" ? `Week of ${fmtDate(period)}` : new Date(period + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</span><b className="ok">+{M.gbp(total)}</b></li>)}</ul>
-      <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={() => {
-        if (confirm("Remove this recorded payment? Your balance will stay unchanged.")) onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) }));
+      <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" disabled={busy} aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={async () => {
+        if (!confirm("Remove this recorded payment? Your balance will stay unchanged.")) return;
+        setBusy(true);
+        try { await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) })); }
+        catch { setMessage("Payment removal could not be saved. Keep Drip open and retry."); }
+        finally { setBusy(false); }
       }}>Remove</button></span></li>)}</ul></details>
     </>}
-    <form onSubmit={event => {
+    <form onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
-      onChange(x => M.recordIncome(x, Number(amount), date, type)); setAmount(""); setType(a.rateType); setMessage("Income recorded. Update your balance separately if needed.");
+      setBusy(true); setMessage("");
+      try {
+        const saved = await onChange(x => M.recordIncome(x, Number(amount), date, type));
+        if (saved === false) { setMessage("Income could not be saved. Keep Drip open and retry."); return; }
+        setAmount(""); setType(a.rateType); setMessage("Income recorded. Update your balance separately if needed.");
+      } catch { setMessage("Income could not be saved. Keep Drip open and retry."); }
+      finally { setBusy(false); }
     }}>
-      <label htmlFor="income-type">Payment type</label><select id="income-type" value={type} onChange={e => setType(e.target.value as IncomeType)}><option value={a.rateType}>{incomeLabel[a.rateType]}</option><option value="bonus">Bonus</option></select>
-      <div className="grid"><div><label htmlFor="income-amount">Amount received £</label><input id="income-amount" aria-label="Income amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} /></div><div><label htmlFor="income-date">Payment date</label><input id="income-date" type="date" max={today()} aria-label="Income date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
+      <label htmlFor="income-type">Payment type</label><select disabled={busy} id="income-type" value={type} onChange={e => setType(e.target.value as IncomeType)}><option value={a.rateType}>{incomeLabel[a.rateType]}</option><option value="bonus">Bonus</option></select>
+      <div className="grid"><div><label htmlFor="income-amount">Amount received £</label><input disabled={busy} id="income-amount" aria-label="Income amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} /></div><div><label htmlFor="income-date">Payment date</label><input disabled={busy} id="income-date" type="date" max={today()} aria-label="Income date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
       {type === "bonus" && a.bonus && <p className="muted">Recording this bonus payment clears the pending bonus so it won&apos;t be predicted again.</p>}
-      <div className="row-gap"><button type="submit" className="btn small" disabled={!valid}>Record income</button></div>
+      <div className="row-gap"><button type="submit" className="btn small" disabled={!valid || busy}>{busy ? "Saving income…" : "Record income"}</button></div>
     </form>
     {message && <output className="muted">{message}</output>}
   </section>;
