@@ -31,8 +31,11 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
     {mode && <form className="panel" aria-label={labels[mode]} onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
-      setBusy(true);
-      try { if (await onChange(x => balanceChange[mode](x, n, date)) !== false) setMode(null); }
+      setBusy(true); setError("");
+      try {
+        if (await onChange(x => balanceChange[mode](x, n, date)) === false) setError("Balance change could not be saved. Your entry is kept; retry.");
+        else setMode(null);
+      }
       catch { setError("Could not save the balance. Keep Drip open and retry."); }
       finally { setBusy(false); }
     }}>

@@ -102,6 +102,65 @@ describe("migration", () => {
 });
 
 describe("accounts", () => {
+  it("does not carry a failed edit into another queued action", async () => {
+    await seed({ accounts: [acct()] });
+    const persist = DB.saveData;
+    let fail!: (reason: Error) => void;
+    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
+    writer.mockImplementationOnce(() => new Promise<void>((_, reject) => { fail = reject; }));
+    render(<Drip />); await screen.findByText("Rainy day pot");
+    fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
+    click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
+    await waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
+    type(screen.getByLabelText("Income amount"), "22.65"); click("Record income");
+    expect(writer).toHaveBeenCalledTimes(1);
+    await act(async () => fail(new Error("QuotaExceededError")));
+    await screen.findByText("Income recorded. Update your balance separately if needed.");
+    expect(await screen.findByText("Balance change could not be saved. Your entry is kept; retry.")).toBeInTheDocument();
+    const received = (await loadData()).accounts[0];
+    expect(received.balance).toBe(3000); expect(received.events).toHaveLength(0); expect(received.payouts).toHaveLength(1);
+    click("Save");
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Top up" })).toBeNull());
+    const retried = (await loadData()).accounts[0];
+    expect(retried.balance).toBe(3100); expect(retried.events).toHaveLength(1); expect(retried.payouts).toHaveLength(1);
+  });
+  it("retries failed top-ups, withdrawals and income without applying them twice", async () => {
+    await seed({ accounts: [acct()] });
+    const persist = DB.saveData;
+    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
+    render(<Drip />); await screen.findByText("Rainy day pot");
+    fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
+
+    async function retryBalance(action: "Top up" | "Withdraw", amount: string, expected: number, eventType: "topup" | "withdraw") {
+      const previous = (await loadData()).accounts[0];
+      click(action); type(screen.getByLabelText("amount"), amount);
+      writer.mockRejectedValueOnce(new Error("QuotaExceededError")); click("Save");
+      await screen.findByText("Changes could not be saved. Your saved data is unchanged; retry the action.");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeEnabled());
+      expect((await loadData()).accounts[0]).toEqual(previous);
+      expect(document.querySelector(".bal")).toHaveTextContent(new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(previous.balance));
+      expect(screen.getByLabelText("amount")).toHaveValue(amount);
+      click("Save");
+      await waitFor(() => expect(screen.queryByRole("form", { name: action })).toBeNull());
+      const saved = (await loadData()).accounts[0];
+      expect(saved.balance).toBe(expected);
+      expect(saved.events!.filter(e => e.type === eventType)).toHaveLength(1);
+    }
+    await retryBalance("Top up", "100", 3100, "topup");
+    await retryBalance("Withdraw", "50", 3050, "withdraw");
+
+    type(screen.getByLabelText("Income amount"), "22.65");
+    writer.mockRejectedValueOnce(new Error("QuotaExceededError")); click("Record income");
+    await screen.findByText("Income could not be saved. Keep Drip open and retry.");
+    expect((await loadData()).accounts[0].payouts).toHaveLength(0);
+    expect(screen.getByLabelText("Income amount")).toHaveValue("22.65");
+    click("Record income");
+    await screen.findByText("Income recorded. Update your balance separately if needed.");
+    const saved = (await loadData()).accounts[0];
+    expect(saved.balance).toBe(3050);
+    expect(saved.payouts).toEqual([{ date: today, amount: 22.65, kind: "actual", incomeType: "interest" }]);
+    expect(screen.queryByText("Changes could not be saved. Your saved data is unchanged; retry the action.")).toBeNull();
+  });
   it("shows a balance change as saved only after the encrypted write completes", async () => {
     await seed({ accounts: [acct()] });
     const persist = DB.saveData;

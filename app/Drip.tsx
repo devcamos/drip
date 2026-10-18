@@ -53,6 +53,7 @@ export default function Drip() {
 function UnlockedDrip() {
   const [data, setData] = useState<AppData | null>(null);
   const latestData = useRef<AppData | null>(null);
+  const edits = useRef<Promise<unknown>>(Promise.resolve());
   const [pendingSaves, setPendingSaves] = useState(0);
   const replaceData = useCallback((next: AppData) => { latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
@@ -99,23 +100,28 @@ function UnlockedDrip() {
     return () => { loadSequence.current++; window.removeEventListener("beforeinstallprompt", onPrompt); };
   }, []);
 
-  const update = useCallback(async (fn: (d: AppData) => AppData) => {
-    if (!latestData.current) return false;
-    const next = fn(latestData.current);
-    const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
-    latestData.current = withSnap; setPendingSaves(n => n + 1);
-    try {
-      await saveData(withSnap);
-      if (latestData.current === withSnap) { setData(withSnap); }
-      setSaveError("");
-      return true;
-    }
-    catch {
-      if (latestData.current === withSnap) { setData(withSnap); }
-      setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."); return false;
-    }
-    finally { setPendingSaves(n => n - 1); }
-  }, []);
+  const update = useCallback((fn: (d: AppData) => AppData) => {
+    setPendingSaves(n => n + 1);
+    // Derive each edit from the last confirmed snapshot, after earlier edits settle.
+    // A failed action must never become the input to a retry or another edit.
+    const operation = edits.current.then(async () => {
+      try {
+        const previous = latestData.current;
+        if (!previous) return false;
+        const next = fn(previous);
+        const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
+        await saveData(withSnap);
+        if (latestData.current !== previous) return false;
+        replaceData(withSnap); setSaveError("");
+        return true;
+      } catch {
+        setSaveError("Changes could not be saved. Your saved data is unchanged; retry the action.");
+        return false;
+      } finally { setPendingSaves(n => n - 1); }
+    });
+    edits.current = operation;
+    return operation;
+  }, [replaceData]);
 
   if (loadError) return <main><p role="alert">{loadError}</p></main>;
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
