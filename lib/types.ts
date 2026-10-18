@@ -1,4 +1,5 @@
 import type { Identity } from "./identity";
+export interface CloudState { userId: string; key: CryptoKey; version: number; dirty: boolean; lastSyncAt: string | null; identityId: string; generation: string; revision: number }
 export type Frequency = "daily" | "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
 
@@ -10,7 +11,7 @@ export interface RatePeriod { from: string; ratePct: number } // rate in force f
 export interface Account {
   id: string;
   provider: string;      // e.g. "Zopa"
-  label: string;         // nickname, stays on device
+  label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   balance: number;       // GBP
   ratePct: number;       // annual %, e.g. 7
   rateType: RateType;
@@ -28,4 +29,4 @@ export interface Account {
 export interface Snapshot { month: string; totalBalance: number; monthlyIncome: number; deposits?: number; withdrawals?: number }
 
 export interface LockSettings { credentialId: string | null; enabledAt: string | null }
-export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; lock?: LockSettings; identity?: Identity }
+export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; projection?: { monthlyDeposit: number; years: number }; lock?: LockSettings; identity?: Identity }

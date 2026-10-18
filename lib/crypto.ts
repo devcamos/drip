@@ -28,7 +28,8 @@ export function normaliseCode(code: string): string {
 }
 
 export function isValidCode(code: string): boolean {
-  const n = normaliseCode(code);
+  const normal = normaliseCode(code);
+  const n = normal.startsWith("DRIP2") ? normal.slice(5) : normal;
   return n.length === 24 && [...n].every((c) => ALPHABET.includes(c));
 }
 
@@ -41,6 +42,12 @@ async function deriveKey(code: string, salt: Uint8Array, iterations: number): Pr
 }
 
 export interface BackupFile { app: "drip"; v: 1; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
+
+/** Shared by cloud recovery and the memory-only cloud key restored at local unlock. */
+export async function deriveCloudEncryptionKey(code: string): Promise<CryptoKey> {
+  if (!isValidCode(code)) throw new Error("Enter your complete recovery code.");
+  return deriveKey(code, enc.encode("drip-cloud-encryption-v1"), KDF_ITERATIONS);
+}
 
 export async function encryptBackup(data: unknown, code: string, iterations = KDF_ITERATIONS): Promise<BackupFile> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -55,7 +62,7 @@ export class BackupError extends Error {}
 export async function decryptBackup<T = unknown>(file: unknown, code: string): Promise<T> {
   const f = file as BackupFile;
   if (!f || f.app !== "drip" || f.v !== 1 || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file.");
-  if (!Number.isInteger(f.iter) || f.iter < 100_000) throw new BackupError("Backup uses unsafe settings.");
+  if (!Number.isInteger(f.iter) || f.iter < 100_000 || f.iter > KDF_ITERATIONS) throw new BackupError("Backup uses unsafe settings.");
   try {
     const key = await deriveKey(code, unb64(f.salt), f.iter);
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(f.iv), additionalData: enc.encode("drip-v1") }, key, unb64(f.ct));

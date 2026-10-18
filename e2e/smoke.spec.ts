@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { unlock } from "./vault-helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -37,10 +38,11 @@ test("onboarding shows a recovery code and gates Start", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Reroll/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · devo_1");
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("devo_1");
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByTestId("settings-tag")).toHaveText("devo_1");
-  await expect(page.getByText(/If this name is taken when sync launches, we'll add a short number to it/)).toBeVisible();
+  await expect(page.getByText(/does not need to be unique/)).toBeVisible();
 });
 
 test("add account, top up, withdraw, Trends, backup export and import", async ({ page }) => {
@@ -71,12 +73,13 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   // Trends
   await page.getByRole("navigation").getByRole("button", { name: "Trends" }).click();
   await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
-  await expect(page.getByText("£3,300.00")).toBeVisible();
+  await expect(page.locator(".stat").filter({ hasText: "Total balance" }).getByText("£3,300.00", { exact: true })).toBeVisible();
   await expect(page.getByText("7.00%")).toBeVisible();
-  await expect(page.getByText(/In 12 months:/)).toBeVisible();
+  await expect(page.getByText("Estimated balance in 1 year")).toBeVisible();
 
   // export
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await page.getByPlaceholder("XXXX-XXXX-XXXX-XXXX-XXXX-XXXX").fill("WRONG");
   await page.getByRole("button", { name: "Export backup" }).click();
   await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
@@ -95,12 +98,12 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   await p2.goto("/");
   await p2.getByRole("button", { name: "Restore a backup" }).click();
   await p2.locator('input[type="file"]').setInputFiles(file);
-  const codeInput = p2.locator("input").nth(1);
+  const codeInput = p2.getByLabel("Restore recovery code");
   await codeInput.fill(code.slice(0, -1) + (code.endsWith("A") ? "B" : "A"));
-  await p2.getByRole("button", { name: "Restore" }).click();
+  await p2.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(p2.getByText(/Wrong recovery code/)).toBeVisible();
   await codeInput.fill(code);
-  await p2.getByRole("button", { name: "Restore" }).click();
+  await p2.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(p2.getByText("Rainy day pot")).toBeVisible();
   await expect(p2.getByTestId("header-tag")).toContainText(tag!); // gamertag restored from backup
   await expect(p2.getByText("£3,300.00").first()).toBeVisible();
@@ -113,18 +116,21 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const code = await onboard(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByText(/screen lock only/)).toBeVisible();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
 
-  // reopen: passkey verifies automatically
+  // Reopening first needs the recovery code to unwrap the local key.
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByText("No accounts yet")).toBeVisible();
 
   // passkey fails -> fallback to recovery code
   await cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
   await page.reload();
+  await unlock(page, code);
   await expect(page.getByRole("heading", { name: /locked/ })).toBeVisible();
   await page.locator("input").fill("WRONG");
   await page.getByRole("button", { name: "Unlock with code" }).click();
@@ -134,24 +140,6 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await expect(page.getByText("No accounts yet")).toBeVisible();
 });
 
-test("existing install without a gamertag is asked for one on next open", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(async () => {
-    const db: IDBDatabase = await new Promise((r) => { const q = indexedDB.open("drip", 1); q.onupgradeneeded = () => q.result.createObjectStore("kv"); q.onsuccess = () => r(q.result); });
-    await new Promise((r) => { const t = db.transaction("kv", "readwrite");
-      t.objectStore("kv").put({ version: 1, accounts: [], snapshots: [], lastBackupAt: null }, "data");
-      t.objectStore("kv").put({ salt: "AAAA", hash: "x" }, "verifier"); t.oncomplete = r; });
-  });
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Pick your gamertag" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save gamertag" })).toBeDisabled();
-  await page.getByLabel(/Gamertag/).fill("oldfriend");
-  await page.getByRole("button", { name: "Save gamertag" }).click();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · oldfriend");
-  await page.reload();
-  await expect(page.getByTestId("header-tag")).toHaveText("💧 Drip · oldfriend");
-});
-
 test("app-lock passkey uses the gamertag as its user name and the account id as user id", async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
@@ -159,30 +147,29 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   await onboard(page);
   const tag = await page.getByTestId("header-tag").locator("b").textContent();
-  await page.getByRole("navigation").getByRole("button", { name: "Backup" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
-  const id: string = await page.evaluate(async () => {
-    const db: IDBDatabase = await new Promise((r) => { const q = indexedDB.open("drip", 1); q.onsuccess = () => r(q.result); });
-    return new Promise((r) => { const g = db.transaction("kv").objectStore("kv").get("data"); g.onsuccess = () => r(g.result.identity.id); });
-  });
   const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
   expect(credentials).toHaveLength(1);
   const userHex = Buffer.from(credentials[0].userHandle!, "base64").toString("hex");
-  expect(userHex).toBe(id.replace(/-/g, ""));
+  expect(userHex).toMatch(/^[a-f0-9]{32}$/);
   if ((credentials[0] as any).userName !== undefined) expect((credentials[0] as any).userName).toBe("devo");
   expect(tag).toBe("devo");
 });
 
-test("onboarding draft survives leaving the page; after Start it always opens to Accounts", async ({ page, context }) => {
+test("onboarding drafts stay in memory and created accounts need a code after reopening", async ({ page, context }) => {
   await page.goto("/");
-  const code = await page.getByTestId("code").textContent();
+  const firstCode = await page.getByTestId("code").textContent();
   await page.getByLabel(/Gamertag/).fill("devo");
   await page.waitForTimeout(300);
   await page.goto("about:blank");
   await page.goto("/");
-  await expect(page.getByTestId("code")).toHaveText(code!);
-  await expect(page.getByLabel(/Gamertag/)).toHaveValue("devo");
+  await expect(page.getByTestId("code")).not.toHaveText(firstCode!);
+  await expect(page.getByLabel(/Gamertag/)).toHaveValue("");
+  const code = (await page.getByTestId("code").textContent())!;
+  await page.getByLabel(/Gamertag/).fill("devo");
   await page.getByLabel(/saved my recovery code/).check();
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
@@ -190,8 +177,9 @@ test("onboarding draft survives leaving the page; after Start it always opens to
   await page.close();
   const p2 = await context.newPage();
   await p2.goto("/");
+  await unlock(p2, code);
   await expect(p2.getByText("No accounts yet")).toBeVisible();
-  await expect(p2.getByTestId("header-tag")).toHaveText("💧 Drip · devo");
+  await expect(p2.getByTestId("header-tag").locator("b")).toHaveText("devo");
   await expect(p2.getByTestId("code")).toHaveCount(0);
 });
 

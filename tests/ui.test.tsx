@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
+import { seedVault } from "./storage-fixtures";
 import Drip from "@/app/Drip";
 import Page from "@/app/page";
 import RootLayout, { metadata, viewport } from "@/app/layout";
@@ -20,8 +21,7 @@ function acct(o: Partial<Account> = {}): Account {
 }
 
 async function seed(d: Partial<AppData>, code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF") {
-  await saveData({ ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "devo", createdAt: "2026-10-15T00:00:00Z" }, ...d });
-  await setItem("verifier", await C.codeVerifier(code));
+  await seedVault({ ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "devo", createdAt: "2026-10-15T00:00:00Z" }, ...d }, code);
   return code;
 }
 
@@ -32,7 +32,7 @@ beforeEach(() => {
 describe("layout and page", () => {
   it("exports metadata and wraps children", () => {
     expect(metadata.title).toBe("Drip");
-    expect(viewport.themeColor).toBe("#0b1020");
+    expect(viewport.themeColor).toBe("#fffaf1");
     const el = RootLayout({ children: "x" }) as any;
     expect(el.type).toBe("html");
     expect((Page() as any).type).toBe(Drip);
@@ -50,7 +50,7 @@ describe("onboarding", () => {
     expect(screen.getByText("Only letters, numbers and underscore.")).toBeInTheDocument();
     type(handle, "devo");
     expect(screen.getByTestId("tag-preview")).toHaveTextContent("You'll be devo");
-    vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { clipboard: { writeText: vi.fn() } }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn() } });
     click("Copy");
     click("Start");
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
@@ -89,8 +89,7 @@ describe("onboarding", () => {
 
 describe("migration", () => {
   it("asks an existing install for a gamertag", async () => {
-    await saveData(emptyData());
-    await setItem("verifier", await C.codeVerifier("AAAA-BBBB-CCCC-DDDD-EEEE-FFFF"));
+    await seedVault(emptyData());
     render(<Drip />);
     expect(await screen.findByRole("heading", { name: "Pick your gamertag" })).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save gamertag" });
@@ -190,7 +189,7 @@ describe("trends", () => {
     expect(screen.getByText("This month vs last")).toBeInTheDocument();
     expect(screen.getByText("£600.00")).toBeInTheDocument();
     expect(screen.getByText("−£117.50")).toBeInTheDocument();
-    expect(screen.getByText(/In 12 months:/)).toBeInTheDocument();
+    expect(screen.getByText("Estimated balance in 1 year")).toBeInTheDocument();
   });
   it("explains missing history", async () => {
     await seed({ accounts: [] });
@@ -208,9 +207,9 @@ describe("backup", () => {
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: (b: Blob) => { blob = b; return "blob:x"; }, revokeObjectURL: vi.fn() }));
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<Drip />);
-    expect(await screen.findByText(/haven't backed up yet/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Back up" }));
-    expect(screen.getByRole("heading", { name: /Backup/ })).toBeInTheDocument();
+    await screen.findByText("Total balance");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    expect(screen.getByRole("heading", { name: "Recovery" })).toBeInTheDocument();
     type(screen.getByLabelText("Export recovery code"), "WRONG");
     click("Export backup");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
@@ -220,7 +219,7 @@ describe("backup", () => {
     expect(clickSpy).toHaveBeenCalled();
     const file = JSON.parse(await blob!.text());
     expect(file.app).toBe("drip");
-    expect((await loadData()).lastBackupAt).not.toBeNull();
+    await waitFor(async () => expect((await loadData()).lastBackupAt).not.toBeNull());
 
     // restore a different backup over it
     const other = await C.encryptBackup({ ...emptyData(), accounts: [acct({ provider: "Plum", label: "From backup" })] }, code, 100_000);
@@ -236,7 +235,7 @@ describe("backup", () => {
     Object.assign(navigator, { canShare: () => true, share });
     render(<Drip />);
     await screen.findByText("Total balance");
-    tab("Backup");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     type(screen.getByLabelText("Export recovery code"), code);
     click("Export backup");
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1), { timeout: 10_000 });
@@ -252,7 +251,7 @@ describe("backup", () => {
     const bad = await C.encryptBackup({ version: 9 }, code, 100_000);
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Backup");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(bad)], "b.json")] } });
     type(screen.getByLabelText("Restore recovery code"), code);
     click("Restore");
@@ -267,7 +266,7 @@ describe("banners", () => {
     Object.defineProperty(navigator, "storage", { configurable: true, value: { persisted: async () => false, persist: async () => false } });
     render(<Drip />);
     expect(await screen.findByText(/Add to Home Screen/)).toBeInTheDocument();
-    expect(await screen.findByText(/may clear Drip's data/)).toBeInTheDocument();
+    expect(screen.queryByText(/may clear Drip's data/)).toBeNull();
     for (const b of screen.getAllByRole("button", { name: "✕" })) fireEvent.click(b);
     expect(screen.queryByText(/Add to Home Screen/)).toBeNull();
     expect(screen.queryByText(/may clear Drip's data/)).toBeNull();
@@ -279,10 +278,10 @@ describe("banners", () => {
     await screen.findByText("Total balance");
     const prompt = vi.fn();
     act(() => { const e = new Event("beforeinstallprompt"); (e as any).prompt = prompt; window.dispatchEvent(e); });
-    expect(await screen.findByText(/Install Drip on this device/)).toBeInTheDocument();
+    expect(await screen.findByText(/Install Drip for quick access/)).toBeInTheDocument();
     click("Install");
     expect(prompt).toHaveBeenCalled();
-    expect(screen.getByText(/over 2 weeks since your last backup/)).toBeInTheDocument();
+    expect(screen.queryByText(/over 2 weeks since your last backup/)).toBeNull();
   });
 });
 
@@ -295,15 +294,15 @@ describe("app lock", () => {
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create, get: vi.fn() } });
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Backup");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(screen.getByText(/screen lock only/)).toBeInTheDocument();
     expect(screen.getByTestId("settings-tag")).toHaveTextContent("devo");
-    expect(screen.getByText(/If this name is taken when sync launches/)).toBeInTheDocument();
+    expect(screen.getByText(/does not need to be unique/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("App lock is on.")).toBeInTheDocument();
     expect((create.mock.calls[0] as any)[0].publicKey.user.name).toBe("devo");
-    expect((await loadData()).lock?.credentialId).toBe(credId);
+    await waitFor(async () => expect((await loadData()).lock?.credentialId).toBe(credId));
     click("Turn off app lock");
     expect(await screen.findByText("App lock is off.")).toBeInTheDocument();
   });
@@ -313,7 +312,7 @@ describe("app lock", () => {
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create: async () => null, get: vi.fn() } });
     const { unmount } = render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Backup");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("Couldn't set up the passkey.")).toBeInTheDocument();
@@ -321,7 +320,7 @@ describe("app lock", () => {
     vi.stubGlobal("PublicKeyCredential", undefined);
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Backup");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(await screen.findByText(/doesn't support a passkey lock/)).toBeInTheDocument();
   });
   it("locks on open, unlocks by passkey or recovery code, and relocks after 5 minutes hidden", async () => {
@@ -406,5 +405,38 @@ describe("daily interest accounts", () => {
     click("By month");
     expect(screen.getByTestId("interest-history").textContent).toMatch(/20\d\d/);
     click("By week");
+  });
+});
+
+describe("sign-out", () => {
+  it("keeps accounts hidden across remount and reopens the local copy only with its code", async () => {
+    const code = await seed({ accounts: [acct()] });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
+    const first = render(<Drip />); await screen.findByText("Total balance");
+    click("Sign out");
+    expect(await screen.findByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(screen.queryByText("Rainy day pot")).toBeNull();
+    first.unmount(); render(<Drip />);
+    await screen.findByRole("heading", { name: "Drip is signed out" });
+    type(screen.getByLabelText("Recovery code"), "wrong"); click("Sign in");
+    expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
+    type(screen.getByLabelText("Recovery code"), code); click("Sign in");
+    expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
+    expect((await loadData()).accounts[0].balance).toBe(3000);
+  });
+  it("does not let delayed startup overwrite a sign-out from another tab", async () => {
+    await seed({ accounts: [acct()] });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
+    const db = await import("../lib/db"); const saved = await loadData();
+    let release!: (value: AppData) => void;
+    const spy = vi.spyOn(db, "loadData").mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    render(<Drip />);
+    await waitFor(() => expect(release).toBeDefined());
+    await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "from-another-tab" });
+    await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: "drip-session-notify" })); });
+    await screen.findByRole("heading", { name: "Drip is signed out" });
+    await act(async () => { release(saved); });
+    expect(screen.getByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(screen.queryByText("Rainy day pot")).toBeNull(); spy.mockRestore();
   });
 });

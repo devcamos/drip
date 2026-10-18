@@ -1,12 +1,19 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, AppData, Frequency, RateType } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
-import { emptyData, getItem, isAppData, loadData, saveData, setItem } from "@/lib/db";
+import { commitCloudRestore, emptyData, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
-import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
+import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
+import { PwaStatus } from "./PwaStatus";
+import { SignOutButton, SignedOut } from "./DeviceSession";
+import { readDeviceSession } from "@/lib/device-session";
+import { RecoveryCodes } from "./RecoveryCodes";
+import { Trends } from "./Trends";
+import { downloadRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -18,14 +25,42 @@ const PROVIDERS: Record<string, string> = {
 const today = () => M.ymd(new Date());
 
 export default function Drip() {
+  const [gate, setGate] = useState<{ status: Awaited<ReturnType<typeof localVaultStatus>>; signedOut: boolean }>();
+  const [error, setError] = useState("");
+  const sequence = useRef(0);
+  const refresh = useCallback(async () => {
+    const id = ++sequence.current;
+    try {
+      const status = await localVaultStatus(); const session = await readDeviceSession();
+      if (id !== sequence.current) return;
+      setGate({ status, signedOut: !!session?.signedOut }); setError("");
+    } catch { if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
+  }, []);
+  useEffect(() => {
+    refresh();
+    const storage = (event: StorageEvent) => { if (event.key === "drip-session-notify") refresh(); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("drip-session-changed", refresh); window.addEventListener("storage", storage); document.addEventListener("visibilitychange", visible);
+    return () => { sequence.current++; window.removeEventListener("drip-session-changed", refresh); window.removeEventListener("storage", storage); document.removeEventListener("visibilitychange", visible); };
+  }, [refresh]);
+  if (error) return <main><p role="alert">{error}</p><button className="btn" onClick={refresh}>Try again</button></main>;
+  if (!gate) return <main><p className="muted">Loading…</p></main>;
+  if (gate.signedOut) return <SignedOut mode="signedOut" onSignedIn={refresh} />;
+  if (gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.status} onSignedIn={refresh} />;
+  return <UnlockedDrip />;
+}
+
+function UnlockedDrip() {
   const [data, setData] = useState<AppData | null>(null);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
-  const [persisted, setPersisted] = useState<boolean | null>(null);
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
   const [deferred, setDeferred] = useState<any>(null);
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
+  const loadSequence = useRef(0);
   const [locked, setLocked] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const lockOn = !!data?.lock?.credentialId;
   useEffect(() => {
     if (!data) return;
@@ -39,42 +74,49 @@ export default function Drip() {
   }, [data, lockOn]);
 
   useEffect(() => {
+    const sequence = ++loadSequence.current;
     (async () => {
+      const session = await readDeviceSession();
       let loaded = await loadData();
       const t0 = today();
       const accrued = loaded.accounts.map((a) => M.applyDailyAccrual(a, t0));
-      if (accrued.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts: accrued }; await saveData(loaded); }
-      setData(loaded);
-      if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
-      setVerifier((await getItem<Verifier>("verifier")) ?? null);
+      if (!session?.signedOut && accrued.some((a, i) => a !== loaded.accounts[i])) { loaded = { ...loaded, accounts: accrued }; await saveData(loaded); }
+      const savedVerifier = (await getItem<Verifier>("verifier")) ?? null;
+      const latest = await readDeviceSession();
+      if (sequence === loadSequence.current && !latest?.signedOut) {
+        setData(loaded); setVerifier(savedVerifier);
+        if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
+      }
       if (navigator.storage?.persist) {
         const already = await navigator.storage.persisted?.();
-        setPersisted(already || (await navigator.storage.persist()));
+        if (!already) await navigator.storage.persist();
       }
-    })();
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (!standalone && ios) setInstallHint("ios");
     const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e); if (!standalone) setInstallHint("android"); };
     window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    return () => { loadSequence.current++; window.removeEventListener("beforeinstallprompt", onPrompt); };
   }, []);
 
   const update = useCallback(async (fn: (d: AppData) => AppData) => {
     setData((prev) => {
       const next = fn(prev ?? emptyData());
       const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
-      saveData(withSnap);
+      saveData(withSnap).catch(() => setSaveError("Changes could not be saved. Keep Drip open and export a backup before continuing."));
       return withSnap;
     });
   }, []);
 
+  if (loadError) return <main><p role="alert">{loadError}</p></main>;
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;
-  if (verifier === null) return <Onboarding onDone={async (v, restored, identity) => {
-    await setItem("verifier", v); await clearDraft(); setVerifier(v); setView({ name: "home" });
-    const d = restored ? { ...restored, lastBackupAt: new Date().toISOString() } : { ...data, identity };
-    await saveData(d); setData(d);
+  if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud, expectedGeneration, root) => {
+    let d = restored ?? { ...data, identity };
+    if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
+    if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
+    await clearDraft();
+    setVerifier(v); setView({ name: "home" }); setData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
@@ -87,50 +129,55 @@ export default function Drip() {
       {installHint && !dismissed.install && (
         <div className="banner info">
           {installHint === "ios"
-            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. This also stops Safari clearing your data.</span>
-            : <span>Install Drip on this device to keep your data safe.</span>}
+            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. Keep cloud recovery or exported backups too; installation alone doesn&apos;t guarantee data retention.</span>
+            : <span>Install Drip for quick access and offline tracking.</span>}
           {installHint === "android" && deferred && <button className="btn small" onClick={async () => { deferred.prompt(); setDeferred(null); setInstallHint(null); }}>Install</button>}
           <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, install: true })}>✕</button>
         </div>
       )}
-      {persisted === false && !dismissed.persist && (
-        <div className="banner warn"><span>Your browser may clear Drip&apos;s data if storage gets low. Install the app and export backups regularly.</span>
-          <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, persist: true })}>✕</button></div>
-      )}
-      {M.backupDue(data.lastBackupAt, data.accounts.length > 0, new Date()) && !dismissed.backup && (
-        <div className="banner warn"><span>{data.lastBackupAt ? "It's been over 2 weeks since your last backup." : "You haven't backed up yet."} Your data only lives on this device.</span>
-          <button className="btn small" onClick={() => setView({ name: "settings" })}>Back up</button></div>
-      )}
+
     </>
   );
 
   let body: React.ReactNode;
-  if (view.name === "detail") {
+  switch (view.name) {
+  case "detail": {
     const a = data.accounts.find((x) => x.id === view.id);
     body = a ? <Detail a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
       onLog={(p) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? { ...x, payouts: [...x.payouts, p] } : x) }))}
       onChange={(fn) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) }))}
       onDelete={() => { if (confirm(`Delete ${a.provider}?`)) { update((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) })); setView({ name: "home" }); } }} /> : null;
-  } else if (view.name === "add") {
+    break;
+  }
+  case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
     body = <AddForm existing={existing} onCancel={() => setView({ name: "home" })} onSave={(a) => {
       update((d) => ({ ...d, accounts: existing ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
       setView({ name: "detail", id: a.id });
     }} />;
-  } else if (view.name === "trends") body = <Trends data={data} />;
-  else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
+    break;
+  }
+  case "trends":
+    body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
+    break;
+  case "settings":
+    body = <Settings data={data} verifier={verifier}
+    onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); setData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d) => { const n = { ...d, lastBackupAt: new Date().toISOString() }; await saveData(n); setData(n); }} />;
-  else body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
+    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); setData(n); }} />;
+    break;
+  default:
+    body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
+  }
 
   return (
     <>
-      <main><div className="tagline" data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></div>{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
-            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Backup" }[n]}
+            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Recovery" }[n]}
           </button>
         ))}
       </nav>
@@ -138,7 +185,7 @@ export default function Drip() {
   );
 }
 
-function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Identity | null) => void; cta?: string; initial?: string; onRaw?: (h: string) => void }) {
+function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (i: I.Identity | null) => void; cta?: string; initial?: string; onRaw?: (h: string) => void }>) {
   const [handle, setHandle] = useState(initial);
   const err = handle ? I.handleError(handle) : null;
   const ok = !!handle && !err;
@@ -154,7 +201,7 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: { onPick: (i: I.Iden
   );
 }
 
-function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, identity?: I.Identity) => void }) {
+function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string) => void | Promise<void> }>) {
   const [draft, setDraft] = useState<{ handle: string; code: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
   useEffect(() => {
@@ -164,32 +211,41 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
     })();
   }, []);
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [mode, setMode] = useState<"new" | "restore">("new");
   if (!draft) return <main><p className="muted">Loading…</p></main>;
   const code = draft.code;
   return (
     <main>
       <h1>Welcome to Drip 💧</h1>
-      <p className="muted">See what your savings and investments earn, and when it lands. Everything stays on this device. No email, no sign-up.</p>
+      <PwaStatus />
+      <p className="muted">See what your savings and investments earn, and when it lands. Start on this device, then enable encrypted cloud recovery in Backup. No real name or email needed.</p>
+      <CloudReturn onRestored={async (d, c) => onDone(await C.codeVerifier(c), d, undefined, true)} />
       {mode === "new" ? (
         <div className="panel">
           <h2>Your gamertag</h2>
           <HandlePicker onPick={setIdentity} initial={draft.handle} onRaw={(h) => saveDraft({ handle: h, code })} />
           <h2>Your recovery code</h2>
-          <p className="muted">This code encrypts your backups. Write it down or save it in your password manager. <b>If you lose this code and this device, your data can&apos;t be recovered.</b> Nobody, including us, can reset it.</p>
+          <p className="muted">This code unlocks your encrypted local accounts and backups. Save it in your password manager. Before Start, leaving this page generates a new code. <b>If you lose this code and this device, your data can&apos;t be recovered.</b> Nobody, including us, can reset it.</p>
           <div className="code" data-testid="code">{code}</div>
-          <div className="row-gap"><button className="btn ghost small" onClick={() => navigator.clipboard?.writeText(code)}>Copy</button></div>
+          <div className="row-gap"><button className="btn ghost small" onClick={() => navigator.clipboard?.writeText(code)}>Copy</button><button className="btn ghost small" onClick={() => downloadRecoveryCodes([code], draft.handle)}>Download recovery code</button></div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--text)" }}>
             <input type="checkbox" style={{ width: "auto" }} checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I&apos;ve saved my recovery code somewhere safe
           </label>
           <div className="row-gap">
-            <button className="btn" disabled={!saved || !identity} onClick={async () => onDone(await C.codeVerifier(code), undefined, identity!)}>Start</button>
+            <button className="btn" disabled={busy || !saved || !identity} onClick={async () => {
+              setBusy(true); setError("");
+              try { const device = await readDeviceSession(); await onDone(await C.codeVerifier(code), undefined, identity!, false, device?.generation, code); }
+              catch { setError("Could not encrypt local accounts. Your recovery code has not changed; try again."); }
+              finally { setBusy(false); }
+            }}>{busy ? "Encrypting…" : "Start"}</button>
             <button className="btn ghost" onClick={() => setMode("restore")}>Restore a backup</button>
           </div>
+          {error && <p role="alert" className="err">{error}</p>}
         </div>
       ) : (
         <div className="panel"><h2>Restore a backup</h2>
-          <Restore onRestored={async (d, c) => onDone(await C.codeVerifier(c), d)} />
+          <Restore onRestored={async (d, c, g) => onDone(await C.codeVerifier(c), d, undefined, false, g, c)} />
           <div className="row-gap"><button className="btn ghost" onClick={() => setMode("new")}>Back</button></div>
         </div>
       )}
@@ -197,7 +253,7 @@ function Onboarding({ onDone }: { onDone: (v: Verifier, restored?: AppData, iden
   );
 }
 
-function Home({ data, open, add }: { data: AppData; open: (id: string) => void; add: () => void }) {
+function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) => void; add: () => void }>) {
   const t = today();
   const up = M.upcoming(data.accounts, t);
   return (
@@ -212,7 +268,7 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
           {data.accounts.map((a) => {
             const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
             return (
-              <button key={a.id} className="card" style={{ background: `linear-gradient(135deg, ${a.colour}, #111)` }} onClick={() => open(a.id)}>
+              <button key={a.id} className="card" onClick={() => open(a.id)}>
                 <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
                 <div className="row meta"><span>{a.label || a.rateType}</span><span>{a.ratePct}%</span></div>
                 <div className="meta" style={{ marginTop: 18 }}>≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} this month · {a.frequency === "daily" ? "Daily interest" : `paid ${fmtDate(next)}`}</div>
@@ -230,7 +286,7 @@ function Home({ data, open, add }: { data: AppData; open: (id: string) => void; 
   );
 }
 
-function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }) {
+function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onLog: (p: Account["payouts"][number]) => void; onChange: (fn: (x: Account) => Account) => void }>) {
   const [amt, setAmt] = useState(""); const [date, setDate] = useState(today());
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null); const [verr, setVerr] = useState(""); const [val, setVal] = useState(""); const [vdate, setVdate] = useState(today());
   const [by, setBy] = useState<"week" | "month">("week");
@@ -241,7 +297,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
   return (
     <>
       <button className="btn ghost small" onClick={onBack}>← Accounts</button>
-      <div className="card" style={{ background: `linear-gradient(135deg, ${a.colour}, #111)`, marginTop: 12, cursor: "default" }}>
+      <div className="card" style={{ marginTop: 12, cursor: "default" }}>
         <div className="row"><span className="prov">{a.provider}</span><span>{a.rateType}</span></div>
         {a.label && <div className="meta">{a.label}</div>}
         <div className="bal">{M.gbp(a.balance)}</div>
@@ -311,7 +367,7 @@ function Detail({ a, onBack, onEdit, onDelete, onLog, onChange }: { a: Account; 
   );
 }
 
-function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (a: Account) => void; onCancel: () => void }) {
+function AddForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void; onCancel: () => void }>) {
   const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
   const [custom, setCustom] = useState(existing && !(existing.provider in PROVIDERS) ? existing.provider : "");
   const [label, setLabel] = useState(existing?.label ?? "");
@@ -327,10 +383,10 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   return (
     <>
       <h1>{existing ? "Edit account" : "Add account"}</h1>
-      <label>Provider</label>
-      <select aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
-      {isOther && <><label>Provider name</label><input aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
-      <label>Nickname (optional, stays on this device)</label><input aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
+      <label htmlFor="account-provider">Provider</label>
+      <select id="account-provider" aria-label="Provider" value={isOther ? "Other" : provider} onChange={(e) => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map((p) => <option key={p}>{p}</option>)}</select>
+      {isOther && <><label htmlFor="custom-provider">Provider name</label><input id="custom-provider" aria-label="Provider name" value={custom} onChange={(e) => setCustom(e.target.value)} /></>}
+      <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
       <div className="grid">
         <div><label>Balance £</label><input inputMode="decimal" aria-label="Balance" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="3000" /></div>
         <div><label>Rate % a year</label><input inputMode="decimal" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="7" /></div>
@@ -356,47 +412,7 @@ function AddForm({ existing, onSave, onCancel }: { existing?: Account; onSave: (
   );
 }
 
-function Trends({ data }: { data: AppData }) {
-  const proj = useMemo(() => M.projection(data.accounts), [data.accounts]);
-  const br = M.momBreakdown(data.snapshots); const g = br ? br.growthPct : M.momGrowth(data.snapshots);
-  const hist = data.snapshots.slice(-6);
-  const max = Math.max(1, ...hist.map((s) => s.totalBalance), ...proj.map((p) => p.balance));
-  const total = M.totalBalance(data.accounts);
-  return (
-    <>
-      <h1>Trends</h1>
-      <div className="grid">
-        <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-        <div className="stat"><div className="muted">Monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
-        <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
-        <div className="stat"><div className="muted">Growth excl. deposits/withdrawals</div><div className="v">{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}%`}</div></div>
-      </div>
-      {br && (
-        <div className="panel"><h2 style={{ marginTop: 0 }}>This month vs last</h2>
-          <ul className="list">
-            <li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li>
-            <li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li>
-            <li><span>Growth from interest and returns</span><b className={br.growth >= 0 ? "ok" : "err"}>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li>
-            <li><span>Total change</span><b>{M.gbp(br.change)}</b></li>
-          </ul>
-          <p className="muted">Growth is the change in balance minus top-ups plus withdrawals, so only manual balance updates can make it look negative.</p>
-        </div>
-      )}
-      <div className="panel"><h2 style={{ marginTop: 0 }}>Balance by month</h2>
-        <p className="muted">Green: recorded. Blue: 12-month projection with interest reinvested.</p>
-        <div className="bars">
-          {hist.map((s) => <div key={s.month} title={M.gbp(s.totalBalance)} style={{ height: `${(s.totalBalance / max) * 100}%` }} />)}
-          {proj.map((p) => <div key={p.month} className="proj" title={M.gbp(p.balance)} style={{ height: `${(p.balance / max) * 100}%` }} />)}
-        </div>
-        <div className="axis">{hist.map((s) => <span key={s.month}>{s.month.slice(5)}</span>)}{proj.map((p) => <span key={p.month}>+{p.month}</span>)}</div>
-        <p className="muted" style={{ marginTop: 12 }}>In 12 months: <b style={{ color: "var(--text)" }}>{M.gbp(proj[11]?.balance ?? 0)}</b> (+{M.gbp((proj[11]?.balance ?? 0) - total)}), if rates stay the same.</p>
-      </div>
-      {g === null && <p className="muted">Month-on-month growth appears after Drip has two months of history.</p>}
-    </>
-  );
-}
-
-function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string; verifier: Verifier; onUnlock: () => void }) {
+function LockScreen({ credentialId, verifier, onUnlock }: Readonly<{ credentialId: string; verifier: Verifier; onUnlock: () => void }>) {
   const [code, setCode] = useState(""); const [err, setErr] = useState("");
   const tryPasskey = async () => { setErr(""); if (await L.verifyPasskey(navigator.credentials, credentialId, location.hostname)) onUnlock(); else setErr("Face ID didn't work. Try again or use your recovery code."); };
   useEffect(() => { tryPasskey(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -406,20 +422,20 @@ function LockScreen({ credentialId, verifier, onUnlock }: { credentialId: string
         <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
         <label>Or use your recovery code</label>
         <input aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
-        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { if (await C.checkCode(code, verifier)) onUnlock(); else setErr("That isn't your recovery code."); }}>Unlock with code</button></div>
+        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { try { if (await C.checkCode(await resolveRecoveryCode(code), verifier)) onUnlock(); else setErr("That isn't your recovery code."); } catch (e) { setErr((e as Error).message); } }}>Unlock with code</button></div>
         {err && <p className="err">{err}</p>}
       </div>
     </main>
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData) => void; onLock: (l: AppData["lock"]) => void }) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: Readonly<{ data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void> }>) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (
     <div className="panel"><h2 style={{ marginTop: 0 }}>App lock</h2>
       <p className="muted">Ask for Face ID (or your device passkey) when Drip opens and after 5 minutes in the background. Your recovery code also unlocks it.</p>
-      <p className="muted"><b>Be aware:</b> this is a screen lock only. It stops someone casually opening Drip on your phone, but it doesn&apos;t encrypt the data stored on this device. Your phone&apos;s own passcode is the real protection. Backups are always encrypted.</p>
+      <p className="muted"><b>Be aware:</b> this is a screen lock only. It stops someone casually opening Drip on your phone, Local accounts are encrypted separately and need your recovery code after a full reload. This extra screen lock does not unwrap the encryption key.</p>
       {data.lock?.credentialId ? (
         <button className="btn ghost" onClick={() => { onLock({ credentialId: null, enabledAt: null }); setLockMsg("App lock is off."); }}>Turn off app lock</button>
       ) : supported === false ? <p className="muted">This device or browser doesn&apos;t support a passkey lock.</p> : (
@@ -434,16 +450,21 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
   const [code, setCode] = useState(""); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [busy, setBusy] = useState(false);
   return (
     <>
-      <h1>Backup &amp; security</h1>
-      <p className="muted">Your data lives only on this device. A backup is an encrypted file locked with your recovery code. Save it to Files or iCloud Drive.</p>
+      <h1>Recovery</h1>
+      <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
+      <RecoveryCodes data={data} verifier={verifier} />
+      <CloudPanel data={data} verifier={verifier} onRestored={onCloudRestored} />
+      <details className="panel"><summary>Advanced: file backups &amp; app lock</summary>
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
+        <p className="muted">An exported file includes this device&apos;s nicknames. Keep the file private.</p>
         <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
         <div className="row-gap"><button className="btn" disabled={busy || !code} onClick={async () => {
           setBusy(true); setMsg(null);
           try {
-            if (!(await C.checkCode(code, verifier))) { setMsg({ ok: false, t: "That isn't your recovery code." }); return; }
-            const file = await C.encryptBackup(data, code);
+            const root = await resolveRecoveryCode(code);
+            if (!(await C.checkCode(root, verifier))) { setMsg({ ok: false, t: "That isn't your recovery code." }); return; }
+            const file = await C.encryptBackup(data, root);
             const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
             const name = `drip-backup-${today()}.json`;
             const f = new File([blob], name, { type: "application/json" });
@@ -457,21 +478,23 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock }: { data: App
       </div>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Restore</h2>
         <p className="muted">Replaces everything on this device with the backup.</p>
-        <Restore onRestored={(d) => { if (confirm("Replace all data on this device with this backup?")) onRestore(d); }} />
+        <p className="muted">Importing a file disconnects cloud recovery on this device to prevent uploading a different account&apos;s data.</p>
+        <Restore onRestored={async (d, c, g) => { if (confirm("Replace all data on this device with this backup? Cloud recovery will be disconnected on this device.")) await onRestore(d, c, g); }} />
       </div>
       {lockPanel}
+      </details>
       {data.identity && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Your gamertag</h2>
           <div className="code" data-testid="settings-tag">{I.formatTag(data.identity)}</div>
-          <p className="muted">Stored on this device only, and included in your encrypted backups. Nobody checks yet whether someone else has the same name. <b>If this name is taken when sync launches, we&apos;ll add a short number to it.</b></p>
-          <p className="muted">Account ID: <code>{data.identity.id.slice(0, 8)}…</code> (random, used later for sync)</p>
+          <p className="muted">Your display name is included in your encrypted cloud copy. It does not need to be unique and cannot be used to sign in or recover your data.</p>
+          <p className="muted">Account ID: <code>{data.identity.id.slice(0, 8)}…</code> (random account identifier)</p>
         </div>
       )}
     </>
   );
 }
 
-function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => void }) {
+function Restore({ onRestored }: Readonly<{ onRestored: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void> }>) {
   const [file, setFile] = useState<File | null>(null); const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   return (
     <>
@@ -480,9 +503,12 @@ function Restore({ onRestored }: { onRestored: (d: AppData, code: string) => voi
       <div className="row-gap"><button className="btn" disabled={!file || !code || busy} onClick={async () => {
         setBusy(true); setErr("");
         try {
-          const d = await C.decryptBackup(JSON.parse(await file!.text()), code);
+          const device = await readDeviceSession();
+          if (device?.signedOut) throw new Error("Sign in before restoring accounts.");
+          const root = await resolveRecoveryCode(code);
+          const d = await C.decryptBackup(JSON.parse(await file!.text()), root);
           if (!isAppData(d)) throw new C.BackupError("The backup's contents aren't valid.");
-          onRestored(M.migrateData(d, today()), code);
+          await onRestored(M.migrateData(d, today()), root, device?.generation);
         } catch (e) { setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
         finally { setBusy(false); }
       }}>{busy ? "Decrypting…" : "Restore"}</button></div>

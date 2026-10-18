@@ -1,12 +1,13 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect } from "vitest";
+import { seedVault } from "./storage-fixtures";
 import * as D from "../lib/db";
 
 describe("db", () => {
   it("returns empty data then persists", async () => {
     expect(await D.loadData()).toEqual(D.emptyData());
     const d = { ...D.emptyData(), lastBackupAt: "2026-10-15" };
-    await D.saveData(d);
+    await seedVault(d);
     expect(await D.loadData()).toEqual(d);
     await D.setItem("k", 5);
     expect(await D.getItem("k")).toBe(5);
