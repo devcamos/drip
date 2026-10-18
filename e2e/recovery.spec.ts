@@ -1,24 +1,7 @@
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { unlock } from "./vault-helpers";
 
-// These journeys share a host/IP. Respect real server Retry-After when several
-// independent test users sign in quickly; never disable production auth limits.
-async function withAuthRetry(page: Page, action: () => Promise<void>, success: Locator) {
-  let retryMs = 10_100;
-  const observe = (response: import("@playwright/test").Response) => {
-    if (response.status() === 429 && response.url().includes("/api/auth/")) retryMs = (Number(response.headers()["retry-after"]) || 10) * 1000 + 100;
-  };
-  page.on("response", observe);
-  try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await action();
-      await expect.poll(async () => await success.isVisible() ? "saved" : await page.getByText(/Too many sign-in attempts/).isVisible() ? "limited" : "pending", { timeout: 30_000 }).not.toBe("pending");
-      if (await success.isVisible()) return;
-      await page.waitForTimeout(retryMs);
-    }
-    await expect(success).toBeVisible();
-  } finally { page.off("response", observe); }
-}
+import { withAuthRetry } from "./auth-helpers";
 
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
   await page.goto("/");
@@ -62,8 +45,7 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
   try {
     await returning.goto("http://localhost:4321");
     await returning.getByLabel("Recovery code", { exact: true }).fill(code);
-    await returning.getByRole("button", { name: "Restore cloud accounts" }).click();
-    await expect(returning.getByText("Total balance")).toBeVisible({ timeout: 30_000 });
+    await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
     await expect(returning.getByText("£3,000.00").first()).toBeVisible();
     await expect(returning.getByText("PRIVATE_LOCAL_NICKNAME")).toHaveCount(0);
 

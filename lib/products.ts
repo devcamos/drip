@@ -15,7 +15,8 @@ export const PRODUCTS: Record<ProductCategory, ProductDefaults> = {
 };
 export function productLabel(account: Pick<Account, "productCategory" | "taxWrapper" | "rateType">) {
   if (account.taxWrapper === "stocks-shares-isa") return "Stocks / funds · Stocks & Shares ISA";
-  return account.productCategory ? PRODUCTS[account.productCategory].label : account.rateType === "dividend" ? "Stocks / funds" : "Unclassified account";
+  if (account.productCategory) return PRODUCTS[account.productCategory].label;
+  return account.rateType === "dividend" ? "Stocks / funds" : "Unclassified account";
 }
 export function validDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;

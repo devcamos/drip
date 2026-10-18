@@ -7,6 +7,11 @@ import { IncomeSummary } from "./IncomeSummary";
 const today = () => M.ymd(new Date());
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
+const balanceChange = { topup: M.applyTopUp, withdraw: M.applyWithdraw, set: M.applySetBalance };
+const eventStyle = {
+  topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
+  set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
+};
 type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onChange: (fn: (x: Account) => Account) => void }>;
 
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
@@ -25,7 +30,7 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
     {mode && <form className="panel" onSubmit={event => {
       event.preventDefault(); if (!valid) return;
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
-      onChange(x => mode === "topup" ? M.applyTopUp(x, n, date) : mode === "withdraw" ? M.applyWithdraw(x, n, date) : M.applySetBalance(x, n, date)); setMode(null);
+      onChange(x => balanceChange[mode](x, n, date)); setMode(null);
     }}>
       <h2 style={{ marginTop: 0 }}>{labels[mode]}</h2><p className="muted">{descriptions[mode]}</p>
       <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input id="balance-date" type="date" aria-label="date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
@@ -94,7 +99,7 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
       {a.bonus && <div className="panel"><h3 style={{ marginTop: 0 }}>Pending bonus · {M.gbp(a.bonus.amount)}</h3><p className="muted">Expected {fmtDate(a.bonus.expectedDate)}. Kept outside your balance and received income.</p><p className="muted">{a.bonus.expectedDate < today() ? "The expected date has passed. Edit the date or record the payment; this bonus is excluded from future predictions." : "Included once in predictions on its expected date. Update the amount from your provider when needed."}</p></div>}
     </section>
     <IncomeHistory a={a} onChange={onChange} />
-    {events.length > 0 && <section className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2><ul className="list" data-testid="events">{events.map((e, i) => <li key={`${e.date}-${i}`}><span>{{ topup: "Top up", withdraw: "Withdrawal", set: "Balance set", interest: "Interest" }[e.type]}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={e.type === "topup" ? "ok" : e.type === "withdraw" ? "err" : ""}>{e.type === "topup" ? "+" : e.type === "withdraw" ? "−" : ""}{M.gbp(e.amount)}</b></li>)}</ul></section>}
+    {events.length > 0 && <section className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2><ul className="list" data-testid="events">{events.map((e, i) => <li key={`${e.date}-${i}`}><span>{eventStyle[e.type].label}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={eventStyle[e.type].className}>{eventStyle[e.type].prefix}{M.gbp(e.amount)}</b></li>)}</ul></section>}
     {legacy.length > 0 && <details className="panel"><summary>Previous interest estimates</summary><p className="muted">Older Drip versions added these estimates to your balance. They aren&apos;t recorded income. Your saved balance has been preserved; update it using your provider&apos;s current figure.</p><ul className="list">{legacy.map(row => <li key={row.period}><span>{row.period}</span><b>{M.gbp(row.amount)}</b></li>)}</ul></details>}
     {(a.rateHistory?.length ?? 0) > 1 && <section className="panel"><h2 style={{ marginTop: 0 }}>Rate history</h2><ul className="list">{a.rateHistory!.toReversed().map(r => <li key={r.from}><span>{r.from === "0000-01-01" ? "Since added" : `From ${fmtDate(r.from)}`}</span><b>{r.ratePct}%</b></li>)}</ul></section>}
     <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button><button className="btn danger" onClick={onDelete}>Delete</button></div>

@@ -4,6 +4,15 @@ import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "
 import { PRODUCTS, PROVIDERS, validDate } from "@/lib/products";
 import * as M from "@/lib/maths";
 const today = () => M.ymd(new Date());
+type FormInputs = { balance: string; rate: string; frequency: Frequency; next: string; provider: string; rateFrom?: string; bonus?: { amount: string; date: string } };
+function validForm(input: FormInputs) {
+  const balance = Number(input.balance), rate = Number(input.rate);
+  if (!Number.isFinite(balance) || balance < 0 || !input.balance.trim()) return false;
+  if (!Number.isFinite(rate) || rate < 0 || rate >= 100 || !input.rate.trim()) return false;
+  if (!input.provider.trim() || (input.frequency !== "daily" && !validDate(input.next))) return false;
+  if (input.rateFrom !== undefined && !validDate(input.rateFrom)) return false;
+  return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.round2(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
+}
 
 export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void; onCancel: () => void }>) {
   const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
@@ -24,9 +33,8 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
   const isOther = provider === "Other" || (!!existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
-  const valid = Number.isFinite(b) && b >= 0 && balance.trim() !== "" && Number.isFinite(r) && r >= 0 && r < 100 && rate.trim() !== "" &&
-    (frequency === "daily" || validDate(next)) && (!isOther || !!custom.trim()) && (!rateChanged || validDate(rateFrom)) &&
-    (!hasBonus || (Number.isFinite(Number(bonusAmount)) && M.round2(Number(bonusAmount)) > 0 && validDate(bonusDate)));
+  const name = isOther ? custom.trim() : provider;
+  const valid = validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
     setFrequency(defaults.frequency); setReinvest(defaults.reinvestIncome);
@@ -35,7 +43,6 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
     <h1>{existing ? "Edit account" : "Add account"}</h1>
     <form onSubmit={event => {
       event.preventDefault(); if (!valid) return;
-      const name = isOther ? custom.trim() : provider;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
       const base: Account = { ...existing, id: existing?.id ?? crypto.randomUUID(), provider: name, label: label.trim(), balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,

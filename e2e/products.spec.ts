@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { unlock } from "./vault-helpers";
+import { withAuthRetry } from "./auth-helpers";
 
 async function createCashIsa(page: Page) {
   await page.goto("/");
@@ -75,13 +76,12 @@ test("product and recorded income survive fresh-device encrypted cloud recovery"
   const code = await createCashIsa(page);
   await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click();
-  await expect(page.getByText("Encrypted cloud copy saved.").first()).toBeVisible({ timeout: 30_000 });
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   const fresh = await browser.newContext();
   try {
     const restored = await fresh.newPage(); await restored.goto("http://localhost:4321");
     await restored.getByLabel("Recovery code", { exact: true }).fill(code);
-    await restored.getByRole("button", { name: "Restore cloud accounts", exact: true }).click();
+    await withAuthRetry(restored, () => restored.getByRole("button", { name: "Restore cloud accounts", exact: true }).click(), restored.getByRole("button", { name: /MoneyFarm/ }));
     await restored.getByRole("button", { name: /MoneyFarm/ }).click();
     await expect(restored.getByText("Cash ISA", { exact: true })).toBeVisible();
     await expect(restored.locator(".bal")).toHaveText("£3,000.00");
