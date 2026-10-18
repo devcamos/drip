@@ -53,9 +53,10 @@ export default function Drip() {
 function UnlockedDrip() {
   const [data, setData] = useState<AppData | null>(null);
   const latestData = useRef<AppData | null>(null);
+  const dataGeneration = useRef(0);
   const edits = useRef<Promise<unknown>>(Promise.resolve());
   const [pendingSaves, setPendingSaves] = useState(0);
-  const replaceData = useCallback((next: AppData) => { latestData.current = next; setData(next); }, []);
+  const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
   const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
@@ -101,18 +102,19 @@ function UnlockedDrip() {
   }, []);
 
   const update = useCallback((fn: (d: AppData) => AppData) => {
+    const generation = dataGeneration.current;
     setPendingSaves(n => n + 1);
     // Derive each edit from the last confirmed snapshot, after earlier edits settle.
     // A failed action must never become the input to a retry or another edit.
     const operation = edits.current.then(async () => {
       try {
         const previous = latestData.current;
-        if (!previous) return false;
+        if (!previous || generation !== dataGeneration.current) return false;
         const next = fn(previous);
         const withSnap = { ...next, snapshots: M.upsertSnapshot(next.snapshots, next.accounts, new Date()) };
         await saveData(withSnap);
-        if (latestData.current !== previous) return false;
-        replaceData(withSnap); setSaveError("");
+        if (latestData.current !== previous || generation !== dataGeneration.current) return false;
+        latestData.current = withSnap; setData(withSnap); setSaveError("");
         return true;
       } catch {
         setSaveError("Changes could not be saved. Your saved data is unchanged; retry the action.");
@@ -121,7 +123,7 @@ function UnlockedDrip() {
     });
     edits.current = operation;
     return operation;
-  }, [replaceData]);
+  }, []);
 
   if (loadError) return <main><p role="alert">{loadError}</p></main>;
   if (!data || verifier === undefined) return <main><p className="muted">Loading…</p></main>;

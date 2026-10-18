@@ -102,6 +102,28 @@ describe("migration", () => {
 });
 
 describe("accounts", () => {
+  it("does not apply queued edits to a replacement backup with the same account id", async () => {
+    const code = await seed({ accounts: [acct()] });
+    const original = await loadData();
+    const backup = await C.encryptBackup({ ...original, accounts: [acct({ balance: 8000 })] }, code, 100_000);
+    let fail!: (reason: Error) => void;
+    const persist = DB.saveData;
+    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
+    writer.mockImplementationOnce(() => new Promise<void>((_, reject) => { fail = reject; }));
+    render(<Drip />); await screen.findByText("Rainy day pot");
+    fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
+    click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
+    await waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
+    type(screen.getByLabelText("Income amount"), "22.65"); click("Record income");
+    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(backup)], "replacement.json")] } });
+    type(screen.getByLabelText("Restore recovery code"), code); click("Restore");
+    await waitFor(async () => expect((await loadData()).accounts[0].balance).toBe(8000));
+    await act(async () => fail(new Error("QuotaExceededError")));
+    await waitFor(() => expect(screen.getByTestId("local-save-status")).not.toHaveTextContent("Saving"));
+    expect(writer).toHaveBeenCalledTimes(1);
+    expect((await loadData()).accounts[0]).toMatchObject({ balance: 8000, payouts: [], events: [] });
+  });
   it("does not carry a failed edit into another queued action", async () => {
     await seed({ accounts: [acct()] });
     const persist = DB.saveData;
