@@ -138,25 +138,36 @@ function UnlockedDrip() {
   );
 
   let body: React.ReactNode;
-  if (view.name === "detail") {
+  switch (view.name) {
+  case "detail": {
     const a = data.accounts.find((x) => x.id === view.id);
     body = a ? <Detail a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
       onLog={(p) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? { ...x, payouts: [...x.payouts, p] } : x) }))}
       onChange={(fn) => update((d) => ({ ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) }))}
       onDelete={() => { if (confirm(`Delete ${a.provider}?`)) { update((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) })); setView({ name: "home" }); } }} /> : null;
-  } else if (view.name === "add") {
+    break;
+  }
+  case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
     body = <AddForm existing={existing} onCancel={() => setView({ name: "home" })} onSave={(a) => {
       update((d) => ({ ...d, accounts: existing ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
       setView({ name: "detail", id: a.id });
     }} />;
-  } else if (view.name === "trends") body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
-  else if (view.name === "settings") body = <Settings data={data} verifier={verifier}
+    break;
+  }
+  case "trends":
+    body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
+    break;
+  case "settings":
+    body = <Settings data={data} verifier={verifier}
     onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); setData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
     onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); setData(n); }} />;
-  else body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
+    break;
+  default:
+    body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
+  }
 
   return (
     <>

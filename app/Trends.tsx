@@ -7,11 +7,8 @@ const ranges = ["3m", "6m", "1y", "Max", "Future"] as const;
 type Range = typeof ranges[number];
 const dateLabel = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 const compactGBP = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 1 }).format(n);
-export function Trends({ data, onAssumptions }: { data: AppData; onAssumptions: (value: Assumptions) => void }) {
-  const [range, setRange] = useState<Range>("Future"); const [editing, setEditing] = useState(false);
-  const assumptions = data.projection ?? { monthlyDeposit: 0, years: 1 };
-  const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
-  const fillId = useId();
+/** Keep chart calculations separate from controls and accessible rendering. */
+function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   const today = M.ymd(new Date()); const currentMonth = today.slice(0, 7);
   const total = M.totalBalance(data.accounts); const monthlyRate = Math.max(0, M.weightedYield(data.accounts)) / 1200;
   const historical = data.snapshots.filter(s => s.month < currentMonth).toSorted((a, b) => a.month.localeCompare(b.month)).map(s => ({ date: M.ymd(new Date(Date.UTC(+s.month.slice(0, 4), +s.month.slice(5, 7), 0))), balance: s.totalBalance }));
@@ -28,6 +25,15 @@ export function Trends({ data, onAssumptions }: { data: AppData; onAssumptions: 
   const scale = Math.pow(10, Math.floor(Math.log10(maximum))); const ceiling = Math.ceil(maximum / scale) * scale;
   const y = (value: number) => 190 - value / ceiling * 166;
   const path = (points: typeof actual) => points.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(p.balance).toFixed(1)}`).join(" ");
+  return { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path };
+}
+
+export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssumptions: (value: Assumptions) => void }>) {
+  const [range, setRange] = useState<Range>("Future"); const [editing, setEditing] = useState(false);
+  const assumptions = data.projection ?? { monthlyDeposit: 0, years: 1 };
+  const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
+  const fillId = useId();
+  const { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path } = balanceChart(data, range, assumptions);
   const br = M.momBreakdown(data.snapshots); const growth = br ? br.growthPct : M.momGrowth(data.snapshots);
   const validDeposit = deposit.trim() !== "" && Number.isFinite(Number(deposit)) && Number(deposit) >= 0 && Number(deposit) <= 1_000_000;
   return <>
@@ -56,7 +62,7 @@ export function Trends({ data, onAssumptions }: { data: AppData; onAssumptions: 
         {editing && <form onSubmit={event => { event.preventDefault(); if (validDeposit) { onAssumptions({ monthlyDeposit: Number(deposit), years }); setEditing(false); } }}>
           <label htmlFor="projection-deposit">Planned monthly top-up (£)</label><input id="projection-deposit" type="number" min="0" max="1000000" step="0.01" value={deposit} onChange={e => setDeposit(e.target.value)} />
           <label htmlFor="projection-years">Project ahead</label><select id="projection-years" value={years} onChange={e => setYears(Number(e.target.value))}>{[1, 3, 5].map(n => <option key={n} value={n}>{n} {n === 1 ? "year" : "years"}</option>)}</select>
-          <div className="row-gap"><button className="btn" disabled={!validDeposit}>Save projection</button></div>
+          <div className="row-gap"><button type="submit" className="btn" disabled={!validDeposit}>Save projection</button></div>
         </form>}
       </>}
       <details className="chart-table"><summary>View chart figures</summary><table><thead><tr><th>Date</th><th>Balance</th><th>Type</th></tr></thead><tbody>{actual.map(p => <tr key={p.date}><td>{p.date === today ? "Today" : dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Recorded</td></tr>)}{future && forecast.slice(1).map(p => <tr key={p.date}><td>{dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Estimate</td></tr>)}</tbody></table></details>
