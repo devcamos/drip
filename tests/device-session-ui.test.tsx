@@ -2,16 +2,41 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 const actions = vi.hoisted(() => ({ readCloudState: vi.fn(), readDeviceSession: vi.fn(), signOutDevice: vi.fn(), finishDeviceSignOut: vi.fn(), resumeDevice: vi.fn(), restoreOtherAccount: vi.fn() }));
+const passkeys = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), unlockWithPasskey: vi.fn() }));
 vi.mock("../lib/cloud", () => ({ readCloudState: actions.readCloudState }));
 vi.mock("../lib/device-session", () => actions);
+vi.mock("../lib/passkey-unlock", () => passkeys);
 import { SignOutButton, SignedOut } from "../app/DeviceSession";
 import { emptyData } from "../lib/db";
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("confirm", vi.fn(() => true));
   actions.readCloudState.mockResolvedValue({ dirty: true }); actions.readDeviceSession.mockResolvedValue({ remotePending: false });
   actions.signOutDevice.mockResolvedValue(undefined); actions.finishDeviceSignOut.mockResolvedValue(undefined); actions.resumeDevice.mockResolvedValue(undefined);
+  passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
 });
 describe("visible sign-out and code return", () => {
+  it("offers saved-passkey unlock, keeps recovery after cancellation and calls back only after success", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    passkeys.unlockWithPasskey.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));
+    const resumed = vi.fn();
+    render(<SignedOut onSignedIn={resumed} mode="locked" />);
+    const button = await screen.findByRole("button", { name: "Unlock with passkey" });
+    fireEvent.click(button);
+    expect(await screen.findByText(/Passkey unlock was cancelled/)).toBeInTheDocument();
+    expect(resumed).not.toHaveBeenCalled(); expect(screen.getByLabelText("Recovery code")).toBeInTheDocument();
+    fireEvent.click(button);
+    await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
+  });
+  it("does not offer passkeys before legacy encryption, and keeps generic unlock failure visible", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    const { unmount } = render(<SignedOut onSignedIn={vi.fn()} mode="migration" />);
+    await waitFor(() => expect(passkeys.hasPasskeyUnlock).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Unlock with passkey" })).toBeNull(); unmount();
+    passkeys.unlockWithPasskey.mockRejectedValueOnce(new Error("Invalid key"));
+    render(<SignedOut onSignedIn={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Unlock with passkey" }));
+    expect(await screen.findByText(/Could not unlock with this passkey/)).toBeInTheDocument();
+  });
   it("warns about unsynced changes before locking, allows cancellation and reports failures", async () => {
     vi.stubGlobal("confirm", vi.fn(() => false)); render(<SignOutButton />);
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));

@@ -12,6 +12,7 @@ import { PwaStatus } from "./PwaStatus";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
+import { PasskeyUnlock } from "./PasskeyUnlock";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
@@ -331,7 +332,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   const lockPanel = (
     <div className="panel"><h2 style={{ marginTop: 0 }}>App lock</h2>
       <p className="muted">Ask for Face ID (or your device passkey) when Drip opens and after 5 minutes in the background. Your recovery code also unlocks it.</p>
-      <p className="muted"><b>Be aware:</b> this is a screen lock only. It stops someone casually opening Drip on your phone, Local accounts are encrypted separately and need your recovery code after a full reload. This extra screen lock does not unwrap the encryption key.</p>
+      <p className="muted">This is a screen lock only and keeps keys in memory. Passkey unlock above opens encrypted accounts after a full reload.</p>
       {data.lock?.credentialId ? (
         <button className="btn ghost" onClick={() => { onLock({ credentialId: null, enabledAt: null }); setLockMsg("App lock is off."); }}>Turn off app lock</button>
       ) : supported === false ? <p className="muted">This device or browser doesn&apos;t support a passkey lock.</p> : (
@@ -348,6 +349,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
     <>
       <h1>Recovery</h1>
       <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
+      <PasskeyUnlock name={data.identity ? I.formatTag(data.identity) : "Drip"} />
       <RecoveryCodes data={data} verifier={verifier} />
       <CloudPanel data={data} verifier={verifier} onRestored={onCloudRestored} />
       <details className="panel"><summary>Advanced: file backups &amp; app lock</summary>

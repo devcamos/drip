@@ -151,7 +151,7 @@ export function CloudPanel({ data, verifier, onRestored }: Readonly<{ data: AppD
       </> : <>
         <label htmlFor="cloud-enable-code">Your saved recovery code</label>
         <input id="cloud-enable-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
-        <p className="muted">Enable cloud recovery only on a trusted device. Keys stay in memory while Drip is unlocked. Reopening the app needs a recovery code; sync pauses while locked.</p>
+        <p className="muted">Enable cloud recovery only on a trusted device. Keys stay in memory while Drip is unlocked. Reopen with your configured passkey or a recovery code; sync pauses while locked.</p>
         <button className="btn" disabled={busy || !available || !C.isValidCode(code)} onClick={enable}>{busy ? "Saving…" : "Enable encrypted cloud recovery"}</button>
       </>}
       {message && <output className="muted">{message}</output>}

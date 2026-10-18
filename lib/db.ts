@@ -4,12 +4,18 @@ import { isIdentity } from "./identity";
 import { validProductFields } from "./products";
 import { checkCode, codeVerifier } from "./crypto";
 import { createVault, openVault, encryptLocal, decryptLocal, type LocalKeys, type VaultHeader, type LocalEnvelope } from "./local-vault";
+import type { PasskeyWrap } from "./passkey-crypto";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
 type Device = { signedOut: boolean; generation: string };
 type Metadata = Omit<CloudState, "key">;
-type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string } };
+type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap };
+export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null }
+function checkBinding(value: Stored, expected: VaultBinding) {
+  if (value.vault?.id !== expected.vaultId || value.gate?.generation !== expected.generation ||
+    (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext)) throw new Error("Device session changed. Unlock Drip again before continuing.");
+}
 let unlocked: { keys: LocalKeys; generation?: string } | undefined;
 let epoch = 0;
 let writes: Promise<unknown> = Promise.resolve();
@@ -42,8 +48,8 @@ async function stored(): Promise<Stored> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const t = db.transaction(STORE, "readonly"); const s = t.objectStore(STORE);
-    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier");
-    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result }); };
+    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock");
+    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result }); };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not read local storage.", { cause: t.error })); };
   });
 }
@@ -75,7 +81,7 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
   return tx("readonly", s => s.get(key));
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
-  if ([KEY, "cloudState", "localVault", "onboardingDraft"].includes(key)) throw new Error("Use the encrypted storage interface.");
+  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
   await tx("readwrite", s => s.put(value, key));
   if (key === "deviceSession" && (value as Device)?.signedOut) lockLocalVault(true);
 }
@@ -90,8 +96,9 @@ export async function loadData(): Promise<AppData> {
 }
 
 /** Unwrap only in memory. Legacy plaintext is removed only after verified encryption. */
-export async function unlockLocalVault(root: string): Promise<{ data: AppData; state?: CloudState }> {
+export async function unlockLocalVault(root: string, expected?: VaultBinding): Promise<{ data: AppData; state?: CloudState }> {
   const before = await stored(); const stamp = epoch;
+  if (expected) checkBinding(before, expected);
   if (before.verifier && !(await checkCode(root, before.verifier))) throw new Error("That isn't your recovery code.");
   const keys = before.vault ? await openVault(before.vault, root) : await createVault(root);
   const legacyCloudKey = !before.vault && (before.cloud as CloudState | undefined)?.key;
@@ -112,7 +119,7 @@ export async function unlockLocalVault(root: string): Promise<{ data: AppData; s
       s.put(metadata(before.cloud as CloudState | undefined), "cloudState");
     }
     s.delete("onboardingDraft");
-  }, true);
+  }, true, false, expected?.passkeyCiphertext !== undefined);
   if (stamp !== epoch) throw new VaultLockedError();
   unlocked = { keys, generation: before.gate?.generation };
   closing = false;
@@ -123,16 +130,33 @@ export async function unlockLocalVault(root: string): Promise<{ data: AppData; s
   return { data: migrateData(fresh, new Date().toISOString().slice(0, 10)), state: connected(latest.cloud, keys) };
 }
 
+/** Only ciphertext and public credential metadata survive a reload or sign-out. */
+export async function passkeyUnlockContext() {
+  const value = await stored();
+  if (!value.vault) throw new Error("Unlock your encrypted accounts with a recovery code first.");
+  const binding: VaultBinding = { vaultId: value.vault.id, generation: value.gate?.generation, passkeyCiphertext: value.passkey?.ct ?? null };
+  return { binding, wrap: value.passkey?.vaultId === value.vault.id ? value.passkey : undefined };
+}
+export async function savePasskeyUnlock(wrap: PasskeyWrap | undefined, expected: VaultBinding) {
+  const before = await stored(); const stamp = epoch;
+  checkBinding(before, expected); current(before);
+  if (wrap && wrap.vaultId !== expected.vaultId) throw new Error("Passkey belongs to another local vault.");
+  await guardedWrite(before, stamp, s => { if (wrap) s.put(wrap, "passkeyUnlock"); else s.delete("passkeyUnlock"); }, false, false, true);
+}
+
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, allowSignedOut = false, requireUnchangedRecords = false): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, allowSignedOut = false, requireUnchangedRecords = false, requireUnchangedPasskey = false): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
-    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState");
-    cloud.onsuccess = () => {
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock");
+    passkey.onsuccess = () => {
       if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!allowSignedOut && gate.result?.signedOut) ||
         vault.result?.id !== before.vault?.id) {
         failure = new Error("Device session changed. Unlock Drip again before continuing."); t.abort(); return;
+      }
+      if (requireUnchangedPasskey && JSON.stringify(passkey.result) !== JSON.stringify(before.passkey)) {
+        failure = new Error("Passkey setup changed. Unlock Drip again before continuing."); t.abort(); return;
       }
       // Replacing a vault must not discard an edit or sync result committed while
       // asynchronous key derivation/encryption was running, including in other tabs.
@@ -193,6 +217,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   const generation = resumeGeneration ? crypto.randomUUID() : before.gate?.generation;
   await guardedWrite(before, stamp, s => {
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");
+    if (keys.header.id !== before.vault?.id) s.delete("passkeyUnlock");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
   }, !!resumeGeneration, true);
   if (stamp !== epoch) throw new VaultLockedError();
