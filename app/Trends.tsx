@@ -64,7 +64,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
         <text x={x(today)} y="234" textAnchor={future ? "middle" : "end"} className="chart-label">Today</text>
         {future && <text x="320" y="219" textAnchor="end" className="chart-label">{dateLabel(end)}</text>}
       </svg>
-      <div className="range-picker" role="group" aria-label="Chart period">{ranges.map(value => <button key={value} aria-pressed={range === value} className={range === value ? "selected" : ""} onClick={() => setRange(value)}>{value}</button>)}</div>
+      <fieldset className="range-picker"><legend className="sr-only">Chart period</legend>{ranges.map(value => <button type="button" key={value} aria-pressed={range === value} className={range === value ? "selected" : ""} onClick={() => setRange(value)}>{value}</button>)}</fieldset>
       <div className="chart-legend"><span><i className="legend-actual" />Recorded balance</span>{future && <><span><i className="legend-projection" />Estimated balance</span><span><i className="legend-baseline" />Today’s balance + planned top-ups</span></>}</div>
       {actual.length < 2 && <p className="muted">Your history starts today. Recorded balances will build as you use Drip.</p>}
       {future && <>

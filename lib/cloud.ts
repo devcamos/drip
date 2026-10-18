@@ -16,7 +16,7 @@ const b64 = (bytes: Uint8Array) => {
   for (const b of bytes) { out += String.fromCodePoint(b); }
   return btoa(out);
 };
-const unb64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const unb64 = (s: string) => Uint8Array.from(atob(s), c => c.codePointAt(0)!);
 async function hash(value: string) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(value)))].map(n => n.toString(16).padStart(2, "0")).join("");
 }

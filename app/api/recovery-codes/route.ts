@@ -41,8 +41,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   if (!sameOrigin(request)) return reply({ error: "Invalid origin." }, 403);
   if (!cloudConfigured()) return reply({ error: "Recovery unavailable." }, 503);
-  const user = (await getAuth().api.getSession({ headers: request.headers }))?.user;
-  if (!user || request.headers.get("x-drip-owner") !== user.id) return reply({ error: "Sign in again." }, 401);
+  const userId = (await getAuth().api.getSession({ headers: request.headers }))?.user.id;
+  if (!userId || request.headers.get("x-drip-owner") !== userId) return reply({ error: "Sign in again." }, 401);
   if (!(await allowed(request))) return reply({ error: "Too many recovery requests. Try again shortly." }, 429);
   const body = await bodyOf(request); const records = body?.records;
   if (!Array.isArray(records) || records.length !== 6 || new Set(records.map(r => r?.locator)).size !== 6 || !records.every(r => {
@@ -55,6 +55,6 @@ export async function PUT(request: Request) {
   // Do not accept unbounded extra properties from clients.
   const safe = records.map(({ locator, envelope }) => ({ locator, envelope: { app: envelope.app, v: envelope.v, kdf: envelope.kdf, iter: envelope.iter, salt: envelope.salt, iv: envelope.iv, ct: envelope.ct } }));
   const { rows } = await database().query(`INSERT INTO drip_recovery_codes (user_id, records) SELECT $1, $2::jsonb WHERE EXISTS (SELECT 1 FROM drip_vault WHERE user_id = $1)
-    ON CONFLICT (user_id) DO UPDATE SET records = EXCLUDED.records RETURNING user_id`, [user.id, JSON.stringify(safe)]);
+    ON CONFLICT (user_id) DO UPDATE SET records = EXCLUDED.records RETURNING user_id`, [userId, JSON.stringify(safe)]);
   return rows.length ? reply({ saved: true }) : reply({ error: "Save your cloud copy first." }, 409);
 }

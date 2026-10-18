@@ -14,7 +14,16 @@ export async function rawStore(values?: Record<string, unknown>): Promise<Record
     const t = db.transaction("kv", values ? "readwrite" : "readonly"); const s = t.objectStore("kv");
     if (values) for (const [key, value] of Object.entries(values)) s.put(value, key);
     const keys = s.getAllKeys(), records = s.getAll();
-    t.oncomplete = () => { db.close(); resolve(Object.fromEntries(keys.result.map((key, i) => [String(key), records.result[i]]))); };
+    t.oncomplete = () => {
+      db.close();
+      try {
+        const entries = keys.result.map((key, i) => {
+          if (typeof key !== "string") throw new Error("Drip's key-value store must use string keys.");
+          return [key, records.result[i]];
+        });
+        resolve(Object.fromEntries(entries));
+      } catch (error) { reject(new Error("Could not read test storage keys.", { cause: error })); }
+    };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Test storage transaction failed.", { cause: t.error })); };
   });
 }

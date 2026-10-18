@@ -9,6 +9,7 @@ main { max-width: 480px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 28px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 20px 0 8px; }
 .muted { color: var(--muted); font-size: 14px; }
 output { display:block; margin:1em 0; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
 .big { font-size: 34px; font-weight: 700; }
 .panel { background: var(--panel); border-radius: 16px; padding: 16px; margin: 12px 0; }
 .banner { border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; background:var(--panel); display:flex; gap:10px; align-items:center; justify-content:space-between; }
@@ -36,7 +37,7 @@ nav.tabs button.on { color: var(--accent-text); }
 .err { color: var(--bad); font-size:14px; } .ok { color: var(--accent-text); font-size:14px; }
 .row-gap { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
 .disclaimer { font-size:12px; color:var(--muted); text-align:center; margin-top:24px; }
-.tagline { font-size:13px; color:var(--muted); margin:4px 0 8px; } .tagline b { color: var(--text); }
+.tagline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin:4px 0 8px; } .tagline b { color: var(--text); }
 
 button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
 
@@ -47,7 +48,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .chart-actual,.chart-projection { stroke:var(--accent); stroke-width:3; }
 .chart-projection { stroke-dasharray:6 6; }
 .chart-baseline { stroke:var(--muted); stroke-width:2; stroke-dasharray:2 5; }
-.range-picker { display:flex; gap:6px; margin:10px 0 18px; }
+.range-picker { display:flex; gap:6px; margin:10px 0 18px; border:0; padding:0; min-width:0; }
 .range-picker button { flex:1; min-height:44px; padding:8px 2px; border:1px solid var(--border); border-radius:24px; background:var(--bg); color:var(--text); font-size:14px; font-weight:700; cursor:pointer; }
 .range-picker .selected { background:var(--text); color:var(--bg); border-color:var(--text); }
 .chart-legend { display:flex; flex-wrap:wrap; gap:10px 16px; font-size:12px; color:var(--muted); }
@@ -62,5 +63,4 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .recovery-list { padding-left:24px; }
 .recovery-list li { padding:10px 0; font-size:13px; overflow-wrap:anywhere; }
 
-.tagline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .tagline > .btn { margin-left:auto; min-height:36px; }

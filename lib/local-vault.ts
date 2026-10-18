@@ -5,7 +5,7 @@ export interface LocalEnvelope { app: "drip-local-data"; v: 1; iv: string; ct: s
 export interface LocalKeys { header: VaultHeader; dataKey: CryptoKey; cloudKey: CryptoKey }
 const enc = new TextEncoder();
 const b64 = (bytes: Uint8Array) => btoa(String.fromCodePoint(...bytes));
-const unb64 = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+const unb64 = (value: string) => Uint8Array.from(atob(value), c => c.codePointAt(0)!);
 const importKey = (bytes: Uint8Array) => crypto.subtle.importKey("raw", bytes as BufferSource, "AES-GCM", false, ["encrypt", "decrypt"]);
 
 export async function createVault(root: string): Promise<LocalKeys> {
