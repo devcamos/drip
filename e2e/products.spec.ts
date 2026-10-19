@@ -83,6 +83,7 @@ test("product and recorded income survive fresh-device encrypted cloud recovery"
   const fresh = await browser.newContext();
   try {
     const restored = await fresh.newPage(); await restored.goto("http://localhost:4321");
+    await showCloudRecovery(restored);
     await restored.getByLabel("Recovery code", { exact: true }).fill(code);
     await withAuthRetry(restored, () => restored.getByRole("button", { name: "Restore cloud accounts", exact: true }).click(), restored.getByRole("button", { name: /MoneyFarm/ }));
     await restored.getByRole("button", { name: /MoneyFarm/ }).click();

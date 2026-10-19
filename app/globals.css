@@ -25,6 +25,7 @@ output { display:block; margin:1em 0; }
 .btn.ghost { background: transparent; color: var(--text); border:1px solid var(--border); } .btn.small { padding:6px 10px; font-size:13px; }
 .btn.danger { background: var(--bad); color:var(--on-accent); }
 .btn:disabled { opacity:.5; }
+.password-form > button[type="submit"] { margin-top:16px; }
 label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
 input, select { width:100%; min-width:0; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; }
 .grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }

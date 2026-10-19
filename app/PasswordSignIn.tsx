@@ -6,7 +6,7 @@ export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled =
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) setUsername(name); }).catch(() => {}); return () => { active = false; }; }, []);
-  return <form className="panel" aria-label={replaceExisting ? "Other account password sign-in" : "Password sign-in"} onSubmit={async event => {
+  return <form className="panel password-form" aria-label={replaceExisting ? "Other account password sign-in" : "Password sign-in"} onSubmit={async event => {
     event.preventDefault();
     if (replaceExisting && !confirm("Replace this browser's accounts with this account's cloud copy? Export any unsynced changes first.")) return;
     setBusy(true); onBusyChange?.(true); setMessage("");

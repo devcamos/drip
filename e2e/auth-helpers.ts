@@ -4,15 +4,19 @@ import { expect, type Page, type Locator } from "@playwright/test";
 // independent test users sign in quickly; never disable production auth limits.
 export async function withAuthRetry(page: Page, action: () => Promise<void>, success: Locator) {
   let retryMs = 10_100;
+  let limited = false;
   const observe = (response: import("@playwright/test").Response) => {
-    if (response.status() === 429 && response.url().includes("/api/auth/")) retryMs = (Number(response.headers()["retry-after"]) || 10) * 1000 + 100;
+    if (response.status() === 429 && response.url().includes("/api/auth/")) {
+      limited = true;
+      retryMs = (Number(response.headers()["retry-after"] ?? response.headers()["x-retry-after"]) || 10) * 1000 + 100;
+    }
   };
   page.on("response", observe);
   async function attempt(remaining: number): Promise<void> {
-    await action();
+    limited = false; await action();
     await expect.poll(async () => {
       if (await success.isVisible()) return "saved";
-      if (await page.getByText(/Too many sign-in attempts/).first().isVisible()) return "limited";
+      if (limited || await page.getByText(/Too many sign-in attempts/).first().isVisible()) return "limited";
       return "pending";
     }, { timeout: 30_000 }).not.toBe("pending");
     if (await success.isVisible()) return;

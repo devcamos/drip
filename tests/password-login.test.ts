@@ -15,7 +15,7 @@ beforeEach(async () => {
   cloud.connect.mockResolvedValue({ user: { id: "owner" }, key: {} });
   cloud.readCloudState.mockResolvedValue({ userId: "owner" });
   cloud.vault.mockResolvedValue({ version: 1, envelope: { app: "drip-cloud" } });
-  cloud.recoveryCredentials.mockResolvedValue({ password: "a".repeat(64) });
+  cloud.recoveryCredentials.mockResolvedValue({ email: "root@recovery.drip.invalid", password: "a".repeat(64) });
   cloud.syncNow.mockResolvedValue("Saved"); request.mockResolvedValue(Response.json({ saved: true }));
   await seedVault(data);
 });

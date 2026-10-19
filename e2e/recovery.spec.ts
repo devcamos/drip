@@ -91,8 +91,7 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   await page.getByText("Device sign-in options").click();
-  await page.getByRole("button", { name: "Add cloud sign-in passkey" }).click();
-  await expect(page.getByText(/Cloud sign-in passkey saved/)).toBeVisible({ timeout: 30_000 });
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Add cloud sign-in passkey" }).click(), page.getByText(/Cloud sign-in passkey saved/));
   await context.clearCookies();
   await page.evaluate(() => new Promise<void>((resolve, reject) => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }));
   await page.reload();

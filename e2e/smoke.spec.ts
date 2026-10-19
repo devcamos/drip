@@ -42,7 +42,7 @@ test("onboarding shows a recovery code and gates Start", async ({ page }) => {
   await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByTestId("settings-tag")).toHaveText("devo_1");
-  await expect(page.getByText(/does not need to be unique/)).toBeVisible();
+  await expect(page.getByText(/Sign in using the unique gamertag saved in/)).toBeVisible();
 });
 
 test("add account, top up, withdraw, Trends, backup export and import", async ({ page }) => {

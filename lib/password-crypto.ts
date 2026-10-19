@@ -3,7 +3,11 @@ import { decode, encode } from "./passkey-crypto";
 
 export const loginTag = (value: string) => value.trim().toLowerCase();
 export const validLoginTag = (value: string) => /^[a-z0-9_]{3,16}$/.test(value);
-export const passwordError = (password: string) => password.length < 12 ? "Use a password with at least 12 characters." : password.length > 256 ? "Use 256 characters or fewer." : null;
+export function passwordError(password: string) {
+  if (password.length < 12) return "Use a password with at least 12 characters.";
+  if (password.length > 256) return "Use 256 characters or fewer.";
+  return null;
+}
 export interface PasswordWrap {
   app: "drip-password"; v: 1; username: string; owner: string;
   iter: 600000; salt: string; iv: string; ct: string;

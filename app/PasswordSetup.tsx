@@ -10,7 +10,7 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
   return <section className="panel" aria-label="Sign-in and password">
     <h2>Sign-in &amp; password</h2>
     <p className="muted">Use your gamertag and password for everyday sign-in. Set a password once for an existing account, or reset it here after recovering access.</p>
-    <form onSubmit={async event => {
+    <form className="password-form" onSubmit={async event => {
       event.preventDefault(); setMessage("");
       if (password !== again) { setMessage("Passwords do not match."); return; }
       setBusy(true);
