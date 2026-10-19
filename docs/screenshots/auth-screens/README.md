@@ -2,7 +2,8 @@
 
 Captured 19 October 2026 from the running local Next.js production build at
 `http://localhost:4321`. UI source commit: `e9810a2026035d13f4b52ebc06fa05602a51f257`,
-PR #21. Later screenshot/documentation commits do not change this UI.
+PR #21. Later copy-selection cleanup and screenshot/documentation commits
+preserve the appearance shown here.
 
 These are real implementation screenshots. `drip_demo` is synthetic; password
 and recovery inputs are empty. Only the generated recovery-code element in the

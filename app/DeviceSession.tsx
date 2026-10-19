@@ -54,8 +54,11 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
   const submitText = busy ? "Unlocking…" : copy.action;
   const title = recovering && mode !== "migration" ? "Recover your account" : copy.title;
   const otherTitle = otherRecovery ? "Recover another account" : "Sign in to another account";
+  let description = "Sign in with your gamertag and password. Your accounts stay encrypted while signed out.";
+  if (recovering) description = "Use a recovery code if you forgot your password.";
+  if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
   return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : title}
-    description={mode === "migration" ? "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified." : recovering ? "Use a recovery code if you forgot your password." : "Sign in with your gamertag and password. Your accounts stay encrypted while signed out."}>
+    description={description}>
     {!recovering && screen !== "other" && !otherRecovery && <>
     <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />
     {passkey && <section className="panel" aria-label="Unlock with your passkey">
@@ -98,9 +101,9 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
       <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} replaceExisting disabled={busy} onBusyChange={setBusy} />
       <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("other-recover")}>Forgot password?</button></div>
     </>}
-    {otherRecovery && <>
+    {otherRecovery &&
       <CloudReturn fromSignedOut={mode === "signedOut"} replaceExisting codeLabel="Other account recovery code" onRestored={() => onSignedIn()} />
-    </>}
+    }
     {(recovering || screen === "other" || otherRecovery) && mode !== "migration" && <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("login")}>Back to sign in</button></div>}
     {remoteMessage && <output className="muted">{remoteMessage}</output>}
     {message && <output className="err">{message}</output>}

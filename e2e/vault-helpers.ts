@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 export async function showRecovery(page: Page) {
+  if (await page.getByRole("heading", { name: "Recover your account", exact: true }).isVisible()) return;
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
 }
 export async function showCloudRecovery(page: Page) {

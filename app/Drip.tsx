@@ -252,6 +252,12 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppD
   useEffect(() => { setPassword(""); setConfirmation(""); setError(""); }, [screen]);
   if (!draft) return <main><p className="muted">Loading…</p></main>;
   const code = draft.code;
+  const screenCopy = {
+    login: { title: "Welcome back", description: "Sign in to your Drip account." },
+    signup: { title: "Create your account", description: "Track your money and the income it earns. No real name, email or phone needed." },
+    recover: { title: "Recover your account", description: "Get back to your accounts using a saved recovery code." },
+    backup: { title: "Restore a backup", description: "Get back to your accounts using a saved recovery code." },
+  }[screen];
   async function createAccount(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!saved || !identity || password !== confirmation || (password && passwordError(password))) return;
@@ -261,8 +267,7 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppD
     finally { setBusy(false); }
   }
   return (
-    <AuthLayout title={screen === "signup" ? "Create your account" : screen === "recover" ? "Recover your account" : screen === "backup" ? "Restore a backup" : "Welcome back"}
-      description={screen === "signup" ? "Track your money and the income it earns. No real name, email or phone needed." : screen === "recover" || screen === "backup" ? "Get back to your accounts using a saved recovery code." : "Sign in to your Drip account."}>
+    <AuthLayout title={screenCopy.title} description={screenCopy.description}>
       <PwaStatus />
       {screen === "login" && <>
       <PasswordSignIn showTitle={false} disabled={busy} onBusyChange={setBusy} onSignedIn={async () => {
