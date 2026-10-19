@@ -5,13 +5,13 @@ const password = "Green meadow 42!";
 const nextPassword = "Blue waterfall 73!";
 const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
 async function onboard(page: Page, handle: string, withPassword = false) {
-  await page.goto("/"); const code = (await page.getByTestId("code").textContent())!.trim();
+  await page.goto("/#signup"); const code = (await page.getByTestId("code").textContent())!.trim();
   await page.getByLabel(/Gamertag/).fill(handle);
   if (withPassword) {
     await page.getByLabel("Create password", { exact: true }).fill(password);
     await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
   }
-  await page.getByLabel(/saved my recovery code/).check(); await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByLabel(/saved my recovery code/).check(); await page.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toBeVisible({ timeout: 30_000 });
   if (withPassword && !(await page.getByText("No accounts yet").isVisible())) {
     // A genuine auth throttle may interrupt setup after local encryption. The

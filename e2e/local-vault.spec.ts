@@ -13,7 +13,7 @@ async function storage(page: Page) {
 }
 test("legacy accounts migrate only with their code and reopen encrypted offline", async ({ page, context }) => {
   const code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF";
-  await page.goto("/"); await expect(page.getByTestId("code")).toBeVisible();
+  await page.goto("/#signup"); await expect(page.getByTestId("code")).toBeVisible();
   await page.evaluate(async root => {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const bytes = new TextEncoder().encode(root.replaceAll("-", ""));
@@ -49,14 +49,14 @@ test("legacy accounts migrate only with their code and reopen encrypted offline"
 });
 
 test("new accounts never persist usable keys and sign-out retains only encrypted records", async ({ page }) => {
-  await page.goto("/"); const code = (await page.getByTestId("code").textContent())!;
+  await page.goto("/#signup"); const code = (await page.getByTestId("code").textContent())!;
   await page.getByLabel(/Gamertag/).fill("vaulttester"); await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click(); await expect(page.getByText("No accounts yet")).toBeVisible();
+  await page.getByRole("button", { name: "Create account", exact: true }).click(); await expect(page.getByText("No accounts yet")).toBeVisible();
   expect((await storage(page)).hasKey).toBe(false);
   page.on("dialog", d => d.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   const raw = await storage(page); expect(raw.data.app).toBe("drip-local-data"); expect(raw.hasKey).toBe(false);
   expect(JSON.stringify(raw)).not.toContain("vaulttester");
-  await page.reload(); await page.getByText("Forgot password? Recover with a code", { exact: true }).click(); await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.reload(); await page.getByRole("button", { name: "Forgot password?", exact: true }).click(); await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("vaulttester");
 });

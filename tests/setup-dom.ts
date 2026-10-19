@@ -11,6 +11,7 @@ afterEach(async () => {
   await clearDraft();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  if (typeof window !== "undefined") window.history.replaceState(null, "", "/");
   // fresh IndexedDB per test
   await new Promise((r) => { const q = indexedDB.deleteDatabase("drip"); q.onsuccess = q.onerror = q.onblocked = () => r(null); });
 });

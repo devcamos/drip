@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { passwordUsername, signInPassword } from "@/lib/password-login";
 
-export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled = false, onBusyChange }: Readonly<{ onSignedIn: () => void | Promise<void>; replaceExisting?: boolean; disabled?: boolean; onBusyChange?: (value: boolean) => void }>) {
+export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled = false, onBusyChange, showTitle = true }: Readonly<{ onSignedIn: () => void | Promise<void>; replaceExisting?: boolean; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean }>) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) setUsername(name); }).catch(() => {}); return () => { active = false; }; }, []);
@@ -14,7 +14,7 @@ export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled =
     catch (error) { setMessage((error as Error).message); }
     finally { setBusy(false); onBusyChange?.(false); }
   }}>
-    <h2>Sign in</h2>
+    {showTitle && <h2>Sign in</h2>}
     <label htmlFor={replaceExisting ? "other-login-tag" : "login-tag"}>Sign-in gamertag</label>
     <input id={replaceExisting ? "other-login-tag" : "login-tag"} autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={event => setUsername(event.target.value)} disabled={busy || disabled} />
     <label htmlFor={replaceExisting ? "other-login-password" : "login-password"}>Password</label>

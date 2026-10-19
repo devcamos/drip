@@ -5,11 +5,11 @@ import { unlock } from "./vault-helpers";
 test.describe.configure({ mode: "serial" });
 
 async function onboard(page: Page) {
-  await page.goto("/");
+  await page.goto("/#signup");
   const code = (await page.getByTestId("code").textContent())!.trim();
   await page.getByLabel(/Gamertag/).fill("devo");
   await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   return code;
 }
 
@@ -24,11 +24,11 @@ async function addZopa(page: Page) {
 }
 
 test("onboarding shows a recovery code and gates Start", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#signup");
   await expect(page.getByTestId("code")).toHaveText(/^([A-Z2-9]{4}-){5}[A-Z2-9]{4}$/);
-  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Create account" })).toBeDisabled();
   await page.getByLabel(/saved my recovery code/).check();
-  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled(); // no gamertag yet
+  await expect(page.getByRole("button", { name: "Create account" })).toBeDisabled(); // no gamertag yet
   await page.getByLabel(/Gamertag/).fill("me@mail");
   await expect(page.getByText("Only letters, numbers and underscore.")).toBeVisible();
   await page.getByLabel(/Gamertag/).fill("de");
@@ -36,7 +36,7 @@ test("onboarding shows a recovery code and gates Start", async ({ page }) => {
   await page.getByLabel(/Gamertag/).fill("devo_1");
   await expect(page.getByTestId("tag-preview")).toHaveText("You'll be devo_1");
   await expect(page.getByRole("button", { name: /Reroll/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
   await expect(page.getByTestId("header-tag").locator("b")).toHaveText("devo_1");
   await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
@@ -96,6 +96,7 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   const fresh = await page.context().browser()!.newContext();
   const p2 = await fresh.newPage();
   await p2.goto("/");
+  await p2.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await p2.getByRole("button", { name: "Restore a backup" }).click();
   await p2.locator('input[type="file"]').setInputFiles(file);
   const codeInput = p2.getByLabel("Restore recovery code");
@@ -160,18 +161,18 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
 });
 
 test("onboarding drafts stay in memory and created accounts need a code after reopening", async ({ page, context }) => {
-  await page.goto("/");
+  await page.goto("/#signup");
   const firstCode = await page.getByTestId("code").textContent();
   await page.getByLabel(/Gamertag/).fill("devo");
   await page.waitForTimeout(300);
   await page.goto("about:blank");
-  await page.goto("/");
+  await page.goto("/#signup");
   await expect(page.getByTestId("code")).not.toHaveText(firstCode!);
   await expect(page.getByLabel(/Gamertag/)).toHaveValue("");
   const code = (await page.getByTestId("code").textContent())!;
   await page.getByLabel(/Gamertag/).fill("devo");
   await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
   // reopen like a home-screen launch (new page, same storage)
   await page.close();

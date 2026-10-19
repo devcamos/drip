@@ -23,7 +23,7 @@ describe("visible sign-out and code return", () => {
     const button = await screen.findByRole("button", { name: "Unlock with passkey" });
     fireEvent.click(button);
     expect(await screen.findByText(/Passkey unlock was cancelled/)).toBeInTheDocument();
-    expect(resumed).not.toHaveBeenCalled(); expect(screen.getByLabelText("Recovery code")).toBeInTheDocument();
+    expect(resumed).not.toHaveBeenCalled(); expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
     fireEvent.click(button);
     await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
   });
@@ -53,6 +53,7 @@ describe("visible sign-out and code return", () => {
   it("requires a recovery code and only reopens retained accounts after successful verification", async () => {
     const resumed = vi.fn(); const data = emptyData(); const verifier = { salt: "s", hash: "h" };
     render(<SignedOut data={data} verifier={verifier} onSignedIn={resumed} />);
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
     actions.resumeDevice.mockRejectedValueOnce(new Error("That isn't your recovery code."));
     fireEvent.change(screen.getByLabelText("Recovery code"), { target: { value: "wrong" } });

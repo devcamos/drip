@@ -61,8 +61,8 @@ export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
   return <section className="panel" aria-label="Return to your cloud account">
-    <h2>Already use Drip?</h2>
-    <p className="muted">If you enabled cloud recovery, restore your encrypted accounts here. Your gamertag alone cannot recover them.</p>
+    <h2>Recover with a code</h2>
+    <p className="muted">Restore your encrypted cloud copy using one of your saved recovery codes. Your gamertag alone cannot recover your accounts.</p>
     {!fromSignedOut && <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>}
     <label htmlFor="cloud-return-code">{codeLabel ?? (fromSignedOut ? "Other account recovery code" : "Recovery code")}</label>
     <input id="cloud-return-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />

@@ -4,11 +4,11 @@ import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 import { withAuthRetry } from "./auth-helpers";
 
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
-  await page.goto("/");
+  await page.goto("/#signup");
   const code = (await page.getByTestId("code").textContent())!.trim();
   await page.getByLabel(/Gamertag/).fill(handle);
   await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   if (nickname) await page.getByLabel("Nickname", { exact: true }).fill(nickname);
   await page.getByLabel("Balance", { exact: true }).fill("3000");
@@ -296,6 +296,7 @@ test("signed-out users can restore rampage201 instead of reopening the current p
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByText("Use another account", { exact: true }).click();
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Other account recovery code", { exact: true }).fill(recovery!);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByText("Total balance"));
   await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");

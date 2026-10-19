@@ -3,11 +3,11 @@ import { unlock, showCloudRecovery } from "./vault-helpers";
 import { withAuthRetry } from "./auth-helpers";
 
 async function createCashIsa(page: Page) {
-  await page.goto("/");
+  await page.goto("/#signup");
   const code = (await page.getByTestId("code").textContent())!.trim();
   await page.getByLabel(/Gamertag/).fill("producttest");
   await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   await page.getByLabel("Product category", { exact: true }).selectOption("cash-isa");
   await page.getByLabel("Provider", { exact: true }).selectOption("MoneyFarm");
