@@ -239,18 +239,21 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (
 function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string, password?: string) => void | Promise<void> }>) {
   const [draft, setDraft] = useState<{ handle: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
+  const [draftAttempt, setDraftAttempt] = useState(0);
   useEffect(() => {
-    (async () => {
+    let active = true;
+    void (async () => {
       const d = (await loadDraft()) ?? { handle: "" };
-      await saveDraft(d); setDraft(d);
-    })();
-  }, []);
+      await saveDraft(d); if (active) setDraft(d);
+    })().catch(() => { if (active) setError("Could not prepare signup on this device. Try again."); });
+    return () => { active = false; };
+  }, [draftAttempt]);
   const [password, setPassword] = useState(""); const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const { screen: route, navigate } = useAuthScreen();
   const screen = route === "other" || route === "other-recover" ? "login" : route;
   useEffect(() => { setPassword(""); setConfirmation(""); setError(""); }, [screen]);
-  if (!draft) return <main><p className="muted">Loading…</p></main>;
+  if (!draft) return <main>{error ? <><p role="alert">{error}</p><button className="btn" onClick={() => { setError(""); setDraftAttempt(n => n + 1); }}>Try again</button></> : <p className="muted">Loading…</p>}</main>;
   const screenCopy = {
     login: { title: "Welcome back", description: "Sign in to your Drip account." },
     signup: { title: "Create your account", description: "Track your money and the income it earns. No real name, email or phone needed." },

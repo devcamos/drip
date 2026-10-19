@@ -3,6 +3,7 @@
 Captured 19 October 2026 from the running local Next.js production build at
 `http://localhost:4321`, UI source `8f327644b037271e01a2bdbe601da18ee0463a65`,
 PR #21. These are implementation screenshots, not mockups.
+Subsequent initialization/fixture error handling preserves the pictured flow.
 
 Signup now contains only gamertag and password fields, followed by Accounts after
 successful registration. Recovery is a separate Forgot password screen. Optional

@@ -45,6 +45,15 @@ describe("layout and page", () => {
 });
 
 describe("onboarding", () => {
+  it("offers a retry instead of staying on Loading when signup initialization fails", async () => {
+    const drafts = await import("../lib/draft");
+    vi.spyOn(drafts, "loadDraft").mockRejectedValueOnce(new Error("Storage unavailable"));
+    render(<Drip />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare signup on this device. Try again.");
+    click("Try again");
+    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(screen.queryByTestId("code")).toBeNull();
+  });
   it("keeps registration failures on signup and opens Accounts only after a successful retry", async () => {
     signup.mockRejectedValueOnce(new Error("That gamertag is already used for sign-in. Choose another."));
     render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
