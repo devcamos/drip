@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const cloud = vi.hoisted(() => ({ connect: vi.fn(), readCloudState: vi.fn(), syncNow: vi.fn(), vault: vi.fn(), writeCloudState: vi.fn(), recoveryCredentials: vi.fn(), authClient: { signOut: vi.fn() }, restoreCloud: vi.fn() }));
+const cloud = vi.hoisted(() => ({ connect: vi.fn(), readCloudState: vi.fn(), syncNow: vi.fn(), vault: vi.fn(), writeCloudState: vi.fn(), recoveryCredentials: vi.fn(), seal: vi.fn(), authClient: { signOut: vi.fn() }, restoreCloud: vi.fn() }));
 const request = vi.hoisted(() => vi.fn());
 vi.mock("../lib/cloud", () => cloud);
 vi.mock("../lib/worker-safety", () => ({ safeFetch: request }));
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validPasswordWrap, wrapPasswordRoot } from "../lib/password-crypto";
-import { setLoginPassword, signInPassword, passwordUsername } from "../lib/password-login";
-import { emptyData, loadData, lockLocalVault, passwordUnlockContext, savePasswordUnlock, setItem, commitCloudRestore } from "../lib/db";
+import { setLoginPassword, signInPassword, passwordUsername, signUpPassword, passwordRecoveryRoot } from "../lib/password-login";
+import { emptyData, loadData, lockLocalVault, passwordUnlockContext, savePasswordUnlock, setItem, getItem, commitCloudRestore } from "../lib/db";
 import { codeVerifier } from "../lib/crypto";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "tester", createdAt: "now" } };
@@ -87,4 +87,43 @@ it("requires a connection for first-time login and never restores over an existi
   vi.stubGlobal("navigator", { onLine: true }); request.mockResolvedValueOnce(Response.json({ owner: "other-owner", envelope: other }));
   await expect(signInPassword("other", password)).rejects.toThrow(/different account/);
   expect(await loadData()).toEqual(data); expect(cloud.restoreCloud).not.toHaveBeenCalled();
+});
+
+async function freshSignupDevice() {
+  lockLocalVault(true);
+  await new Promise(resolve => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = r.onerror = () => resolve(null); });
+  vi.stubGlobal("navigator", { onLine: true });
+  cloud.seal.mockResolvedValue({ app: "drip-cloud", v: 1, ct: "synthetic" });
+  cloud.vault.mockImplementation(async (method: string) => method === "PUT" ? { version: 1 } : { version: 0, envelope: null });
+}
+it("registers password access before atomically installing encrypted local signup and offline unlock", async () => {
+  await freshSignupDevice();
+  request.mockImplementationOnce(async () => { expect((await passwordUnlockContext()).binding).toBeUndefined(); expect(await getItem("verifier")).toBeUndefined(); return Response.json({ saved: true }); });
+  await signUpPassword("tester", password, data);
+  expect(await loadData()).toEqual(data); expect(await passwordUsername()).toBe("tester");
+  const raw = JSON.stringify(await rawStore()); expect(raw).not.toContain(password);
+  const root = await passwordRecoveryRoot(password); expect(raw).not.toContain(root);
+  await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "new-out" });
+  vi.stubGlobal("navigator", { onLine: false }); await signInPassword("tester", password); expect(await loadData()).toEqual(data);
+});
+it("keeps failed signup off Accounts without leaving a local vault that cannot be unlocked", async () => {
+  await freshSignupDevice();
+  request.mockResolvedValueOnce(Response.json({ message: "Gamertag is taken" }, { status: 409 }));
+  await expect(signUpPassword("tester", password, data)).rejects.toThrow(/taken/);
+  expect((await passwordUnlockContext()).binding).toBeUndefined(); expect(await getItem("verifier")).toBeUndefined();
+  expect(await loadData()).toEqual(emptyData());
+});
+it("never replaces an account created in another tab during signup", async () => {
+  await freshSignupDevice();
+  const other = { ...data, identity: { ...data.identity, handle: "other" } };
+  request.mockImplementationOnce(async () => { await seedVault(other); return Response.json({ saved: true }); });
+  await expect(signUpPassword("tester", password, data)).rejects.toThrow(/already has an account/);
+  expect(await loadData()).toEqual(other);
+});
+it("requires the correct current password to prepare recovery codes, without exposing the root in storage", async () => {
+  await setLoginPassword(fixtureCode, "tester", password, data);
+  await expect(passwordRecoveryRoot("wrong password")).rejects.toThrow(/incorrect/);
+  expect(await passwordRecoveryRoot(password)).toBe(fixtureCode);
+  await setItem("verifier", await codeVerifier((await import("../lib/crypto")).generateRecoveryCode()));
+  await expect(passwordRecoveryRoot(password)).rejects.toThrow(/Account changed/);
 });

@@ -1,3 +1,4 @@
+import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock } from "./vault-helpers";
 async function storage(page: Page) {
@@ -13,7 +14,7 @@ async function storage(page: Page) {
 }
 test("legacy accounts migrate only with their code and reopen encrypted offline", async ({ page, context }) => {
   const code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF";
-  await page.goto("/#signup"); await expect(page.getByTestId("code")).toBeVisible();
+  await page.goto("/"); await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await page.evaluate(async root => {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const bytes = new TextEncoder().encode(root.replaceAll("-", ""));
@@ -48,10 +49,8 @@ test("legacy accounts migrate only with their code and reopen encrypted offline"
   await expect(page.getByTestId("header-tag")).toContainText("oldfriend");
 });
 
-test("new accounts never persist usable keys and sign-out retains only encrypted records", async ({ page }) => {
-  await page.goto("/#signup"); const code = (await page.getByTestId("code").textContent())!;
-  await page.getByLabel(/Gamertag/).fill("vaulttester"); await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Create account", exact: true }).click(); await expect(page.getByText("No accounts yet")).toBeVisible();
+test("encrypted local accounts never persist usable keys and sign-out retains only encrypted records", async ({ page }) => {
+  const code = await legacyAccount(page, "vaulttester");
   expect((await storage(page)).hasKey).toBe(false);
   page.on("dialog", d => d.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();

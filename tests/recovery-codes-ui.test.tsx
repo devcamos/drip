@@ -6,6 +6,8 @@ import { RecoveryCodes } from "../app/RecoveryCodes";
 import { emptyData } from "../lib/db";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
 const mocks = vi.hoisted(() => ({ readCloudState: vi.fn(), connect: vi.fn(), registerRecoveryCodes: vi.fn(), createRecoveryCodes: vi.fn(), authClient: { getSession: vi.fn() } }));
+const passwords = vi.hoisted(() => ({ passwordUsername: vi.fn(), passwordRecoveryRoot: vi.fn() }));
+vi.mock("../lib/password-login", () => passwords);
 vi.mock("../lib/cloud", () => ({ readCloudState: mocks.readCloudState, connect: mocks.connect, authClient: mocks.authClient }));
 vi.mock("../lib/recovery-codes", async importOriginal => ({ ...await importOriginal<typeof import("../lib/recovery-codes")>(), registerRecoveryCodes: mocks.registerRecoveryCodes, createRecoveryCodes: mocks.createRecoveryCodes }));
 import { downloadRecoveryCodes } from "../lib/recovery-codes";
@@ -13,6 +15,7 @@ const code = generateRecoveryCode(); const codes = Array.from({ length: 6 }, () 
 const data = { ...emptyData(), identity: { id: "id", handle: "devo", createdAt: "now" } };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.authClient.getSession.mockResolvedValue({ data: null }); vi.stubGlobal("confirm", () => true);
+  passwords.passwordUsername.mockResolvedValue(undefined); passwords.passwordRecoveryRoot.mockResolvedValue(code);
   mocks.readCloudState.mockResolvedValue({ userId: "owner", version: 1 }); mocks.connect.mockResolvedValue({ user: { id: "owner" } });
   mocks.createRecoveryCodes.mockResolvedValue({ codes, records: [] }); mocks.registerRecoveryCodes.mockResolvedValue(true);
 });
@@ -22,6 +25,20 @@ async function panel(value = code) {
   fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
 }
 describe("recovery codes experience", () => {
+  it("creates the first code set with password confirmation and keeps wrong passwords from registering codes", async () => {
+    passwords.passwordUsername.mockResolvedValue("devo");
+    passwords.passwordRecoveryRoot.mockRejectedValueOnce(new Error("Gamertag or password is incorrect."));
+    render(<RecoveryCodes data={data} verifier={await codeVerifier(code)} />);
+    const input = await screen.findByLabelText("Confirm your password");
+    expect(input).toHaveAttribute("autocomplete", "current-password");
+    fireEvent.change(input, { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
+    await screen.findByText("Gamertag or password is incorrect."); expect(mocks.registerRecoveryCodes).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "Green meadow 42!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
+    expect(await screen.findAllByRole("listitem")).toHaveLength(6); expect(input).not.toBeInTheDocument();
+    expect(passwords.passwordRecoveryRoot).toHaveBeenLastCalledWith("Green meadow 42!");
+  });
   it.each([true, false])("reveals all six codes after confirmed registration even when caching is %s", async cached => {
     mocks.registerRecoveryCodes.mockResolvedValue(cached);
     if (cached) mocks.authClient.getSession.mockResolvedValue({ data: { user: { id: "owner" } } });

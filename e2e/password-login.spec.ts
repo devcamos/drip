@@ -1,3 +1,6 @@
+import { legacyAccount } from "./legacy-account-helpers";
+import { unwrapPasswordRoot } from "../lib/password-crypto";
+import { mkdir } from "node:fs/promises";
 import { test, expect, type Page } from "@playwright/test";
 import { showRecovery } from "./vault-helpers";
 import { withAuthRetry } from "./auth-helpers";
@@ -5,24 +8,20 @@ const password = "Green meadow 42!";
 const nextPassword = "Blue waterfall 73!";
 const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
 async function onboard(page: Page, handle: string, withPassword = false) {
-  await page.goto("/#signup"); const code = (await page.getByTestId("code").textContent())!.trim();
+  if (!withPassword) return legacyAccount(page, handle);
+  await page.goto("/#signup");
+  await expect(page.getByTestId("code")).toHaveCount(0);
   await page.getByLabel(/Gamertag/).fill(handle);
-  if (withPassword) {
-    await page.getByLabel("Create password", { exact: true }).fill(password);
-    await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
-  }
-  await page.getByLabel(/saved my recovery code/).check(); await page.getByRole("button", { name: "Create account", exact: true }).click();
-  await expect(page.getByTestId("header-tag")).toBeVisible({ timeout: 30_000 });
-  if (withPassword && !(await page.getByText("No accounts yet").isVisible())) {
-    // A genuine auth throttle may interrupt setup after local encryption. The
-    // account is retained and Recovery offers the same safe retry to the user.
-    await setPassword(page, handle, code, password);
-    await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
-  }
-  await expect(page.getByText("No accounts yet")).toBeVisible(); return code;
+  await page.getByLabel("Create password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true })).toHaveClass("on");
+  return "";
 }
+
 async function setPassword(page: Page, handle: string, code: string, secret: string) {
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   const form = page.getByRole("region", { name: "Sign-in and password" });
   await form.getByLabel("Sign-in gamertag").fill(handle);
   await form.getByLabel("Recovery code to set or reset your password").fill(code);
@@ -70,11 +69,31 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
   } finally { await second.close(); }
 });
-test("new accounts can choose a password from the start and keep passwords and roots out of requests and storage", async ({ page }) => {
+test("signup opens Accounts without recovery and offers code setup later with password confirmation", async ({ page }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(90_000);
   const payloads: string[] = [];
   page.on("request", request => { if (["/api/auth/sign-in/gamertag", "/api/auth/gamertag-password"].some(path => request.url().endsWith(path))) payloads.push(request.postData() ?? ""); });
-  const handle = tag(); const code = await onboard(page, handle, true);
+  const handle = tag(); await onboard(page, handle, true);
+  const setup = payloads.map(body => JSON.parse(body)).find(body => body.envelope);
+  const code = await unwrapPasswordRoot(setup.envelope, handle, password);
+  if (process.env.DRIP_UI_CAPTURE) {
+    await mkdir("docs/screenshots/signup-to-accounts", { recursive: true });
+    await expect(page.getByText("Cloud copy is up to date.")).toBeVisible();
+    await page.screenshot({ path: "docs/screenshots/signup-to-accounts/accounts-mobile.png", fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: "docs/screenshots/signup-to-accounts/accounts-desktop.png", fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+  // Recovery setup is optional after signup, and starts with password confirmation.
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
+  const codes = page.getByRole("region", { name: "Recovery codes" });
+  await expect(codes.getByLabel("Confirm your password", { exact: true })).toBeVisible();
+  if (process.env.DRIP_UI_CAPTURE) await codes.screenshot({ path: "docs/screenshots/signup-to-accounts/code-setup-mobile.png" });
+  await codes.getByLabel("Confirm your password", { exact: true }).fill(password);
+  page.on("dialog", dialog => dialog.accept());
+  await codes.getByRole("button", { name: "Create six recovery codes" }).click();
+  await expect(codes.getByRole("listitem")).toHaveCount(6, { timeout: 30_000 });
+  await expect(codes.getByRole("button", { name: "Download recovery codes" })).toBeEnabled();
   await page.reload(); await login(page, handle, password); await expect(page.getByTestId("header-tag")).toContainText(handle);
   expect(payloads.length).toBeGreaterThan(0); expect(payloads.some(body => body.includes(password) || body.includes(code))).toBe(false);
   const leak = await page.evaluate(async ({ root, secret }) => {
@@ -89,7 +108,7 @@ test("another account cannot claim an existing login gamertag", async ({ page, b
   const fresh = await browser.newContext();
   try {
     const other = await fresh.newPage(); const otherCode = await onboard(other, tag());
-    await other.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+    await other.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
     const form = other.getByRole("region", { name: "Sign-in and password" });
     await form.getByLabel("Sign-in gamertag").fill(handle); await form.getByLabel(/Recovery code to set/).fill(otherCode);
     await form.getByLabel("New password", { exact: true }).fill(nextPassword); await form.getByLabel("Confirm password", { exact: true }).fill(nextPassword);

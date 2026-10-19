@@ -39,16 +39,16 @@ describe("daily interest", () => {
 });
 
 describe("onboarding draft", () => {
-  it("saves, reloads (same code), updates handle, clears", async () => {
+  it("saves the unsent name in memory, updates it and clears", async () => {
     expect(await loadDraft()).toBeNull();
-    await saveDraft({ handle: "", code: "AAAA-BBBB" });
-    await saveDraft({ handle: "devo", code: "AAAA-BBBB" });
-    expect(await loadDraft()).toEqual({ handle: "devo", code: "AAAA-BBBB" });
+    await saveDraft({ handle: "" });
+    await saveDraft({ handle: "devo" });
+    expect(await loadDraft()).toEqual({ handle: "devo" });
     await clearDraft();
     expect(await loadDraft()).toBeNull();
   });
   it("returns null if the stored draft can't be decrypted", async () => {
-    await saveDraft({ handle: "x", code: "c" });
+    await saveDraft({ handle: "x" });
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
     await clearDraft();
     await rawStore({ onboardingDraft: { handle: "x", key, iv: new Uint8Array(12), ct: new ArrayBuffer(20) } });

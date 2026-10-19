@@ -1,13 +1,10 @@
+import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showCloudRecovery } from "./vault-helpers";
 import { withAuthRetry } from "./auth-helpers";
 
 async function createCashIsa(page: Page) {
-  await page.goto("/#signup");
-  const code = (await page.getByTestId("code").textContent())!.trim();
-  await page.getByLabel(/Gamertag/).fill("producttest");
-  await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  const code = await legacyAccount(page, "producttest");
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   await page.getByLabel("Product category", { exact: true }).selectOption("cash-isa");
   await page.getByLabel("Provider", { exact: true }).selectOption("MoneyFarm");
@@ -44,7 +41,7 @@ test("categories, income and bonus predictions survive reload and encrypted back
     await page.setViewportSize({ width, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await page.getByLabel("Export recovery code", { exact: true }).fill(code);
   const downloaded = page.waitForEvent("download");
@@ -77,7 +74,7 @@ test("categories, income and bonus predictions survive reload and encrypted back
 test("product and recorded income survive fresh-device encrypted cloud recovery", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database; no Production credentials in CI.");
   const code = await createCashIsa(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   const fresh = await browser.newContext();

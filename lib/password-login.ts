@@ -1,6 +1,6 @@
-import { checkCode } from "./crypto";
-import { authClient, cloudKey, connect, readCloudState, recoveryCredentials, syncNow, vault, writeCloudState } from "./cloud";
-import { claimEmptyPasswordDevice, getItem, passwordUnlockContext, savePasswordUnlock, type VaultBinding } from "./db";
+import { checkCode, codeVerifier, generateRecoveryCode } from "./crypto";
+import { authClient, cloudKey, connect, readCloudState, recoveryCredentials, seal, syncNow, vault, writeCloudState } from "./cloud";
+import { claimEmptyPasswordDevice, commitCloudRestore, getItem, passwordUnlockContext, savePasswordUnlock, type VaultBinding } from "./db";
 import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, unlockDevice, type DeviceSession } from "./device-session";
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -15,6 +15,36 @@ async function call(path: string, body: unknown, headers?: Record<string, string
   return value;
 }
 export async function passwordUsername() { return (await passwordUnlockContext()).envelope?.username; }
+
+/** Register cloud/password access before atomically installing a new local vault. */
+export async function signUpPassword(username: string, password: string, data: AppData) {
+  const name = loginTag(username); const error = passwordError(password);
+  if (!validLoginTag(name) || !data.identity) throw new Error("Use 3–16 letters, numbers or underscores for your gamertag.");
+  if (error) throw new Error(error);
+  const before = await readDeviceSession();
+  if (before?.signedOut || (await passwordUnlockContext()).binding || await getItem("verifier")) throw new Error("This browser already has an account. Sign in instead.");
+  if (!navigator.onLine) throw new Error("Connect to the internet to create your account.");
+  const root = generateRecoveryCode();
+  const { user, key } = await connect(root, data, true);
+  const remote = await vault("GET", undefined, user.id);
+  if (remote.version !== 0 || remote.envelope) throw new Error("Account setup changed. Try again.");
+  const saved = await vault("PUT", { version: 0, envelope: await seal(data, key) }, user.id);
+  const envelope = await wrapPasswordRoot(root, name, password, user.id);
+  const recovery = await recoveryCredentials(root);
+  await call("gamertag-password", { username: name, proof: await passwordProof(name, password), recoveryProof: recovery.password, envelope }, { "X-Drip-Owner": user.id });
+  await commitCloudRestore(data, { userId: user.id, identityId: data.identity.id, key, version: saved.version, dirty: false, lastSyncAt: saved.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(root), before?.generation, undefined, root, envelope);
+}
+
+/** Password confirmation can create recovery codes without an earlier code. */
+export async function passwordRecoveryRoot(password: string) {
+  const before = await passwordUnlockContext();
+  if (!before.binding || !before.envelope) throw new Error("Sign in with your password first.");
+  const root = await unwrapPasswordRoot(before.envelope, before.envelope.username, password);
+  const verifier = await getItem<{ salt: string; hash: string }>("verifier");
+  const fresh = await passwordUnlockContext();
+  if (fresh.binding?.vaultId !== before.binding.vaultId || fresh.binding?.generation !== before.binding.generation || fresh.envelope?.ct !== before.envelope.ct || !verifier || !(await checkCode(root, verifier))) throw new Error("Account changed. Sign in again before creating recovery codes.");
+  return root;
+}
 
 async function preparePasswordCloud(root: string, data: AppData, binding: VaultBinding) {
   const recovery = await recoveryCredentials(root);

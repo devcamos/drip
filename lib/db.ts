@@ -222,9 +222,10 @@ export async function acknowledgeCloudUpload(expected: CloudState, version: numb
   });
   return result;
 }
-export async function commitCloudRestore(data: AppData, state: CloudState | undefined, verifier: { salt: string; hash: string }, expectedGeneration?: string, resumeGeneration?: string, root?: string): Promise<void> {
+export async function commitCloudRestore(data: AppData, state: CloudState | undefined, verifier: { salt: string; hash: string }, expectedGeneration?: string, resumeGeneration?: string, root?: string, signupPassword?: PasswordWrap): Promise<void> {
   if (!isAppData(data)) throw new Error("Invalid local data. Your stored copy has not changed.");
   const before = await stored(); const stamp = epoch;
+  if (signupPassword && (before.vault || before.verifier || signupPassword.owner !== state?.userId)) throw new Error("This browser already has an account. Sign in instead.");
   if ((before.gate?.signedOut && before.gate.generation !== resumeGeneration) || before.gate?.generation !== expectedGeneration) throw new Error("Device session changed. Sign in again before restoring.");
   const keys = root ? await createVault(root) : current(before, !!resumeGeneration).keys;
   const encrypted = await encryptLocal(data, keys);
@@ -234,6 +235,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");
     if (keys.header.id !== before.vault?.id) s.delete("passkeyUnlock");
     if (keys.header.id !== before.vault?.id) s.delete("passwordUnlock");
+    if (signupPassword) s.put({ vaultId: keys.header.id, envelope: signupPassword }, "passwordUnlock");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
   }, { allowSignedOut: !!resumeGeneration, records: true });
   if (stamp !== epoch) throw new VaultLockedError();

@@ -16,14 +16,14 @@ import { PasskeyUnlock } from "./PasskeyUnlock";
 import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
-import { setLoginPassword } from "@/lib/password-login";
+import { signUpPassword } from "@/lib/password-login";
 import { passwordError } from "@/lib/password-crypto";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
 import { IncomeSummary } from "./IncomeSummary";
 import { productLabel } from "@/lib/products";
-import { downloadRecoveryCodes, resolveRecoveryCode } from "@/lib/recovery-codes";
+import { resolveRecoveryCode } from "@/lib/recovery-codes";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -137,15 +137,16 @@ function UnlockedDrip() {
   if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud, expectedGeneration, root, password) => {
     let d = restored ?? { ...data, identity };
     if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
-    if (!fromCloud) await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
-    await clearDraft();
-    let target: View = { name: "home" };
-    if (password && root && d.identity) {
-      try { await setLoginPassword(root, d.identity.handle, password, d); }
-      catch (error) { target = { name: "settings" }; setSaveError(`Your local account is saved. Password setup did not finish: ${(error as Error).message} Retry in Sign-in & password.`); }
+    if (password && identity) await signUpPassword(identity.handle, password, d);
+    else if (!fromCloud) {
+      if (!v) throw new Error("Could not verify the restored account.");
+      await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
     }
+    await clearDraft();
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    setVerifier(v); setView(target); replaceData(d);
+    const savedVerifier = await getItem<Verifier>("verifier");
+    if (!savedVerifier) throw new Error("Could not open your account. Sign in again.");
+    setVerifier(savedVerifier); setView({ name: "home" }); replaceData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
     <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
@@ -211,7 +212,7 @@ function UnlockedDrip() {
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
-            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Recovery" }[n]}
+            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Settings" }[n]}
           </button>
         ))}
       </nav>
@@ -235,23 +236,21 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (
   );
 }
 
-function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string, password?: string) => void | Promise<void> }>) {
-  const [draft, setDraft] = useState<{ handle: string; code: string } | null>(null);
+function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string, password?: string) => void | Promise<void> }>) {
+  const [draft, setDraft] = useState<{ handle: string } | null>(null);
   const [identity, setIdentity] = useState<I.Identity | null>(null);
   useEffect(() => {
     (async () => {
-      const d = (await loadDraft()) ?? { handle: "", code: C.generateRecoveryCode() };
+      const d = (await loadDraft()) ?? { handle: "" };
       await saveDraft(d); setDraft(d);
     })();
   }, []);
-  const [saved, setSaved] = useState(false);
   const [password, setPassword] = useState(""); const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const { screen: route, navigate } = useAuthScreen();
   const screen = route === "other" || route === "other-recover" ? "login" : route;
   useEffect(() => { setPassword(""); setConfirmation(""); setError(""); }, [screen]);
   if (!draft) return <main><p className="muted">Loading…</p></main>;
-  const code = draft.code;
   const screenCopy = {
     login: { title: "Welcome back", description: "Sign in to your Drip account." },
     signup: { title: "Create your account", description: "Track your money and the income it earns. No real name, email or phone needed." },
@@ -260,10 +259,10 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppD
   }[screen];
   async function createAccount(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!saved || !identity || password !== confirmation || (password && passwordError(password))) return;
+    if (!identity || password !== confirmation || passwordError(password)) return;
     setBusy(true); setError("");
-    try { const device = await readDeviceSession(); await onDone(await C.codeVerifier(code), undefined, identity, false, device?.generation, code, password || undefined); setPassword(""); setConfirmation(""); }
-    catch { setError("Could not encrypt local accounts. Your recovery code has not changed; try again."); }
+    try { await onDone(undefined, undefined, identity, false, undefined, undefined, password); setPassword(""); setConfirmation(""); }
+    catch (error) { setError((error as Error).message || "Could not create your account. Try again."); }
     finally { setBusy(false); }
   }
   return (
@@ -285,21 +284,14 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier, restored?: AppD
       {screen === "signup" && (
         <form className="panel auth-signup" onSubmit={createAccount}>
           <h2>Your gamertag</h2>
-          <HandlePicker onPick={setIdentity} initial={draft.handle} onRaw={(h) => saveDraft({ handle: h, code })} />
+          <HandlePicker onPick={setIdentity} initial={draft.handle} onRaw={(h) => saveDraft({ handle: h })} />
           <label htmlFor="new-account-password">Create password</label>
           <input id="new-account-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} value={password} onChange={event => setPassword(event.target.value)} />
           <label htmlFor="new-account-confirm">Confirm new account password</label>
           <input id="new-account-confirm" type="password" autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />
-          <p className="muted">Use at least 12 characters for normal sign-in and encrypted cloud saving. Leave both blank to start on this device only.</p>
-          <h2>Your recovery code</h2>
-          <p className="muted">Save this code for a forgotten password or lost device. Use your gamertag and password for normal sign-in. Until you create your account, reloading generates a new code. <b>If you lose all passwords, passkeys and recovery codes, we cannot recover your encrypted data.</b></p>
-          <div className="code" data-testid="code">{code}</div>
-          <div className="row-gap"><button type="button" className="btn ghost small" onClick={() => navigator.clipboard?.writeText(code)}>Copy</button><button type="button" className="btn ghost small" onClick={() => downloadRecoveryCodes([code], draft.handle)}>Download recovery code</button></div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--text)" }}>
-            <input type="checkbox" style={{ width: "auto" }} checked={saved} onChange={(e) => setSaved(e.target.checked)} /> I&apos;ve saved my recovery code somewhere safe
-          </label>
+          <p className="muted">Use at least 12 characters. You can save it in your password manager.</p>
           <div className="row-gap">
-            <button type="submit" className="btn" disabled={busy || !saved || !identity || (!!password && (!!passwordError(password) || password !== confirmation)) || (!password && !!confirmation)}>{busy ? "Creating account…" : "Create account"}</button>
+            <button type="submit" className="btn" disabled={busy || !identity || !!passwordError(password) || password !== confirmation}>{busy ? "Creating account…" : "Create account"}</button>
           </div>
           {error && <p role="alert" className="err">{error}</p>}
         </form>
@@ -387,7 +379,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   const [code, setCode] = useState(""); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [busy, setBusy] = useState(false);
   return (
     <>
-      <h1>Recovery</h1>
+      <h1>Settings</h1>
       <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
       <PasswordSetup data={data} />
       <PasskeyUnlock name={data.identity ? I.formatTag(data.identity) : "Drip"} />

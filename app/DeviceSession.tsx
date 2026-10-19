@@ -90,7 +90,7 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
       } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
     }}>
       <h2>{copy.section}</h2>
-      {mode !== "migration" && <p className="muted">Use a recovery code to regain access, then set a new password in Recovery → Sign-in &amp; password. Existing accounts need this once to set their first password.</p>}
+      {mode !== "migration" && <p className="muted">Use a recovery code to regain access, then set a new password in Settings → Sign-in &amp; password. Existing accounts need this once to set their first password.</p>}
       <label htmlFor="device-sign-in-code">Recovery code</label>
       <input id="device-sign-in-code" type="password" autoComplete="off" autoCapitalize="characters" value={code} onChange={e => setCode(e.target.value)} />
       <p className="muted">Use your original code or one of your downloaded codes. Your gamertag alone cannot sign you in.</p>

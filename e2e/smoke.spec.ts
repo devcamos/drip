@@ -1,17 +1,11 @@
+import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { unlock } from "./vault-helpers";
 
 test.describe.configure({ mode: "serial" });
 
-async function onboard(page: Page) {
-  await page.goto("/#signup");
-  const code = (await page.getByTestId("code").textContent())!.trim();
-  await page.getByLabel(/Gamertag/).fill("devo");
-  await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Create account" }).click();
-  return code;
-}
+const onboard = legacyAccount;
 
 async function addZopa(page: Page) {
   await page.getByRole("navigation").getByRole("button", { name: "Add" }).click();
@@ -23,26 +17,20 @@ async function addZopa(page: Page) {
   await page.getByRole("button", { name: "Save" }).click();
 }
 
-test("onboarding shows a recovery code and gates Start", async ({ page }) => {
+test("signup asks for a gamertag and matching password without recovery", async ({ page }) => {
   await page.goto("/#signup");
-  await expect(page.getByTestId("code")).toHaveText(/^([A-Z2-9]{4}-){5}[A-Z2-9]{4}$/);
-  await expect(page.getByRole("button", { name: "Create account" })).toBeDisabled();
-  await page.getByLabel(/saved my recovery code/).check();
-  await expect(page.getByRole("button", { name: "Create account" })).toBeDisabled(); // no gamertag yet
+  const submit = page.getByRole("button", { name: "Create account", exact: true });
+  await expect(page.getByTestId("code")).toHaveCount(0);
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(submit).toBeDisabled();
   await page.getByLabel(/Gamertag/).fill("me@mail");
   await expect(page.getByText("Only letters, numbers and underscore.")).toBeVisible();
-  await page.getByLabel(/Gamertag/).fill("de");
-  await expect(page.getByText("Use at least 3 characters.")).toBeVisible();
   await page.getByLabel(/Gamertag/).fill("devo_1");
-  await expect(page.getByTestId("tag-preview")).toHaveText("You'll be devo_1");
-  await expect(page.getByRole("button", { name: /Reroll/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByText("No accounts yet")).toBeVisible();
-  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("devo_1");
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
-  await page.getByText("Advanced: file backups & app lock").click();
-  await expect(page.getByTestId("settings-tag")).toHaveText("devo_1");
-  await expect(page.getByText(/Sign in using the unique gamertag saved in/)).toBeVisible();
+  await page.getByLabel("Create password", { exact: true }).fill("Green meadow 42!");
+  await page.getByLabel("Confirm new account password", { exact: true }).fill("Different password!");
+  await expect(submit).toBeDisabled();
+  await page.getByLabel("Confirm new account password", { exact: true }).fill("Green meadow 42!");
+  await expect(submit).toBeEnabled();
 });
 
 test("add account, top up, withdraw, Trends, backup export and import", async ({ page }) => {
@@ -78,7 +66,7 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   await expect(page.getByText("Estimated balance in 1 year")).toBeVisible();
 
   // export
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await page.getByPlaceholder("XXXX-XXXX-XXXX-XXXX-XXXX-XXXX").fill("WRONG");
   await page.getByRole("button", { name: "Export backup" }).click();
@@ -117,7 +105,7 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const code = await onboard(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await expect(page.getByText(/screen lock only/)).toBeVisible();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
@@ -148,7 +136,7 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   await onboard(page);
   const tag = await page.getByTestId("header-tag").locator("b").textContent();
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
   await expect(page.getByText("App lock is on.")).toBeVisible();
@@ -160,28 +148,14 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
   expect(tag).toBe("devo");
 });
 
-test("onboarding drafts stay in memory and created accounts need a code after reopening", async ({ page, context }) => {
+test("unsent signup names and passwords do not survive a fresh page", async ({ page }) => {
   await page.goto("/#signup");
-  const firstCode = await page.getByTestId("code").textContent();
   await page.getByLabel(/Gamertag/).fill("devo");
-  await page.waitForTimeout(300);
-  await page.goto("about:blank");
-  await page.goto("/#signup");
-  await expect(page.getByTestId("code")).not.toHaveText(firstCode!);
+  await page.getByLabel("Create password", { exact: true }).fill("Green meadow 42!");
+  await page.goto("about:blank"); await page.goto("/#signup");
   await expect(page.getByLabel(/Gamertag/)).toHaveValue("");
-  const code = (await page.getByTestId("code").textContent())!;
-  await page.getByLabel(/Gamertag/).fill("devo");
-  await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByText("No accounts yet")).toBeVisible();
-  // reopen like a home-screen launch (new page, same storage)
-  await page.close();
-  const p2 = await context.newPage();
-  await p2.goto("/");
-  await unlock(p2, code);
-  await expect(p2.getByText("No accounts yet")).toBeVisible();
-  await expect(p2.getByTestId("header-tag").locator("b")).toHaveText("devo");
-  await expect(p2.getByTestId("code")).toHaveCount(0);
+  await expect(page.getByLabel("Create password", { exact: true })).toHaveValue("");
+  await expect(page.getByTestId("code")).toHaveCount(0);
 });
 
 test("daily-interest account has no payout date and skips upcoming payouts", async ({ page }) => {
