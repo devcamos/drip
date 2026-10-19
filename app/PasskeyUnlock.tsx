@@ -32,7 +32,7 @@ export function PasskeyUnlock({ name }: Readonly<{ name: string }>) {
   return <section className="panel" aria-label="Passkey unlock">
     <h2>Passkey unlock</h2>
     <p className="muted">Open Drip with a saved passkey using Face ID, Touch ID or your device lock. Save it in Apple Passwords or another compatible password manager.</p>
-    <p className="muted">This unlocks encrypted accounts in this browser, including offline. Keep your recovery codes for a new device, cleared browser data or a lost passkey.</p>
+    <p className="muted">This unlocks encrypted accounts in this browser, including offline. On a new device or after clearing browser data, sign in with your password or use a recovery code.</p>
     {controls}
     {message && <output className="muted">{message}</output>}
   </section>;

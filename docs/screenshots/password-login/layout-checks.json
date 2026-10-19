@@ -1,0 +1,62 @@
+[
+  {
+    "state": "new-account",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "state": "new-account",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "state": "new-account",
+    "width": 1280,
+    "overflow": false
+  },
+  {
+    "state": "password-setup",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "state": "password-setup",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "state": "password-setup",
+    "width": 1280,
+    "overflow": false
+  },
+  {
+    "state": "signed-out",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "state": "signed-out",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "state": "signed-out",
+    "width": 1280,
+    "overflow": false
+  },
+  {
+    "state": "forgot-password",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "state": "forgot-password",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "state": "forgot-password",
+    "width": 1280,
+    "overflow": false
+  }
+]

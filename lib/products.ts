@@ -1,12 +1,13 @@
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "./types";
 
 export const PROVIDERS: Record<string, string> = {
-  Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
+  Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
   Vanguard: "#96151d", Marcus: "#1d2f4f", "Premium Bonds": "#3c6e47", Other: "#4a5070",
 };
 type ProductDefaults = { label: string; rateType: RateType; frequency: Frequency; taxWrapper: TaxWrapper; reinvestIncome: boolean };
 export const PRODUCTS: Record<ProductCategory, ProductDefaults> = {
   "cash-isa": { label: "Cash ISA", rateType: "interest", frequency: "monthly", taxWrapper: "cash-isa", reinvestIncome: true },
+  "cash-lisa": { label: "Cash Lifetime ISA (LISA)", rateType: "interest", frequency: "monthly", taxWrapper: "lifetime-isa", reinvestIncome: true },
   "easy-access": { label: "Easy-access saver", rateType: "interest", frequency: "monthly", taxWrapper: "none", reinvestIncome: true },
   "regular-saver": { label: "Regular saver", rateType: "interest", frequency: "annually", taxWrapper: "none", reinvestIncome: true },
   "current-account": { label: "Current account", rateType: "interest", frequency: "monthly", taxWrapper: "none", reinvestIncome: true },
@@ -24,7 +25,7 @@ export function validDate(value: unknown): value is string {
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
   return (account.productCategory === undefined || Object.hasOwn(PRODUCTS, account.productCategory)) &&
-    (account.taxWrapper === undefined || ["none", "cash-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&
+    (account.taxWrapper === undefined || ["none", "cash-isa", "lifetime-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&
     (account.reinvestIncome === undefined || typeof account.reinvestIncome === "boolean") &&
     (account.bonus === undefined || (!!account.bonus && Number.isFinite(account.bonus.amount) && account.bonus.amount > 0 && validDate(account.bonus.expectedDate))) &&
     (account.payouts === undefined || (Array.isArray(account.payouts) && account.payouts.every(p => !!p && (p.incomeType === undefined || ["interest", "dividend", "bonus"].includes(p.incomeType)))));

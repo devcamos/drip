@@ -26,7 +26,7 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
   const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
   const [custom, setCustom] = useState(customProviderName(existing?.provider));
   const [category, setCategory] = useState<ProductCategory>(existing?.productCategory ?? (existing ? "other" : "easy-access"));
-  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? (existing?.productCategory === "cash-isa" ? "cash-isa" : "none"));
+  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[existing?.productCategory ?? "other"].taxWrapper);
   const [label, setLabel] = useState(existing?.label ?? "");
   const [balance, setBalance] = useState(existing ? String(existing.balance) : "");
   const [rate, setRate] = useState(existing ? String(existing.ratePct) : "");

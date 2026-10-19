@@ -1,0 +1,56 @@
+[
+  {
+    "state": "login",
+    "width": 390,
+    "height": 844,
+    "overflow": false
+  },
+  {
+    "state": "signup",
+    "width": 390,
+    "height": 844,
+    "overflow": false
+  },
+  {
+    "state": "recovery",
+    "width": 390,
+    "height": 844,
+    "overflow": false
+  },
+  {
+    "state": "login",
+    "width": 1280,
+    "height": 900,
+    "overflow": false
+  },
+  {
+    "state": "signup",
+    "width": 1280,
+    "height": 900,
+    "overflow": false
+  },
+  {
+    "state": "recovery",
+    "width": 1280,
+    "height": 900,
+    "overflow": false
+  },
+  {
+    "state": "login",
+    "width": 320,
+    "height": 740,
+    "overflow": false
+  },
+  {
+    "state": "signup",
+    "width": 320,
+    "height": 740,
+    "overflow": false
+  },
+  {
+    "state": "recovery",
+    "width": 320,
+    "height": 740,
+    "overflow": false
+  }
+]

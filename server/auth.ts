@@ -3,6 +3,8 @@ import { passkey } from "@better-auth/passkey";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import WebSocket from "ws";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { passwordLogin } from "./password-login";
+import { databaseTypes } from "./database-types";
 
 neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
   ? class extends WebSocket { constructor(address: string, protocols?: string | string[]) { super(address, protocols, { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY!) }); } }
@@ -13,7 +15,7 @@ let instance: ReturnType<typeof createAuth> | undefined;
 let pool: Pool | undefined;
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error("Cloud recovery is not configured.");
-  pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+  pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 3, types: databaseTypes });
   return pool;
 }
 export function authOptions() {
@@ -27,7 +29,7 @@ export function authOptions() {
     // Identifiers are generated from high-entropy recovery codes, not real email addresses.
     user: { changeEmail: { enabled: false } },
     rateLimit: { enabled: true, storage: "database" as const, window: 60, max: 30 },
-    plugins: [passkey({ rpID: new URL(baseURL).hostname, rpName: "Drip", origin })],
+    plugins: [passkey({ rpID: new URL(baseURL).hostname, rpName: "Drip", origin }), passwordLogin(database())],
   };
 }
 export function getAuth() {

@@ -10,6 +10,9 @@ import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
 import type { AppData, Account } from "@/lib/types";
 
+const signup = vi.hoisted(() => vi.fn());
+vi.mock("../lib/password-login", async importOriginal => ({ ...await importOriginal<typeof import("../lib/password-login")>(), signUpPassword: signup }));
+const signupPassword = "Green meadow 42!";
 const today = new Date().toISOString().slice(0, 10);
 const type = (el: HTMLElement, v: string) => fireEvent.change(el, { target: { value: v } });
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole("button", { name }));
@@ -28,6 +31,7 @@ async function seed(d: Partial<AppData>, code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF")
 
 beforeEach(() => {
   vi.stubGlobal("confirm", () => true);
+  signup.mockImplementation(async (_name, _password, data) => { await seedVault(data); });
 });
 
 describe("layout and page", () => {
@@ -41,19 +45,43 @@ describe("layout and page", () => {
 });
 
 describe("onboarding", () => {
-  it("needs a valid gamertag and saved code, then starts", async () => {
+  it("offers a retry instead of staying on Loading when signup initialization fails", async () => {
+    const drafts = await import("../lib/draft");
+    vi.spyOn(drafts, "loadDraft").mockRejectedValueOnce(new Error("Storage unavailable"));
     render(<Drip />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare signup on this device. Try again.");
+    click("Try again");
+    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(screen.queryByTestId("code")).toBeNull();
+  });
+  it("keeps registration failures on signup and opens Accounts only after a successful retry", async () => {
+    signup.mockRejectedValueOnce(new Error("That gamertag is already used for sign-in. Choose another."));
+    render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    type(screen.getByLabelText(/Gamertag/), "devo");
+    type(screen.getByLabelText("Create password"), signupPassword);
+    type(screen.getByLabelText("Confirm new account password"), signupPassword);
+    click("Create account");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/already used/);
+    expect(screen.queryByTestId("header-tag")).toBeNull(); expect(screen.queryByTestId("code")).toBeNull();
+    expect(screen.getByLabelText("Create password")).toHaveValue(signupPassword);
+    click("Create account"); await screen.findByText(/No accounts yet/);
+    expect(within(screen.getByRole("navigation")).getByRole("button", { name: "Accounts" })).toHaveClass("on");
+  });
+  it("needs a valid gamertag and matching password, then opens Accounts without recovery", async () => {
+    render(<Drip />);
+    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
     const handle = await screen.findByLabelText(/Gamertag/);
-    const start = screen.getByRole("button", { name: "Start" });
-    fireEvent.click(screen.getByRole("checkbox"));
+    const start = screen.getByRole("button", { name: "Create account" });
+    expect(screen.queryByTestId("code")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     expect(start).toBeDisabled();
     type(handle, "a b");
     expect(screen.getByText("Only letters, numbers and underscore.")).toBeInTheDocument();
     type(handle, "devo");
     expect(screen.getByTestId("tag-preview")).toHaveTextContent("You'll be devo");
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn() } });
-    click("Copy");
-    click("Start");
+    type(screen.getByLabelText("Create password"), signupPassword);
+    type(screen.getByLabelText("Confirm new account password"), signupPassword);
+    click("Create account");
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
     expect(screen.getByTestId("header-tag")).toHaveTextContent("devo");
     expect((await loadData()).identity?.handle).toBe("devo");
@@ -63,7 +91,8 @@ describe("onboarding", () => {
     const code = C.generateRecoveryCode();
     const backup = await C.encryptBackup({ ...emptyData(), accounts: [acct()], identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "restored", createdAt: "x" } }, code, 100_000);
     render(<Drip />);
-    click(await screen.findByRole("button", { name: "Restore a backup" }).then(() => "Restore a backup"));
+    fireEvent.click(await screen.findByRole("button", { name: "Forgot password?" }));
+    click("Restore a backup");
     const file = new File([JSON.stringify(backup)], "b.json", { type: "application/json" });
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [file] } });
     type(screen.getByLabelText("Restore recovery code"), C.generateRecoveryCode());
@@ -77,14 +106,14 @@ describe("onboarding", () => {
 
   it("rejects a non-Drip file and can go back", async () => {
     render(<Drip />);
-    await screen.findByRole("button", { name: "Restore a backup" });
+    fireEvent.click(await screen.findByRole("button", { name: "Forgot password?" }));
     click("Restore a backup");
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File(["not json"], "x.json")] } });
     type(screen.getByLabelText("Restore recovery code"), "x");
     click("Restore");
     expect(await screen.findByText("That file couldn't be read.")).toBeInTheDocument();
     click("Back");
-    expect(screen.getByText("Your recovery code")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recover your account" })).toBeInTheDocument();
   });
 });
 
@@ -115,7 +144,7 @@ describe("accounts", () => {
     click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
     await waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
     type(screen.getByLabelText("Income amount"), "22.65"); click("Record income");
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(backup)], "replacement.json")] } });
     type(screen.getByLabelText("Restore recovery code"), code); click("Restore");
     await waitFor(async () => expect((await loadData()).accounts[0].balance).toBe(8000));
@@ -308,8 +337,8 @@ describe("backup", () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<Drip />);
     await screen.findByText("Total balance");
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
-    expect(screen.getByRole("heading", { name: "Recovery" })).toBeInTheDocument();
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     type(screen.getByLabelText("Export recovery code"), "WRONG");
     click("Export backup");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
@@ -335,7 +364,7 @@ describe("backup", () => {
     Object.assign(navigator, { canShare: () => true, share });
     render(<Drip />);
     await screen.findByText("Total balance");
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     type(screen.getByLabelText("Export recovery code"), code);
     click("Export backup");
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1), { timeout: 10_000 });
@@ -351,7 +380,7 @@ describe("backup", () => {
     const bad = await C.encryptBackup({ version: 9 }, code, 100_000);
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(bad)], "b.json")] } });
     type(screen.getByLabelText("Restore recovery code"), code);
     click("Restore");
@@ -394,10 +423,10 @@ describe("app lock", () => {
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create, get: vi.fn() } });
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(screen.getByText(/screen lock only/)).toBeInTheDocument();
     expect(screen.getByTestId("settings-tag")).toHaveTextContent("devo");
-    expect(screen.getByText(/does not need to be unique/)).toBeInTheDocument();
+    expect(screen.getByText(/unique gamertag saved/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("App lock is on.")).toBeInTheDocument();
@@ -412,7 +441,7 @@ describe("app lock", () => {
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create: async () => null, get: vi.fn() } });
     const { unmount } = render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("Couldn't set up the passkey.")).toBeInTheDocument();
@@ -420,7 +449,7 @@ describe("app lock", () => {
     vi.stubGlobal("PublicKeyCredential", undefined);
     render(<Drip />);
     await screen.findByText(/No accounts yet/);
-    tab("Recovery"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(await screen.findByText(/doesn't support a passkey lock/)).toBeInTheDocument();
   });
   it("locks on open, unlocks by passkey or recovery code, and relocks after 5 minutes hidden", async () => {
@@ -454,17 +483,20 @@ describe("app lock", () => {
 });
 
 describe("onboarding draft persistence", () => {
-  it("keeps the same recovery code and typed gamertag after leaving and coming back", async () => {
+  it("keeps the unsent gamertag in memory but clears passwords after leaving and coming back", async () => {
     const first = render(<Drip />);
-    const code = (await screen.findByTestId("code")).textContent;
+    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    await screen.findByLabelText(/Gamertag/);
     type(screen.getByLabelText(/Gamertag/), "devo");
     await waitFor(async () => expect((await (await import("@/lib/draft")).loadDraft())?.handle).toBe("devo"));
     first.unmount();
     render(<Drip />);
-    expect(await screen.findByTestId("code")).toHaveTextContent(code!);
+    await screen.findByLabelText(/Gamertag/);
+    expect(screen.queryByTestId("code")).toBeNull();
     expect(screen.getByLabelText(/Gamertag/)).toHaveValue("devo");
-    fireEvent.click(screen.getByRole("checkbox"));
-    click("Start");
+    type(screen.getByLabelText("Create password"), signupPassword);
+    type(screen.getByLabelText("Confirm new account password"), signupPassword);
+    click("Create account");
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
     expect(await (await import("@/lib/draft")).loadDraft()).toBeNull();
   });
@@ -513,6 +545,7 @@ describe("sign-out", () => {
     expect(screen.queryByText("Rainy day pot")).toBeNull();
     first.unmount(); render(<Drip />);
     await screen.findByRole("heading", { name: "Drip is signed out" });
+    click("Forgot password?");
     type(screen.getByLabelText("Recovery code"), "wrong"); click("Sign in");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
     type(screen.getByLabelText("Recovery code"), code); click("Sign in");

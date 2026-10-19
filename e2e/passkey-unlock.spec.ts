@@ -1,3 +1,4 @@
+import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect } from "@playwright/test";
 
 test("saved PRF passkey reopens encrypted accounts offline and after sign-out; recovery survives removal", async ({ page, context }) => {
@@ -7,11 +8,9 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
     protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true,
     hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true,
   } });
-  await page.goto("/"); const code = (await page.getByTestId("code").textContent())!;
-  await page.getByLabel(/Gamertag/).fill("passkeytester"); await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  const code = await legacyAccount(page, "passkeytester");
   await expect(page.getByText("No accounts yet")).toBeVisible();
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Recovery code to set up passkey unlock").fill(code);
   await page.getByRole("button", { name: "Set up passkey unlock" }).click();
   await expect(page.getByText(/Passkey saved and verified/)).toBeVisible();
@@ -43,11 +42,12 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Remove passkey unlock" }).click();
   await expect(page.getByText(/removed from this browser/)).toBeVisible();
   await page.reload(); await expect(page.getByRole("heading", { name: "Unlock Drip" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
@@ -60,14 +60,13 @@ test("ordinary saved passkeys without PRF do not enable encrypted unlock", async
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true,
     isUserVerified: true, automaticPresenceSimulation: true, hasPrf: false,
   } });
-  await page.goto("/"); const code = (await page.getByTestId("code").textContent())!;
-  await page.getByLabel(/Gamertag/).fill("fallbacktester"); await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery" }).click();
+  const code = await legacyAccount(page, "fallbacktester");
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Recovery code to set up passkey unlock").fill(code);
   await page.getByRole("button", { name: "Set up passkey unlock" }).click();
   await expect(page.getByText(/does not support encrypted passkey unlock/)).toBeVisible();
   await page.reload(); await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("fallbacktester");

@@ -48,6 +48,9 @@ async function renewCloudAfterUnlock(root: string, data: AppData, expected: Clou
     const device = await readDeviceSession();
     const cloud = await getItem<CloudState>("cloudState");
     if (device?.signedOut || device?.generation !== generation || cloud?.userId !== expected.userId || cloud?.generation !== expected.generation) return;
+    // Password sign-in already issued the ordinary session. Do not spend an
+    // additional recovery-auth attempt to renew an already matching session.
+    try { if ((await authClient.getSession()).data?.user.id === expected.userId) return; } catch { /* Retry through the recovery credential below. */ }
     // safeFetch checks this generation again under the private-request lock,
     // so a delayed renewal cannot authenticate after a later sign-out.
     const account = await connect(root, data, false, undefined, generation);
@@ -99,19 +102,20 @@ export async function unlockDevice(code: string, expected?: VaultBinding) {
 }
 
 /** Explicitly replace this device from another cloud account, only after UI confirmation. */
-export async function restoreOtherAccount(code: string) {
+export async function restoreOtherAccount(code: string, expected?: { generation?: string; userId?: string }, quiet = false) {
   const current = await readDeviceSession();
   if (!current?.signedOut) throw new Error("Sign out before switching accounts.");
+  if (expected && current.generation !== expected.generation) throw new Error("Device session changed. Try again.");
   try { await ending?.promise; } catch { /* Explicit recovery claims a new generation below. */ }
   const claimed = { signedOut: true, remotePending: false, generation: crypto.randomUUID() };
   if (!(await completeDeviceSession(current.generation, claimed))) throw new Error("Device session changed. Try again.");
-  notifyDeviceSession();
+  if (!quiet) notifyDeviceSession();
   try {
-    const data = await restoreCloud(code, undefined, claimed.generation);
-    notifyDeviceSession();
+    const data = await restoreCloud(code, expected?.userId, claimed.generation);
+    if (!quiet) notifyDeviceSession();
     return data;
   } catch (error) {
-    if (await completeDeviceSession(claimed.generation, { ...claimed, remotePending: true })) notifyDeviceSession();
+    if (await completeDeviceSession(claimed.generation, { ...claimed, remotePending: true }) && !quiet) notifyDeviceSession();
     throw error;
   }
 }

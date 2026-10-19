@@ -1,14 +1,11 @@
+import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
-import { unlock } from "./vault-helpers";
+import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
 import { withAuthRetry } from "./auth-helpers";
 
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
-  await page.goto("/");
-  const code = (await page.getByTestId("code").textContent())!.trim();
-  await page.getByLabel(/Gamertag/).fill(handle);
-  await page.getByLabel(/saved my recovery code/).check();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  const code = await legacyAccount(page, handle);
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   if (nickname) await page.getByLabel("Nickname", { exact: true }).fill(nickname);
   await page.getByLabel("Balance", { exact: true }).fill("3000");
@@ -37,13 +34,14 @@ test("offline reload keeps accounts and never caches private APIs", async ({ pag
 test("cloud copy survives a fresh device, offline edits queue, and stale devices cannot overwrite it", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database; no production credentials in normal CI.");
   const code = await setup(page, "recoverytest", "PRIVATE_LOCAL_NICKNAME");
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
 
   const second = await browser.newContext(); const returning = await second.newPage();
   try {
     await returning.goto("http://localhost:4321");
+    await showCloudRecovery(returning);
     await returning.getByLabel("Recovery code", { exact: true }).fill(code);
     await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
     await expect(returning.getByText("£3,000.00").first()).toBeVisible();
@@ -82,19 +80,21 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
 
 test("cloud passkey verifies on the server, while new-device decryption still requires the code", async ({ page, context }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  // A shared-host auth bucket can require a genuine 60-second Retry-After.
+  test.setTimeout(120_000);
   const cdp = await context.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const code = await setup(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   await page.getByText("Device sign-in options").click();
-  await page.getByRole("button", { name: "Add cloud sign-in passkey" }).click();
-  await expect(page.getByText(/Cloud sign-in passkey saved/)).toBeVisible({ timeout: 30_000 });
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Add cloud sign-in passkey" }).click(), page.getByText(/Cloud sign-in passkey saved/));
   await context.clearCookies();
   await page.evaluate(() => new Promise<void>((resolve, reject) => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }));
   await page.reload();
+  await showCloudRecovery(page);
   await page.getByRole("button", { name: "Sign in with passkey" }).click();
   await expect(page.getByText(/Signed in. Enter your recovery code/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Restore cloud accounts" })).toBeDisabled();
@@ -111,7 +111,7 @@ test("downloaded set of six codes independently restores the same cloud account"
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
   test.setTimeout(180_000);
   const original = await setup(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(original);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   page.on("dialog", dialog => dialog.accept());
@@ -132,6 +132,7 @@ test("downloaded set of six codes independently restores the same cloud account"
     const fresh = await browser.newContext();
     try {
       const returning = await fresh.newPage(); await returning.goto("http://localhost:4321");
+    await showCloudRecovery(returning);
       await returning.getByLabel("Recovery code", { exact: true }).fill(code);
       await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
       await expect(returning.getByText("£3,000.00").first()).toBeVisible();
@@ -182,9 +183,11 @@ test("sign-out survives reload, locks other tabs and preserves local-only accoun
   await page.reload();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await expect(page.getByText("£3,000.00")).toHaveCount(0);
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill("wrong");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Total balance")).toBeVisible();
@@ -198,7 +201,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
   test.setTimeout(120_000);
   const code = await setup(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
@@ -209,7 +212,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".bal")).toHaveText("£3,200.00");
   // A failed offline disconnect must not drop the connection or its queued £200.
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("Device sign-in options").click();
   await page.getByRole("button", { name: "Disconnect this device", exact: true }).click();
   await expect(page.getByRole("button", { name: "Disconnect this device", exact: true })).toBeEnabled();
@@ -222,6 +225,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   expect(warned).toBe(true);
   await expect(page.getByText(/not yet confirmed/)).toBeVisible();
   await page.reload();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
@@ -230,6 +234,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Sign in", exact: true }).click(), page.getByText("Total balance"));
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
@@ -238,7 +243,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
 test("an online cloud authentication outage does not block local unlock or queued top-ups", async ({ page }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
   const code = await setup(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
   page.on("dialog", dialog => dialog.accept());
@@ -251,6 +256,7 @@ test("an online cloud authentication outage does not block local unlock or queue
     attempted = true;
     return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Test authentication outage" }) });
   });
+  await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Total balance")).toBeVisible();
@@ -265,7 +271,7 @@ test("an online cloud authentication outage does not block local unlock or queue
   await page.reload(); await unlock(page, code);
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
   await page.unroute("**/api/auth/sign-in/email");
-  await page.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("Device sign-in options").click();
   await page.getByLabel("Recovery code to renew sign-in").fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Sign in without replacing local data" }).click(), page.getByText("Encrypted cloud copy saved.").first());
@@ -279,7 +285,7 @@ test("signed-out users can restore rampage201 instead of reopening the current p
   const original = await browser.newContext(); let recovery: string;
   try {
     const originalPage = await original.newPage(); recovery = await setup(originalPage, "rampage201");
-    await originalPage.getByRole("navigation").getByRole("button", { name: "Recovery", exact: true }).click();
+    await originalPage.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
     await originalPage.getByLabel("Your saved recovery code").fill(recovery);
     await withAuthRetry(originalPage, () => originalPage.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), originalPage.getByText("Encrypted cloud copy saved.").first());
   } finally { await original.close(); }
@@ -287,6 +293,7 @@ test("signed-out users can restore rampage201 instead of reopening the current p
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByText("Use another account", { exact: true }).click();
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Other account recovery code", { exact: true }).fill(recovery!);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByText("Total balance"));
   await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");

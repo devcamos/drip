@@ -21,6 +21,7 @@ describe("local vault gate", () => {
     await seedVault(data); lockLocalVault(); render(<Drip />);
     await screen.findByRole("heading", { name: "Unlock Drip" });
     expect(screen.queryByText("private_user")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     fill(fixtureCode); fireEvent.click(screen.getByRole("button", { name: "Unlock Drip" }));
     await screen.findByTestId("header-tag"); expect(await loadData()).toEqual(data);
   });
