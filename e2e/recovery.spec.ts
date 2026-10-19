@@ -83,6 +83,8 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
 
 test("cloud passkey verifies on the server, while new-device decryption still requires the code", async ({ page, context }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  // A shared-host auth bucket can require a genuine 60-second Retry-After.
+  test.setTimeout(120_000);
   const cdp = await context.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
