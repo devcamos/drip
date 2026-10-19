@@ -44,6 +44,14 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
   page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await login(page, handle, "Wrong password 42!", true); await expect(page.getByText("Gamertag or password is incorrect.")).toBeVisible();
+  // The library's durable limiter must return usable seconds, not a bigint
+  // timestamp concatenated with its window. Keep the real limit enabled.
+  await login(page, handle, "Another wrong password 43!", true);
+  await login(page, handle, "Another wrong password 44!", true);
+  const limited = await page.request.post("/api/auth/sign-in/gamertag", { headers: { origin: "http://localhost:4321" }, data: { username: handle, proof: "A".repeat(43) } });
+  expect(limited.status()).toBe(429);
+  const retryAfter = Number(limited.headers()["retry-after"] ?? limited.headers()["x-retry-after"]);
+  expect(retryAfter).toBeGreaterThan(0); expect(retryAfter).toBeLessThanOrEqual(60);
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await login(page, handle.toUpperCase(), password); await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
