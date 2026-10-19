@@ -1,5 +1,8 @@
 # Separate authentication screens
 
+Historical evidence: signup now skips the recovery-code step. See the
+[current signup-to-Accounts gallery](../signup-to-accounts/README.md).
+
 Captured 19 October 2026 from the running local Next.js production build at
 `http://localhost:4321`. UI source commit: `e9810a2026035d13f4b52ebc06fa05602a51f257`,
 PR #21. Later copy-selection cleanup and screenshot/documentation commits

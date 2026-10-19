@@ -1,5 +1,8 @@
 # Password sign-in UI evidence
 
+Historical evidence: signup and navigation have since changed. See the
+[current signup-to-Accounts gallery](../signup-to-accounts/README.md).
+
 Captured 19 October 2026 from the running local Next.js production build at
 `http://localhost:4321`, on `feat/gamertag-password` for PR #21. UI source commit:
 `e362d9d045440f01c3246140b24165e446474f93`. Later server-only retry parsing fixes do
