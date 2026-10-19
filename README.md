@@ -29,6 +29,8 @@ Password setup saves/links encrypted cloud recovery where no cloud copy exists. 
 
 Apply `scripts/migrate.mjs` to the intended environment before deploying this feature. Development migration was tested only on the isolated Preview database; Production migration/release needs its own authorization. No Production data copying is involved.
 
+Password reset and login finalization share an owner-row lock in a short READ COMMITTED transaction. Better Auth creates a candidate session before that transaction, but Drip publishes no cookie or encrypted unlock wrapper until the current credential and session are checked under the lock. A reset that wins the overlap causes the stale login's candidate to be removed and rejected. If login finalizes first, reset revokes that session. The reset mutation runs in a separate statement after taking the lock so it sees sessions committed while waiting. Auth-adapter calls stay outside the transaction to avoid exhausting the shared connection pool. Transaction failures fail closed without publishing the candidate token. This does not revoke encryption roots or offline wrappers already held elsewhere.
+
 ## Encrypted local accounts
 
 Local unlock is independent of cloud authentication. After sign-out, a valid recovery code opens the existing encrypted device copy before a best-effort cloud sign-in runs. Authentication outages keep local accounts, edits and queued uploads usable. The renewal is bound to the device generation and cannot start after a later sign-out/account switch. If it fails, sync reports that sign-in is needed; Recovery → Device sign-in options → Sign in without replacing local data renews the session later. A cached password wrapper, configured passkey, original code or already cached alternative can unlock offline without a server lookup.
@@ -52,6 +54,8 @@ The service worker caches only the public shell, fonts and static assets. Auth/s
 ## Backend verification
 
 `DRIP_CLOUD_E2E=1 npm run e2e` additionally tests against the configured isolated Preview database: cross-device restore, offline queued writes, conflicts and unauthorised vault access. It creates synthetic encrypted test accounts. Ordinary CI skips this database-dependent case when credentials are absent but runs all offline and local journeys. Use dedicated non-production test data.
+
+`e2e/password-race.spec.ts` uses that flag and an explicit isolated-Preview host/local-origin guard. It pauses real authentication during verification and session creation, completes reset in another request, and checks that stale logins receive no session cookie and leave no extra session. It also checks owner-lock exclusion, fresh post-lock session visibility and progress with the three-connection pool. Its synthetic user and cascaded rows are removed afterward; never point this test at Production.
 
 Server auth and vault endpoints require a session, same-origin writes, bounded encrypted payloads, per-owner vault rate limits and version checks. Never put database URLs, auth secrets, recovery codes, cookies or browser traces containing them into git or public CI artifacts.
 

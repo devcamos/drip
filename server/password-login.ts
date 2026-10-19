@@ -4,6 +4,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import type { Pool } from "@neondatabase/serverless";
 import * as z from "zod";
 import { validPasswordWrap } from "../lib/password-crypto";
+import { withPasswordOwner } from "./password-transaction";
 
 const username = z.string().regex(/^[a-z0-9_]{3,16}$/);
 const proof = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -38,6 +39,24 @@ export function passwordLogin(db: Pool) {
         if (!user || !validPasswordWrap(entry.envelope) || entry.envelope.owner !== user.id || entry.envelope.username !== ctx.body.username) throw badLogin();
         const session = await ctx.context.internalAdapter.createSession(user.id);
         if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Could not sign in. Try again." });
+        // This candidate session stays private until the credential is rechecked
+        // under the same owner lock used by reset. Creating it before taking the
+        // lock avoids nested pool acquisition through the Better Auth adapter.
+        let current: boolean;
+        try {
+          current = await withPasswordOwner(db, user.id, async client => {
+            const fresh = await client.query(`SELECT login.user_id FROM drip_password_login login
+              JOIN "session" s ON s."userId" = login.user_id
+              WHERE login.user_id = $1 AND login.username = $2 AND login.password_hash = $3 AND s.id = $4`, [user.id, ctx.body.username, entry.password_hash, session.id]);
+            if (!fresh.rows.length) await client.query('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', [session.id, user.id]);
+            return fresh.rows.length > 0;
+          });
+        } catch (error) {
+          // No token/cookie has been exposed, even if outage cleanup also fails.
+          await ctx.context.internalAdapter.deleteSession(session.token).catch(() => undefined);
+          throw error;
+        }
+        if (!current) throw badLogin();
         await setSessionCookie(ctx, { user, session });
         ctx.setHeader("Cache-Control", "no-store");
         return ctx.json({ owner: user.id, envelope: entry.envelope });
@@ -57,13 +76,13 @@ export function passwordLogin(db: Pool) {
         const hash = await ctx.context.password.hash(ctx.body.proof);
         try {
           // Keep this recovery-verified session; expire other cloud sessions.
-          const saved = await db.query(`WITH saved AS (
+          const saved = await withPasswordOwner(db, owner, client => client.query(`WITH saved AS (
             INSERT INTO drip_password_login (user_id, username, password_hash, envelope)
             SELECT $1, $2, $3, $4::jsonb WHERE EXISTS (SELECT 1 FROM drip_vault WHERE user_id = $1)
             ON CONFLICT (user_id) DO UPDATE SET username = EXCLUDED.username, password_hash = EXCLUDED.password_hash, envelope = EXCLUDED.envelope, updated_at = now()
             RETURNING user_id
           ), revoked AS (DELETE FROM "session" WHERE "userId" = (SELECT user_id FROM saved) AND id <> $5 RETURNING id)
-          SELECT user_id FROM saved`, [owner, ctx.body.username, hash, JSON.stringify(safe), ctx.context.session.session.id]);
+          SELECT user_id FROM saved`, [owner, ctx.body.username, hash, JSON.stringify(safe), ctx.context.session.session.id]));
           if (!saved.rows.length) throw new APIError("CONFLICT", { message: "Save your cloud copy before setting a password." });
         } catch (error) {
           if ((error as { code?: string }).code === "23505") throw new APIError("CONFLICT", { message: "That gamertag is already used for sign-in. Choose another." });
