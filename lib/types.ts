@@ -2,8 +2,8 @@ import type { Identity } from "./identity";
 export interface CloudState { userId: string; key: CryptoKey; version: number; dirty: boolean; lastSyncAt: string | null; identityId: string; generation: string; revision: number }
 export type Frequency = "daily" | "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
-export type ProductCategory = "cash-isa" | "easy-access" | "regular-saver" | "current-account" | "stocks-funds" | "other";
-export type TaxWrapper = "none" | "cash-isa" | "stocks-shares-isa";
+export type ProductCategory = "cash-isa" | "cash-lisa" | "easy-access" | "regular-saver" | "current-account" | "stocks-funds" | "other";
+export type TaxWrapper = "none" | "cash-isa" | "lifetime-isa" | "stocks-shares-isa";
 export type IncomeType = RateType | "bonus";
 export interface PendingBonus { amount: number; expectedDate: string }
 

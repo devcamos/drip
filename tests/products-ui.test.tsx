@@ -27,7 +27,7 @@ describe("category-driven accounts", () => {
     change("Pending bonus amount £", "15.44"); change("Expected bonus payment date", "2030-05-06");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "Any Broker", productCategory: "stocks-funds", taxWrapper: "stocks-shares-isa", rateType: "dividend", frequency: "annually", reinvestIncome: false, bonus: { amount: 15.44, expectedDate: "2030-05-06" } }));
-    for (const category of ["regular-saver", "current-account", "easy-access", "cash-isa"]) {
+    for (const category of ["regular-saver", "current-account", "easy-access", "cash-isa", "cash-lisa"]) {
       change("Product category", category); expect(screen.getByLabelText("Reinvest predicted income")).toBeChecked();
       expect(screen.getByLabelText("Next payout date")).toHaveValue(addMonths(today, category === "regular-saver" ? 12 : 1));
     }
