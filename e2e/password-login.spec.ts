@@ -10,12 +10,10 @@ const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
 async function captureConfidence(page: Page, state: string) {
   if (!process.env.DRIP_CONFIDENCE_CAPTURE) return;
   await mkdir("docs/screenshots/signup-and-sync-confidence", { recursive: true });
-  const mask = [];
-  for (const input of await page.locator('input[type="password"]').all()) if (await input.inputValue()) mask.push(input);
   for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `docs/screenshots/signup-and-sync-confidence/${state}-${device}.png`, fullPage: true, scale: "css", mask, maskColor: "#d8c9b5" });
+    await page.screenshot({ path: `docs/screenshots/signup-and-sync-confidence/${state}-${device}.png`, fullPage: true, scale: "css", style: 'input[type="password"] { color: transparent !important; caret-color: transparent !important; }' });
   }
   await page.setViewportSize({ width: 390, height: 844 });
 }
@@ -143,6 +141,9 @@ test("signed-out signup preserves a recoverable old account through cancellation
     return new Promise<boolean>(resolve => { const t = db.transaction("kv"); const r = t.objectStore("kv").get("cloudState"); t.oncomplete = () => { db.close(); resolve(r.result?.dirty === false && r.result.version > 1); }; });
   }), { timeout: 30_000 }).toBe(true);
   page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(page.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0);
+  await captureConfidence(page, "signed-out");
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
   await expect(page.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0);

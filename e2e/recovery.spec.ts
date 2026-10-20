@@ -4,6 +4,10 @@ import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
 import { enableCloudRecovery, withAuthRetry } from "./auth-helpers";
 
+// Real cloud journeys share an auth bucket on this host. The mounted app retries
+// temporary session failures every 60 seconds; allow that unchanged recovery path.
+test.describe.configure({ timeout: 180_000 });
+
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
   const code = await legacyAccount(page, handle);
   await page.getByRole("button", { name: "Add account", exact: true }).click();
@@ -56,13 +60,13 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.locator(".bal")).toHaveText("£3,200.00");
     await page.context().setOffline(false);
-    await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 75_000 });
 
     await returning.getByRole("button", { name: /Zopa/ }).click();
     await returning.getByRole("button", { name: "Top up", exact: true }).click();
     await returning.getByLabel("amount", { exact: true }).fill("50");
     await returning.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(returning.getByText(/Cloud changed on another device/)).toBeVisible({ timeout: 30_000 });
+    await expect(returning.getByText(/Cloud changed on another device/)).toBeVisible({ timeout: 75_000 });
     await expect(returning.locator(".bal")).toHaveText("£3,050.00");
     const session = await (await page.request.get("/api/auth/get-session")).json();
     const remote = await (await page.request.get("/api/cloud", { headers: { "X-Drip-Owner": session.user.id } })).json();
@@ -230,7 +234,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
   await context.setOffline(false);
-  await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 75_000 });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
   await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
