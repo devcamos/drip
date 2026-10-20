@@ -53,9 +53,11 @@ Unfinished signup names stay in memory only; passwords clear on leaving the form
 
 ## PWA lifecycle
 
-Manifest, icons, standalone mode and a service worker support installation. Open the stable URL in Safari → Share → Add to Home Screen, or use the install action in a supporting Android browser. Browser storage can still be cleared; installation is not a backup.
+Manifest, icons, standalone mode and a service worker support installation. Bookmark the stable app address, or open it in Safari → Share → Add to Home Screen; Android browsers also offer an install action. Keep using that same address: a one-off deployment URL stays tied to that deployment, and another hostname has separate local storage and passkeys. Browser storage can still be cleared; installation is not a backup.
 
-The service worker caches only the public shell, fonts and static assets. Auth/session/vault APIs are never cached. Update/version messages are accepted only from the app's own origin. Before authentication or private requests, a worker-version handshake blocks any legacy Drip worker that cached all GETs until the user accepts the update. Updates wait for an explicit Reload update action; finish editing first. Bump the shell cache version when changing offline shell behaviour. Physical iPhone/Safari install behaviour must be tested separately; Chromium emulation is not that test.
+Once a new version is deployed to that address, opening the bookmark online loads the current app. A running copy checks for updates when brought to the foreground, when a connection returns and periodically while visible. Each build supplies a public release identity so the offline shell updates along with the app; no manual cache-version bump is required. Finish editing, wait for the local save, then choose **Reload update** when offered. Updates replace app files, preserving encrypted local accounts and queued saves; they do not require reinstalling or clearing browser data. Offline copies keep their previous working version until an update can be downloaded.
+
+The service worker caches only the public shell, fonts and static assets. Auth/session/vault APIs are never cached. Update/version messages are accepted only from the app's own origin. Before authentication or private requests, a worker-version handshake blocks any legacy Drip worker that cached all GETs until the user accepts the update. Previous immutable chunks remain available while another app tab is open. Physical iPhone/Safari install behaviour must be tested separately; Chromium emulation is not that test.
 
 ## Backend verification
 
