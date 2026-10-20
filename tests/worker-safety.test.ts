@@ -1,6 +1,21 @@
 import { expect, it, vi } from "vitest";
 import { requireSafeWorker, safeFetch } from "../lib/worker-safety";
 
+it("permits only the reserved signup paths while retaining the signed-out gate", async () => {
+  const { setItem } = await import("../lib/db");
+  const fetcher = vi.fn(async () => Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);
+  await setItem("deviceSession", { signedOut: true, generation: "signup-generation", signupNonce: "signup-nonce" });
+  const headers = { "X-Drip-Resume": "signup-generation", "X-Drip-Signup": "signup-nonce" };
+  for (const path of ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password"]) await safeFetch(path, { method: "POST", headers });
+  await safeFetch("/api/cloud", { method: "PUT", headers });
+  expect(fetcher).toHaveBeenCalledTimes(4);
+  for (const [path, method] of [["/api/auth/change-email", "POST"], ["/api/cloud", "DELETE"], ["/api/auth/get-session", "GET"]]) await expect(safeFetch(path, { method, headers })).rejects.toThrow(/Signup changed/);
+  await expect(safeFetch("/api/auth/sign-up/email", { method: "POST", headers: { ...headers, "X-Drip-Signup": "stale" } })).rejects.toThrow(/Signup changed/);
+  await setItem("deviceSession", { signedOut: true, generation: "another-tab", signupNonce: "signup-nonce" });
+  await expect(safeFetch("/api/auth/sign-up/email", { method: "POST", headers })).rejects.toThrow();
+  expect(fetcher).toHaveBeenCalledTimes(4);
+});
+
 it("does not require a worker in server or fresh browser contexts", async () => {
   await expect(requireSafeWorker()).resolves.toBeUndefined();
   vi.stubGlobal("window", {}); vi.stubGlobal("navigator", {}); await expect(requireSafeWorker()).resolves.toBeUndefined();

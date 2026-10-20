@@ -7,6 +7,18 @@ import { withAuthRetry } from "./auth-helpers";
 const password = "Green meadow 42!";
 const nextPassword = "Blue waterfall 73!";
 const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
+async function captureConfidence(page: Page, state: string) {
+  if (!process.env.DRIP_UI_CAPTURE) return;
+  await mkdir("docs/screenshots/signup-and-sync-confidence", { recursive: true });
+  const mask = [];
+  for (const input of await page.locator('input[type="password"]').all()) if (await input.inputValue()) mask.push(input);
+  for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `docs/screenshots/signup-and-sync-confidence/${state}-${device}.png`, fullPage: true, scale: "css", mask, maskColor: "#d8c9b5" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+}
 async function onboard(page: Page, handle: string, withPassword = false) {
   if (!withPassword) return legacyAccount(page, handle);
   await page.goto("/#signup");
@@ -116,4 +128,49 @@ test("another account cannot claim an existing login gamertag", async ({ page, b
     await expect(form.getByText(/already used for sign-in/)).toBeVisible({ timeout: 30_000 });
     await page.reload(); await login(page, handle, password); await expect(page.getByTestId("header-tag")).toContainText(handle);
   } finally { await fresh.close(); }
+});
+
+test("signed-out signup preserves a recoverable old account through cancellation, duplicate name and successful replacement", async ({ page, browser }) => {
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(180_000);
+  const original = tag(), replacement = tag(); await onboard(page, original, true);
+  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await page.getByLabel("Provider", { exact: true }).selectOption("Moneybox");
+  await page.getByLabel("Product category", { exact: true }).selectOption("cash-lisa");
+  await page.getByLabel("Balance", { exact: true }).fill("1234"); await page.getByLabel("Rate", { exact: true }).fill("4");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open("drip"); r.onsuccess = () => resolve(r.result); });
+    return new Promise<boolean>(resolve => { const t = db.transaction("kv"); const r = t.objectStore("kv").get("cloudState"); t.oncomplete = () => { db.close(); resolve(r.result?.dirty === false && r.result.version > 1); }; });
+  }), { timeout: 30_000 }).toBe(true);
+  page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await expect(page.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0);
+  await captureConfidence(page, "retained-signup");
+  await page.getByRole("button", { name: "Back to sign in" }).click(); await login(page, original, password);
+  await expect(page.getByRole("button", { name: /Moneybox/ })).toContainText("£1,234.00");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await page.getByLabel(/Gamertag/).fill(original);
+  await page.getByLabel("Create password", { exact: true }).fill(nextPassword); await page.getByLabel("Confirm new account password").fill(nextPassword);
+  await expect(page.getByRole("button", { name: "Create account", exact: true })).toBeDisabled();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await expect(page.getByRole("form", { name: "Sign up", exact: true }).getByRole("alert")).toContainText(/already used|taken/);
+  await captureConfidence(page, "duplicate-name");
+  await expect(page.getByTestId("header-tag")).toHaveCount(0);
+  await page.getByLabel(/Gamertag/).fill(replacement);
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await expect(page.getByTestId("header-tag")).toContainText(replacement); await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByText("Cloud copy is up to date.")).toBeVisible();
+  await captureConfidence(page, "new-account");
+  await page.context().setOffline(true);
+  await expect(page.getByText(/Offline.*no changes waiting/)).toBeVisible();
+  await captureConfidence(page, "offline-clean");
+  await page.context().setOffline(false);
+  const other = await browser.newContext();
+  try {
+    const restored = await other.newPage(); await restored.goto("http://localhost:4321/#login"); await login(restored, original, password);
+    await expect(restored.getByRole("button", { name: /Moneybox/ })).toContainText("£1,234.00");
+  } finally { await other.close(); }
 });

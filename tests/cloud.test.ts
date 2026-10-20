@@ -172,7 +172,7 @@ describe("versioned offline sync", () => {
     api.getSession.mockResolvedValue({ data: null });
     await expect(cloud.syncNow()).rejects.toThrow("Sign in again");
     api.getSession.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    await saveData({ ...data, identity: { ...data.identity!, id: "other" } });
+    await saveData({ ...data, identity: { ...data.identity!, id: "8f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a11" } });
     await expect(cloud.syncNow()).rejects.toThrow("another account");
   });
   it("doesn't upload clean data, disabled sync or a second in-flight operation", async () => {

@@ -159,15 +159,19 @@ export async function savePasswordUnlock(envelope: PasswordWrap, expected: Vault
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean } = {}): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean; signup?: SignupReplacement } = {}): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
-    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
-    password.onsuccess = () => {
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock"), verifier = s.get("verifier");
+    verifier.onsuccess = () => {
       if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!options.allowSignedOut && gate.result?.signedOut) ||
         vault.result?.id !== before.vault?.id) {
         failure = new Error("Device session changed. Unlock Drip again before continuing."); t.abort(); return;
+      }
+      if (options.signup && (gate.result?.signedOut !== true || gate.result?.signupNonce !== options.signup.nonce ||
+        gate.result?.generation !== options.signup.generation || signupRecords({ vault: vault.result, data: data.result, cloud: cloud.result, verifier: verifier.result, passkey: passkey.result, password: password.result }) !== options.signup.records)) {
+        failure = new Error("Your current account changed during signup. Its local copy is kept; sign in and retry."); t.abort(); return;
       }
       if ((options.passkey && JSON.stringify(passkey.result) !== JSON.stringify(before.passkey)) ||
         (options.password && JSON.stringify(password.result) !== JSON.stringify(before.password))) {
@@ -264,7 +268,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
     if (keys.header.id !== before.vault?.id) s.delete("passwordUnlock");
     if (signupPassword) s.put({ vaultId: keys.header.id, envelope: signupPassword }, "passwordUnlock");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
-  }, { allowSignedOut: !!resumeGeneration, records: true });
+  }, { allowSignedOut: !!resumeGeneration, records: true, signup: replacement });
   if (stamp !== epoch) throw new VaultLockedError();
   epoch++; // Pending writes belong to the copy the user just replaced.
   unlocked = { keys, generation };

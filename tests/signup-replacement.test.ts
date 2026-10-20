@@ -4,7 +4,9 @@ const request = vi.hoisted(() => vi.fn());
 vi.mock("../lib/cloud", () => cloud);
 vi.mock("../lib/worker-safety", () => ({ safeFetch: request }));
 import { signUpPassword, passwordUsername } from "../lib/password-login";
-import { cloudSnapshot, completeDeviceSession, emptyData, getItem, loadData, setItem, unlockLocalVault } from "../lib/db";
+import { cloudSnapshot, commitCloudRestore, completeDeviceSession, emptyData, getItem, loadData, reserveSignupReplacement, setItem, unlockLocalVault } from "../lib/db";
+import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
+import { wrapPasswordRoot } from "../lib/password-crypto";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 const identity = { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "original", createdAt: "2026-10-20" };
 const original = { ...emptyData(), identity, lastBackupAt: "original-only-value" };
@@ -66,4 +68,32 @@ it("does not sign out a later tab's session when delayed registration fails", as
 it("retains the original account when replacement was not explicitly requested", async () => {
   await expect(signUpPassword("new_account", password, fresh)).rejects.toThrow(/already has an account/);
   expect(cloud.connect).not.toHaveBeenCalled();
+});
+it.each(["reservation", "vault-header", "verifier", "password-wrapper", "passkey-wrapper"])("keeps the old encrypted account if its %s changes during signup encryption", async changed => {
+  const replacement = await reserveSignupReplacement();
+  const root = generateRecoveryCode();
+  const wrap = await wrapPasswordRoot(root, "new_account", password, "new-owner");
+  const verifier = await codeVerifier(root);
+  const before = await rawStore();
+  const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+  const spy = vi.spyOn(crypto.subtle, "encrypt").mockImplementationOnce(async (...args) => {
+    const cipher = await encrypt(...args);
+    if (changed === "reservation") await completeDeviceSession(replacement.generation, { signedOut: true, remotePending: false, generation: replacement.generation });
+    if (changed === "vault-header") await rawStore({ localVault: { ...before.localVault, changed: true } });
+    if (changed === "verifier") await rawStore({ verifier: { salt: "changed", hash: "changed" } });
+    if (changed === "password-wrapper") await rawStore({ passwordUnlock: { vaultId: before.localVault.id, envelope: { ct: "changed" } } });
+    if (changed === "passkey-wrapper") await rawStore({ passkeyUnlock: { vaultId: before.localVault.id, ct: "changed" } });
+    return cipher;
+  });
+  try {
+    await expect(commitCloudRestore(fresh, { userId: "new-owner", identityId: fresh.identity.id, key: {} as CryptoKey, version: 1, dirty: false, lastSyncAt: null, generation: "new-cloud", revision: 0 }, verifier, replacement.generation, replacement.generation, root, wrap, replacement)).rejects.toThrow(/current account changed/);
+  } finally { spy.mockRestore(); }
+  const after = await rawStore();
+  expect(after.data).toEqual(before.data); expect(after.cloudState).toEqual(before.cloudState);
+  if (changed !== "vault-header") expect(after.localVault).toEqual(before.localVault);
+  if (changed !== "verifier") expect(after.verifier).toEqual(before.verifier);
+  if (changed !== "password-wrapper") expect(after.passwordUnlock).toEqual(before.passwordUnlock);
+  if (changed !== "passkey-wrapper") expect(after.passkeyUnlock).toEqual(before.passkeyUnlock);
+  expect(after.deviceSession.signedOut).toBe(true);
+  await expect(loadData()).rejects.toThrow();
 });
