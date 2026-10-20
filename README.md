@@ -11,7 +11,7 @@ Node 24. `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, then `npm s
 
 Copy `.env.example` to ignored `.env.local`, supply a dedicated environment's database and random auth secret, and set `BETTER_AUTH_URL` to that environment's stable origin. Do not use deployment-specific URLs: storage and passkeys belong to a hostname. Never share Preview database credentials or auth secrets with Production. Run `node --env-file=.env.local scripts/migrate.mjs` against the selected database before starting.
 
-From Settings, enter the saved recovery code and enable encrypted cloud recovery. Add a cloud sign-in passkey. Existing local tracking works without enabling cloud. On a fresh browser/device choose Restore cloud accounts. A passkey authenticates but the recovery code is still needed to decrypt the cloud copy; code-only recovery is also supported. A display gamertag remains a label; the sign-in gamertag registered below is unique and case-insensitive.
+New gamertag/password signup creates encrypted cloud access automatically. Existing local-only accounts can enable it in Settings using their saved recovery code; local tracking still works without enabling cloud. On a fresh browser, sign in with a configured gamertag/password to restore the latest successfully synced copy, or choose Forgot password to recover with a saved code. A cloud sign-in passkey authenticates but still needs a recovery code to decrypt on that browser; it is separate from browser-local Passkey unlock. A display gamertag remains a label; the sign-in gamertag registered below is unique and case-insensitive.
 
 Cloud authentication uses Better Auth and its passkey plugin. A domain-separated digest of the random recovery code supplies an internal synthetic `.invalid` email identifier and another digest supplies an authentication secret. No mail is sent. The root code is never sent to the server. Server-side authentication still handles security metadata such as rate limiting; this is pseudonymous, not a promise of anonymous financial data.
 
@@ -21,12 +21,11 @@ Local changes and their queued-upload marker commit together. Sync runs on chang
 
 ## Gamertag and password sign-in
 
-Drip opens on sign-in. **Create account** and **Forgot password?** open separate
-screens in the same app window; file restore is reached from recovery. Browser
-Back/Forward and reload preserve the selected screen, while leaving a password
-form clears its unsent password. Screen fragments (`#login`, `#signup`, `#recover`,
-`#backup`) also work with the offline app shell. Signed-out devices retain their
-encrypted accounts; **Use another account** keeps replacement confirmation.
+Drip separates **Sign in**, **Sign up** and **Forgot password?** into screens in
+the same app window; file restore is reached from recovery. Leaving a password
+form clears its unsent password. Signed-out devices retain their encrypted
+accounts; opening an auth form is not permission to replace them. **Use another
+account** requires confirmation before replacing this browser's local copy.
 
 Normal sign-in uses a unique, case-insensitive sign-in gamertag and a password (12–256 characters; case, spaces and punctuation preserved). Password managers use standard username/current-password/new-password autocomplete. Signup requires a gamertag and matching password, then opens Accounts directly. It does not show a recovery code or a save-code checkbox. New registration needs a connection; existing encrypted accounts continue to work offline with configured credentials. Existing accounts use a recovery code once in **Settings → Sign-in & password** to add a password. **Forgot password?** opens the separate recovery screen and restores access; the same setup form sets a new password. No real name, email or phone is required.
 
@@ -78,7 +77,7 @@ After signup, optionally open Settings → Six ways back in → confirm your pas
 
 Replacing a set atomically removes its server lookups; this is not key revocation. Previously recovered devices or anyone who retained a decrypted root/wrapper keep access. Codes do not recover unsynced changes. New-device recovery requires network access; encrypted wrappers cached on a trusted device also support offline unlock. Downloads are shown only during that screen visit; save before leaving. Server save success still reveals the codes if local wrapper caching fails. Public recovery lookup and authenticated rotation have durable global/IP rate limits. IP buckets are HMAC-derived; forwarded IPs are trusted only on Vercel.
 
-The old storage/fortnightly backup nags are replaced with local-only, queued or cloud-saved status. File backups, imports and app lock remain under Advanced. Recovery codes are optional setup in Settings, separate from signup and everyday sign-in. Save them before losing a password; without any saved code, password or configured passkey, encrypted data cannot be recovered.
+The old storage/fortnightly backup nags are replaced with local-only, queued or cloud-saved status. File backups, imports and app lock remain under Advanced. Recovery codes are optional setup in Settings, separate from signup and everyday sign-in. Save them before losing a password. A configured passkey unlocks only a browser where its encrypted wrapper is retained; it does not restore a cleared or new browser on its own. Without a usable password, saved recovery code or accessible configured device, there is no administrator reset or decryption service. Codes recover the latest successfully synced copy, not unsynced edits on another device.
 
 Trends plots recorded month-end snapshots, a Today marker, and dashed future estimates. No history is invented. The 3m/6m/1y/Max/Future controls filter the chart. Projection assumptions (monthly top-up and 1/3/5-year horizon) are saved with account data and included in encrypted recovery. The baseline shows today's balance plus planned top-ups, not historical cost basis. An accessible table provides the chart values.
 
@@ -98,4 +97,4 @@ Use **Sign out** beside your gamertag. It locks Drip on this device, pauses clou
 
 Offline/failed cloud revocation stays visibly pending, retries on reconnect, and offers Retry cloud sign-out. Reload and other tabs keep the gate. Unlocking one tab does not give keys to another; each unlocks independently. Private requests and sign-out use the browser's shared Web Lock where available (per-tab queue fallback); generation checks reject stale sign-in/sign-out and restore completion. File/cloud restores commit data, verifier and connection atomically only while the initiating device session remains active. Sign-out does not delete the cloud account or cloud copy.
 
-From the signed-out screen, **Use another account** restores an existing cloud account using its recovery code, after confirmation that this replaces the local accounts. A failed restore keeps the previous copy intact. The new account's ciphertext, verifier, wrapped data key and active device generation commit together; usable keys are activated only in memory after the commit. Cancelling the prompt leaves the device signed out.
+From the signed-out screen, **Use another account** offers gamertag/password sign-in for an existing cloud account; **Forgot password?** there opens recovery with a saved code. Both restore the latest successfully synced copy after confirmation that it replaces this browser's local accounts. Unsynced edits are not transferred: sign back in to the current account and sync or export a backup before replacing it. A failed restore keeps the previous copy intact. The new account's ciphertext, verifier, wrapped data key and active device generation commit together; usable keys are activated only in memory after the commit. Cancelling the prompt leaves the device signed out. Sign-out retains local data; confirmed account replacement is a different action.

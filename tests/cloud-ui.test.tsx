@@ -115,7 +115,8 @@ describe("cloud recovery settings", () => {
   });
   it("keeps local recovery available when the backend status cannot be fetched", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
-    await panel(); expect(screen.getByText(/Cloud is unavailable here/)).toBeInTheDocument();
+    await panel(); expect(await screen.findByText(/Could not check cloud availability/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry cloud status" })).toBeEnabled();
   });
   it("reports local storage failures during connection refresh and can recover on the next event", async () => {
     cloud.readCloudState.mockRejectedValue(new Error("Could not read local storage"));

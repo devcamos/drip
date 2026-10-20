@@ -1,7 +1,7 @@
 import { checkCode, codeVerifier, generateRecoveryCode } from "./crypto";
 import { authClient, cloudKey, connect, readCloudState, recoveryCredentials, seal, syncNow, vault, writeCloudState } from "./cloud";
-import { claimEmptyPasswordDevice, commitCloudRestore, getItem, passwordUnlockContext, savePasswordUnlock, type VaultBinding } from "./db";
-import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, unlockDevice, type DeviceSession } from "./device-session";
+import { claimEmptyPasswordDevice, commitCloudRestore, completeDeviceSession, getItem, isAppData, passwordUnlockContext, reserveSignupReplacement, savePasswordUnlock, type SignupReplacement, type VaultBinding } from "./db";
+import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, signOutDevice, unlockDevice, type DeviceSession } from "./device-session";
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
 import { safeFetch } from "./worker-safety";
@@ -17,22 +17,45 @@ async function call(path: string, body: unknown, headers?: Record<string, string
 export async function passwordUsername() { return (await passwordUnlockContext()).envelope?.username; }
 
 /** Register cloud/password access before atomically installing a new local vault. */
-export async function signUpPassword(username: string, password: string, data: AppData) {
+export async function signUpPassword(username: string, password: string, data: AppData, replaceExisting = false) {
   const name = loginTag(username); const error = passwordError(password);
   if (!validLoginTag(name) || !data.identity) throw new Error("Use 3–16 letters, numbers or underscores for your gamertag.");
   if (error) throw new Error(error);
-  const before = await readDeviceSession();
-  if (before?.signedOut || (await passwordUnlockContext()).binding || await getItem("verifier")) throw new Error("This browser already has an account. Sign in instead.");
+  if (!isAppData(data) || (replaceExisting && (data.accounts.length > 0 || data.snapshots.length > 0))) throw new Error("A new account must start empty. Your current local account is kept.");
   if (!navigator.onLine) throw new Error("Connect to the internet to create your account.");
+  let before = await readDeviceSession();
+  let replacement: SignupReplacement | undefined;
+  const existing = (await passwordUnlockContext()).binding || await getItem("verifier");
+  if (replaceExisting && existing) {
+    if (!before?.signedOut) await signOutDevice();
+    await finishDeviceSignOut();
+    replacement = await reserveSignupReplacement();
+    before = await readDeviceSession();
+  } else if (before?.signedOut || existing) throw new Error("This browser already has an account. Sign in instead.");
   const root = generateRecoveryCode();
-  const { user, key } = await connect(root, data, true);
-  const remote = await vault("GET", undefined, user.id);
+  try {
+  const { user, key } = await connect(root, data, true, replacement?.generation, undefined, replacement?.nonce);
+  const remote = await vault("GET", undefined, user.id, replacement?.generation, replacement?.nonce);
   if (remote.version !== 0 || remote.envelope) throw new Error("Account setup changed. Try again.");
-  const saved = await vault("PUT", { version: 0, envelope: await seal(data, key) }, user.id);
+  const saved = await vault("PUT", { version: 0, envelope: await seal(data, key) }, user.id, replacement?.generation, replacement?.nonce);
   const envelope = await wrapPasswordRoot(root, name, password, user.id);
   const recovery = await recoveryCredentials(root);
-  await call("gamertag-password", { username: name, proof: await passwordProof(name, password), recoveryProof: recovery.password, envelope }, { "X-Drip-Owner": user.id });
-  await commitCloudRestore(data, { userId: user.id, identityId: data.identity.id, key, version: saved.version, dirty: false, lastSyncAt: saved.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(root), before?.generation, undefined, root, envelope);
+  await call("gamertag-password", { username: name, proof: await passwordProof(name, password), recoveryProof: recovery.password, envelope }, { "X-Drip-Owner": user.id, ...(replacement ? { "X-Drip-Resume": replacement.generation, "X-Drip-Signup": replacement.nonce } : {}) });
+  await commitCloudRestore(data, { userId: user.id, identityId: data.identity.id, key, version: saved.version, dirty: false, lastSyncAt: saved.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(root), before?.generation, replacement?.generation, root, envelope, replacement);
+  } catch (error) {
+    if (replacement) {
+      // Revoke only while this exact signup still owns the device generation.
+      // A later tab's sign-in must never be signed out by delayed cleanup.
+      const current = await readDeviceSession();
+      if (current?.signedOut && current.generation === replacement.generation) {
+        let remotePending = true;
+        try { const result = await authClient.signOut({ fetchOptions: { headers: { "X-Drip-Signout": replacement.generation } } }); remotePending = !!result.error; } catch { /* Retry on return; local ciphertext remains intact. */ }
+        await completeDeviceSession(replacement.generation, { signedOut: true, remotePending, generation: replacement.generation });
+      }
+    }
+    throw error;
+  }
+  notifyDeviceSession();
 }
 
 /** Password confirmation can create recovery codes without an earlier code. */

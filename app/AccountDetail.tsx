@@ -68,8 +68,11 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
       <ul className="list" data-testid="income-history">{[...groups].map(([period, total]) => <li key={period}><span>{by === "week" ? `Week of ${fmtDate(period)}` : new Date(period + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</span><b className="ok">+{M.gbp(total)}</b></li>)}</ul>
       <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" disabled={busy} aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={async () => {
         if (!confirm("Remove this recorded payment? Your balance will stay unchanged.")) return;
-        setBusy(true);
-        try { await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) })); }
+        setBusy(true); setMessage("");
+        try {
+          const saved = await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) }));
+          setMessage(saved === false ? "Payment removal could not be saved. Keep Drip open and retry." : "Payment removed. Your balance is unchanged.");
+        }
         catch { setMessage("Payment removal could not be saved. Keep Drip open and retry."); }
         finally { setBusy(false); }
       }}>Remove</button></span></li>)}</ul></details>

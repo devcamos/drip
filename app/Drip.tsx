@@ -17,7 +17,7 @@ import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
-import { passwordError } from "@/lib/password-crypto";
+import { SignupForm } from "./SignupForm";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
@@ -149,7 +149,7 @@ function UnlockedDrip() {
     setVerifier(savedVerifier); setView({ name: "home" }); replaceData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
-    <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
+    <p className="muted">Choose a display gamertag for your existing accounts. This label does not create password sign-in. You can add a sign-in gamertag and password later in Settings → Sign-in &amp; password.</p>
     <div className="panel"><HandlePicker onPick={async (identity) => {
       if (!identity) return;
       const d = { ...data, identity };
@@ -238,7 +238,6 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (
 
 function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string, password?: string) => void | Promise<void> }>) {
   const [draft, setDraft] = useState<{ handle: string } | null>(null);
-  const [identity, setIdentity] = useState<I.Identity | null>(null);
   const [draftAttempt, setDraftAttempt] = useState(0);
   useEffect(() => {
     let active = true;
@@ -248,11 +247,10 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     })().catch(() => { if (active) setError("Could not prepare signup on this device. Try again."); });
     return () => { active = false; };
   }, [draftAttempt]);
-  const [password, setPassword] = useState(""); const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const { screen: route, navigate } = useAuthScreen();
   const screen = route === "other" || route === "other-recover" ? "login" : route;
-  useEffect(() => { setPassword(""); setConfirmation(""); setError(""); }, [screen]);
+  useEffect(() => { setError(""); }, [screen]);
   if (!draft) return <main>{error ? <><p role="alert">{error}</p><button className="btn" onClick={() => { setError(""); setDraftAttempt(n => n + 1); }}>Try again</button></> : <p className="muted">Loading…</p>}</main>;
   const screenCopy = {
     login: { title: "Welcome back", description: "Sign in to your Drip account." },
@@ -260,14 +258,6 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     recover: { title: "Recover your account", description: "Get back to your accounts using a saved recovery code." },
     backup: { title: "Restore a backup", description: "Get back to your accounts using a saved recovery code." },
   }[screen];
-  async function createAccount(event: React.SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!identity || password !== confirmation || passwordError(password)) return;
-    setBusy(true); setError("");
-    try { await onDone(undefined, undefined, identity, false, undefined, undefined, password); setPassword(""); setConfirmation(""); }
-    catch (error) { setError((error as Error).message || "Could not create your account. Try again."); }
-    finally { setBusy(false); }
-  }
   return (
     <AuthLayout title={screenCopy.title} description={screenCopy.description}>
       <PwaStatus />
@@ -278,26 +268,15 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
         await onDone(v, restored, undefined, true);
       }} />
       <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("recover")}>Forgot password?</button></div>
-      <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Create account</button></div>
+      <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Sign up</button></div>
       </>}
       {screen === "recover" && <>
         <CloudReturn onRestored={async (d, c) => onDone(await C.codeVerifier(c), d, undefined, true)} />
         <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("backup")}>Restore a backup</button></div>
       </>}
       {screen === "signup" && (
-        <form className="panel auth-signup" onSubmit={createAccount}>
-          <h2>Your gamertag</h2>
-          <HandlePicker onPick={setIdentity} initial={draft.handle} onRaw={(h) => saveDraft({ handle: h })} />
-          <label htmlFor="new-account-password">Create password</label>
-          <input id="new-account-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} value={password} onChange={event => setPassword(event.target.value)} />
-          <label htmlFor="new-account-confirm">Confirm new account password</label>
-          <input id="new-account-confirm" type="password" autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />
-          <p className="muted">Use at least 12 characters. You can save it in your password manager.</p>
-          <div className="row-gap">
-            <button type="submit" className="btn" disabled={busy || !identity || !!passwordError(password) || password !== confirmation}>{busy ? "Creating account…" : "Create account"}</button>
-          </div>
-          {error && <p role="alert" className="err">{error}</p>}
-        </form>
+        <SignupForm initialHandle={draft.handle} onHandleChange={h => { void saveDraft({ handle: h }); }} onBusyChange={setBusy}
+          onCreate={async (identity, password) => { await onDone(undefined, undefined, identity, false, undefined, undefined, password); }} />
       )}
       {screen === "backup" && (
         <div className="panel">

@@ -54,8 +54,8 @@ export async function writeCloudState(state: CloudState | undefined, expected?: 
   if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
 }
 
-export async function vault(method = "GET", body?: unknown, ownerId?: string, resumeGeneration?: string) {
-  const response = await safeFetch("/api/cloud", { method, credentials: "same-origin", cache: "no-store", headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(ownerId ? { "X-Drip-Owner": ownerId } : {}), ...(resumeGeneration ? { "X-Drip-Resume": resumeGeneration } : {}) }, body: body ? JSON.stringify(body) : undefined });
+export async function vault(method = "GET", body?: unknown, ownerId?: string, resumeGeneration?: string, signupNonce?: string) {
+  const response = await safeFetch("/api/cloud", { method, credentials: "same-origin", cache: "no-store", headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(ownerId ? { "X-Drip-Owner": ownerId } : {}), ...(resumeGeneration ? { "X-Drip-Resume": resumeGeneration } : {}), ...(signupNonce ? { "X-Drip-Signup": signupNonce } : {}) }, body: body ? JSON.stringify(body) : undefined });
   if (!response.ok) {
     const messages: Record<number, string> = {
       409: "Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.",
@@ -65,14 +65,15 @@ export async function vault(method = "GET", body?: unknown, ownerId?: string, re
   }
   return response.json() as Promise<{ version: number; envelope: Envelope | null; updated_at?: string }>;
 }
-export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string, reconnectGeneration?: string) {
+export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string, reconnectGeneration?: string, signupNonce?: string) {
   const credentials = await recoveryCredentials(code);
   let headers: Record<string, string> | undefined;
   if (resumeGeneration) headers = { "X-Drip-Resume": resumeGeneration };
   else if (reconnectGeneration) headers = { "X-Drip-Reconnect": reconnectGeneration };
+  if (signupNonce) headers = { ...headers, "X-Drip-Signup": signupNonce };
   let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email({ ...credentials, ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
   if ((result.error as { status?: number } | null)?.status === 429) throw new Error("Too many sign-in attempts. Wait a few seconds, then try again.");
-  if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user" });
+  if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user", ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
   if (result.error || !result.data?.user) throw new Error("Could not sign in. Check your recovery code and connection.");
   return { user: result.data.user, key: await cloudKey(code) };
 }
@@ -118,7 +119,11 @@ export async function syncNow(): Promise<string> {
     // no financial edits are queued. This leaves this device's labels intact.
     const previous = remote.envelope ? await decode(remote.envelope, state.key) : undefined;
     const needsCleanup = previous && JSON.stringify(cloudPayload(previous)) !== JSON.stringify(previous);
-    if (!state.dirty && !needsCleanup) return "Cloud copy is up to date.";
+    if (!state.dirty && !needsCleanup) {
+      const latest = await cloudSnapshot();
+      if (latest.signedOut || latest.state?.generation !== state.generation || latest.state.vaultId !== state.vaultId) return "Cloud connection changed during sync. Check its status before continuing.";
+      return latest.state.revision === state.revision && !latest.state.dirty ? "Cloud copy is up to date." : "Saved on this device. Changes are waiting to sync.";
+    }
     const envelope = await seal(data, state.key);
     const current = await cloudSnapshot();
     if (current.signedOut) return "Signed out. Cloud sync is paused.";

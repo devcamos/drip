@@ -41,6 +41,8 @@ output { display:block; margin:1em 0; }
 .auth-footer { border-top:1px solid var(--border); margin-top:24px; padding-top:16px; text-align:center; }
 .auth-footer p { color:var(--muted); font-size:14px; }
 .auth-footer .btn { width:100%; }
+.signup-consent { display:flex; gap:10px; align-items:flex-start; line-height:1.5; }
+.signup-consent input { width:18px; min-width:18px; margin-top:2px; }
 button:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
 label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
 input, select { width:100%; min-width:0; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; }

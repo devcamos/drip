@@ -56,7 +56,7 @@ describe("onboarding", () => {
   });
   it("keeps registration failures on signup and opens Accounts only after a successful retry", async () => {
     signup.mockRejectedValueOnce(new Error("That gamertag is already used for sign-in. Choose another."));
-    render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     type(screen.getByLabelText(/Gamertag/), "devo");
     type(screen.getByLabelText("Create password"), signupPassword);
     type(screen.getByLabelText("Confirm new account password"), signupPassword);
@@ -69,7 +69,7 @@ describe("onboarding", () => {
   });
   it("needs a valid gamertag and matching password, then opens Accounts without recovery", async () => {
     render(<Drip />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     const handle = await screen.findByLabelText(/Gamertag/);
     const start = screen.getByRole("button", { name: "Create account" });
     expect(screen.queryByTestId("code")).toBeNull();
@@ -485,7 +485,7 @@ describe("app lock", () => {
 describe("onboarding draft persistence", () => {
   it("keeps the unsent gamertag in memory but clears passwords after leaving and coming back", async () => {
     const first = render(<Drip />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     await screen.findByLabelText(/Gamertag/);
     type(screen.getByLabelText(/Gamertag/), "devo");
     await waitFor(async () => expect((await (await import("@/lib/draft")).loadDraft())?.handle).toBe("devo"));
