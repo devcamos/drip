@@ -8,7 +8,7 @@ const password = "Green meadow 42!";
 const nextPassword = "Blue waterfall 73!";
 const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
 async function captureConfidence(page: Page, state: string) {
-  if (!process.env.DRIP_UI_CAPTURE) return;
+  if (!process.env.DRIP_CONFIDENCE_CAPTURE) return;
   await mkdir("docs/screenshots/signup-and-sync-confidence", { recursive: true });
   const mask = [];
   for (const input of await page.locator('input[type="password"]').all()) if (await input.inputValue()) mask.push(input);
@@ -162,7 +162,9 @@ test("signed-out signup preserves a recoverable old account through cancellation
   await page.getByLabel(/Gamertag/).fill(replacement);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
   await expect(page.getByTestId("header-tag")).toContainText(replacement); await expect(page.getByText("No accounts yet")).toBeVisible();
-  await expect(page.getByText("Cloud copy is up to date.")).toBeVisible();
+  // Multiple real synthetic users share this test host's auth limiter. Allow
+  // the normal automatic retry without weakening or bypassing that limiter.
+  await expect(page.getByText("Cloud copy is up to date.")).toBeVisible({ timeout: 75_000 });
   await captureConfidence(page, "new-account");
   await page.context().setOffline(true);
   await expect(page.getByText(/Offline.*no changes waiting/)).toBeVisible();

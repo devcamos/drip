@@ -110,6 +110,8 @@ export async function syncNow(): Promise<string> {
     if (signedOut) return "Signed out. Cloud sync is paused.";
     if (!state) return "Cloud recovery is off.";
     const session = await authClient.getSession();
+    if (session.error?.status === 429) throw new Error("Cloud sync is temporarily rate limited. Drip will retry automatically; your local data is safe.");
+    if (session.error) throw new Error("Could not check cloud sign-in. Drip will retry automatically; your local data is safe.");
     if (session.data?.user.id !== state.userId) throw new Error("Sign in again to sync. Your local data is safe.");
     const data = migrateData(snapshot, new Date().toISOString().slice(0, 10));
     if (data.identity?.id !== state.identityId) throw new Error("This local backup belongs to another account. Disconnect cloud recovery first.");

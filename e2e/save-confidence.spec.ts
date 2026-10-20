@@ -17,7 +17,7 @@ async function failNextDataWrite(page: Page) {
   });
 }
 async function capture(page: Page, state: string, region: string) {
-  if (!process.env.DRIP_UI_CAPTURE) return;
+  if (!process.env.DRIP_CONFIDENCE_CAPTURE) return;
   await mkdir("docs/screenshots/signup-and-sync-confidence", { recursive: true });
   for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
     await page.setViewportSize({ width, height: 900 });

@@ -2,7 +2,7 @@ import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
-import { withAuthRetry } from "./auth-helpers";
+import { enableCloudRecovery, withAuthRetry } from "./auth-helpers";
 
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
   const code = await legacyAccount(page, handle);
@@ -36,7 +36,7 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
   const code = await setup(page, "recoverytest", "PRIVATE_LOCAL_NICKNAME");
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
 
   const second = await browser.newContext(); const returning = await second.newPage();
   try {
@@ -88,7 +88,7 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   const code = await setup(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
   await page.getByText("Device sign-in options").click();
   await withAuthRetry(page, () => page.getByRole("button", { name: "Add cloud sign-in passkey" }).click(), page.getByText(/Cloud sign-in passkey saved/));
   await context.clearCookies();
@@ -113,7 +113,7 @@ test("downloaded set of six codes independently restores the same cloud account"
   const original = await setup(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(original);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
   page.on("dialog", dialog => dialog.accept());
   await page.getByLabel("Your current recovery code").fill(original);
   await page.getByRole("button", { name: "Create six recovery codes" }).click();
@@ -203,7 +203,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   const code = await setup(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
   await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
   await page.getByRole("button", { name: /Zopa/ }).click();
   await context.setOffline(true);
@@ -245,7 +245,7 @@ test("an online cloud authentication outage does not block local unlock or queue
   const code = await setup(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
@@ -287,7 +287,7 @@ test("signed-out users can restore rampage201 instead of reopening the current p
     const originalPage = await original.newPage(); recovery = await setup(originalPage, "rampage201");
     await originalPage.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
     await originalPage.getByLabel("Your saved recovery code").fill(recovery);
-    await withAuthRetry(originalPage, () => originalPage.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), originalPage.getByText("Encrypted cloud copy saved.").first());
+    await enableCloudRecovery(originalPage);
   } finally { await original.close(); }
   await setup(page, "newprofile");
   page.on("dialog", dialog => dialog.accept());

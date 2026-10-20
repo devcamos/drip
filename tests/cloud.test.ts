@@ -175,6 +175,14 @@ describe("versioned offline sync", () => {
     await saveData({ ...data, identity: { ...data.identity!, id: "8f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a11" } });
     await expect(cloud.syncNow()).rejects.toThrow("another account");
   });
+  it.each([429, 503])("keeps queued data and reports a temporary session-check failure (%s) without asking for another login", async status => {
+    await configured(); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    api.getSession.mockResolvedValue({ data: null, error: { status } });
+    await expect(cloud.syncNow()).rejects.toThrow(status === 429 ? "temporarily rate limited" : "Could not check cloud sign-in");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await cloud.readCloudState())?.dirty).toBe(true);
+    expect(await loadData()).toEqual(data);
+  });
   it("doesn't upload clean data, disabled sync or a second in-flight operation", async () => {
     expect(await cloud.syncNow()).toContain("off");
     await configured(false); vi.stubGlobal("fetch", vi.fn(async () => response({ version: 1 })));
