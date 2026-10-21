@@ -33,6 +33,13 @@ describe("six alternative recovery codes", () => {
     vi.mocked(fetch).mockResolvedValue(Response.json({ envelope: { ...envelope, ct: "AAAA" } }));
     await expect(resolveRecoveryCode(code)).rejects.toThrow(/Wrong recovery/);
   });
+  it("replaces cached records that share a locator and keeps the rest, newest last", async () => {
+    await setItem("recoveryRecords", [{ locator: "a", envelope: { v: 1 } }, { locator: "b", envelope: { v: 1 } }]);
+    vi.mocked(fetch).mockResolvedValue(Response.json({ saved: true }));
+    const fresh = [{ locator: "b", envelope: { v: 2 } }, { locator: "c", envelope: { v: 2 } }] as never;
+    expect(await registerRecoveryCodes(fresh, "owner")).toBe(true);
+    expect(await getItem("recoveryRecords")).toEqual([{ locator: "a", envelope: { v: 1 } }, { locator: "b", envelope: { v: 2 } }, { locator: "c", envelope: { v: 2 } }]);
+  });
   it("only caches sets confirmed by the server and keeps old codes if registration fails", async () => {
     const records = [{ locator: "old", envelope: {} }];
     await setItem("recoveryRecords", records);

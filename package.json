@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.10",
+    "@google/genai": "2.30.0",
     "@neondatabase/serverless": "1.2.0",
     "better-auth": "1.7.10",
     "https-proxy-agent": "9.1.0",
