@@ -1,6 +1,25 @@
 import { expect, it, vi } from "vitest";
 import { requireSafeWorker, safeFetch } from "../lib/worker-safety";
 
+it("shares a stable browser id across concurrent tabs and rechecks sign-out after identifying the browser", async () => {
+  const db = await import("../lib/db");
+  const ids = await Promise.all(Array.from({ length: 5 }, () => db.browserDeviceId()));
+  expect(new Set(ids).size).toBe(1);
+  await db.setItem("deviceSession", { signedOut: true, generation: "out" });
+  expect(await db.browserDeviceId()).toBe(ids[0]);
+  const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);
+  await safeFetch("/api/auth/sign-in/gamertag-key", { method: "POST", headers: { "X-Drip-Resume": "out" } });
+  expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("X-Drip-Device")).toBe(ids[0]);
+  let release!: (id: string) => void;
+  vi.spyOn(db, "browserDeviceId").mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const result = safeFetch("/api/auth/sign-in/gamertag-key", { method: "POST", headers: { "X-Drip-Resume": "out" } }).catch(error => error);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  await db.setItem("deviceSession", { signedOut: true, generation: "later-sign-out" });
+  release(ids[0]);
+  expect(await result).toEqual(expect.objectContaining({ message: expect.stringMatching(/session changed/) }));
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
 it("permits only the reserved signup paths while retaining the signed-out gate", async () => {
   const { setItem } = await import("../lib/db");
   const fetcher = vi.fn(async () => Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);

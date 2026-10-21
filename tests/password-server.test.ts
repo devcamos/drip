@@ -22,7 +22,7 @@ const endpoints = passwordLogin(db as any).endpoints as any;
 beforeEach(() => { vi.clearAllMocks(); client.query.mockImplementation((...args) => db.query(...args)); db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.includes("WITH saved") ? [{ user_id: "owner" }] : [] })); });
 it("uses Better Auth password verification and cookie sessions before returning an encrypted wrapper", async () => {
   const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
-  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ id: "new-session", user_id: "owner", password_hash: "hashed", envelope }] }));
   const ctx = context({ username: "tester", proof });
   expect(await endpoints.signInGamertag(ctx)).toEqual({ owner: "owner", envelope });
   expect(ctx.context.password.verify).toHaveBeenCalledWith({ hash: "hashed", password: proof });
@@ -36,6 +36,47 @@ it("returns the same failure for unknown users and wrong passwords, with dummy h
   db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ user_id: "owner", password_hash: "hashed" }] }));
   const wrong = context({ username: "tester", proof }); wrong.context.password.verify.mockResolvedValue(false);
   await expect(endpoints.signInGamertag(wrong)).rejects.toThrow(/Gamertag or password is incorrect/); expect(cookie).not.toHaveBeenCalled();
+});
+it("preflights an encrypted key without creating a session or publishing a cookie", async () => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
+  const ctx = context({ username: "tester", proof });
+  expect(await endpoints.gamertagKey(ctx)).toEqual({ owner: "owner", envelope });
+  expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled(); expect(cookie).not.toHaveBeenCalled();
+  expect(client.query).toHaveBeenCalledWith(expect.stringContaining("AND password_hash = $3"), ["owner", "tester", "hashed"]);
+});
+it.each(["expectedOwner", "expectedEnvelope"])("rejects a changed %s before creating or admitting a candidate", async field => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
+  const ctx = context({ username: "tester", proof, [field]: "another-value" });
+  await expect(endpoints.signInGamertag(ctx)).rejects.toMatchObject({ statusCode: 409 });
+  expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled(); expect(cookie).not.toHaveBeenCalled();
+});
+it("rejects a preflight whose password is reset during verification, without creating a session", async () => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
+  let credential = "old-hash";
+  db.query.mockImplementation(async (sql: string, params: unknown[] = []) => {
+    if (sql.includes("drip_recovery_limits")) return { rows: [{ key: "login:global", hits: 1 }] };
+    if (sql.startsWith("SELECT user_id, password_hash")) return { rows: [{ user_id: "owner", password_hash: credential, envelope }] };
+    if (sql.includes("WITH saved")) { credential = String(params[2]); return { rows: [{ user_id: "owner" }] }; }
+    if (sql.startsWith("SELECT user_id FROM drip_password_login")) return { rows: credential === params[2] ? [{ user_id: "owner" }] : [] };
+    return { rows: [] };
+  });
+  const paused = deferred(), resume = deferred();
+  const ctx = context({ username: "tester", proof });
+  ctx.context.password.verify.mockImplementation(async () => { paused.resolve(); await resume.promise; return true; });
+  const pending = endpoints.gamertagKey(ctx); await paused.promise;
+  await endpoints.setGamertagPassword(context({ username: "tester", proof: "z".repeat(43), recoveryProof, envelope }));
+  resume.resolve(); await expect(pending).rejects.toThrow(/Gamertag or password is incorrect/);
+  expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled(); expect(cookie).not.toHaveBeenCalled();
+});
+it("commits deletion of a third-device password candidate before returning the device-limit error", async () => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.startsWith('SELECT id, "dripDeviceId"') ? [{ id: "one" }, { id: "two" }, { id: "new-session" }] : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
+  const ctx = context({ username: "tester", proof });
+  await expect(endpoints.signInGamertag(ctx)).rejects.toMatchObject({ statusCode: 409, body: { code: "DEVICE_LIMIT_REACHED" } });
+  expect(client.query).toHaveBeenCalledWith('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', ["new-session", "owner"]);
+  expect(client.query.mock.calls.at(-1)).toEqual(["COMMIT"]); expect(cookie).not.toHaveBeenCalled();
 });
 it("requires proof of the recovery credential and owner before creating or resetting password login", async () => {
   const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
@@ -77,6 +118,7 @@ it.each(["verification", "session creation"])("rejects an old-password login whe
       return { rows: [{ user_id: "owner" }] };
     }
     if (sql.includes("JOIN \"session\"")) return { rows: credential === params[2] && sessions.has(String(params[3])) ? [{ user_id: "owner" }] : [] };
+    if (sql.startsWith('SELECT id, "dripDeviceId"')) return { rows: [...sessions].map(id => ({ id })) };
     if (sql.startsWith('DELETE FROM "session"')) sessions.delete(String(params[0]));
     return { rows: [] };
   });

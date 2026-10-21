@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey, checkCode } from "./crypto";
-import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection } from "./db";
+import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection, type RetainedAccount } from "./db";
 import type { AppData, CloudState } from "./types";
 export type { CloudState } from "./types";
 import { migrateData } from "./maths";
@@ -78,7 +78,7 @@ export async function connect(code: string, data: AppData, create = false, resum
   return { user: result.data.user, key: await cloudKey(code) };
 }
 
-export async function restoreCloud(code: string, userId?: string, resumeGeneration?: string) {
+export async function restoreCloud(code: string, userId?: string, resumeGeneration?: string, retained?: RetainedAccount) {
   const device = await getItem<{ signedOut: boolean; generation: string }>("deviceSession");
   if (device?.signedOut && device.generation !== resumeGeneration) throw new Error("Sign in before restoring accounts.");
   const credentials = await recoveryCredentials(code);
@@ -96,7 +96,7 @@ export async function restoreCloud(code: string, userId?: string, resumeGenerati
     const labels = new Map(local.data.accounts.map(a => [a.id, a.label]));
     data = { ...data, accounts: data.accounts.map(a => ({ ...a, label: labels.get(a.id) ?? "" })) };
   }
-  await commitCloudRestore(data, { userId: account.user.id, identityId: data.identity!.id, key: account.key, version: remote.version, dirty: false, lastSyncAt: remote.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(code), device?.generation, resumeGeneration, code);
+  await commitCloudRestore(data, { userId: account.user.id, identityId: data.identity!.id, key: account.key, version: remote.version, dirty: false, lastSyncAt: remote.updated_at ?? new Date().toISOString(), generation: crypto.randomUUID(), revision: 0 }, await codeVerifier(code), device?.generation, resumeGeneration, code, undefined, undefined, retained);
   if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-cloud-changed"));
   return data;
 }

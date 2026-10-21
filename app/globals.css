@@ -45,6 +45,7 @@ output { display:block; margin:1em 0; }
 .btn.danger { background: var(--bad); color:var(--on-accent); }
 .btn:disabled { opacity:.5; }
 .password-form > button[type="submit"] { margin-top:16px; }
+.account-switch { border-top:1px solid var(--border); margin-top:20px; padding-top:4px; font-size:14px; line-height:1.5; }
 .auth-page { padding-top:clamp(24px, 7vh, 72px); }
 .auth-brand { display:flex; align-items:center; gap:10px; font-size:24px; font-weight:800; margin-bottom:28px; }
 .auth-brand img { border-radius:12px; }

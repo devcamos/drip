@@ -6,6 +6,7 @@ vi.mock("../lib/password-login", () => actions);
 import { PasswordSignIn } from "../app/PasswordSignIn";
 import { PasswordSetup } from "../app/PasswordSetup";
 import { emptyData } from "../lib/db";
+import { AccountSwitchRequired } from "../lib/account-switch";
 beforeEach(() => { vi.clearAllMocks(); actions.passwordUsername.mockResolvedValue("tester"); actions.signInPassword.mockResolvedValue(undefined); actions.setLoginPassword.mockResolvedValue("tester"); });
 it("offers ordinary password-manager-compatible sign-in and keeps failed credentials for retry", async () => {
   actions.signInPassword.mockRejectedValueOnce(new Error("Gamertag or password is incorrect."));
@@ -23,6 +24,38 @@ it("requires confirmation before replacing another account", async () => {
   await waitFor(() => expect(screen.getByLabelText("Sign-in gamertag")).toHaveValue("tester"));
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Some password 123!" } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in with password" })); expect(actions.signInPassword).not.toHaveBeenCalled();
+});
+it("offers an inline account switch after verification and cancellation makes no second sign-in", async () => {
+  const retained = { vaultId: "saved-vault", generation: "saved-generation", records: "sealed-records" };
+  actions.signInPassword.mockRejectedValueOnce(new AccountSwitchRequired(retained, true));
+  render(<PasswordSignIn onSignedIn={vi.fn()} />);
+  await waitFor(() => expect(screen.getByLabelText("Sign-in gamertag")).toHaveValue("tester"));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Some password 123!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in with password" }));
+  expect(await screen.findByRole("region", { name: "Switch saved account" })).toHaveTextContent("has synced");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel account switch" }));
+  expect(actions.signInPassword).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("region", { name: "Switch saved account" })).toBeNull();
+  expect(screen.getByLabelText("Password")).toHaveValue("");
+  actions.signInPassword.mockRejectedValueOnce(new AccountSwitchRequired(retained, true));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Some password 123!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in with password" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Switch account on this browser" }));
+  await waitFor(() => expect(actions.signInPassword).toHaveBeenLastCalledWith("tester", "Some password 123!", true, retained));
+});
+it("keeps unsynced account protection separate from the two-device error", async () => {
+  actions.signInPassword.mockRejectedValueOnce(new AccountSwitchRequired({ vaultId: "saved", records: "sealed" }, false));
+  render(<PasswordSignIn onSignedIn={vi.fn()} />);
+  await waitFor(() => expect(screen.getByLabelText("Sign-in gamertag")).toHaveValue("tester"));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Some password 123!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in with password" }));
+  expect(await screen.findByText(/aren.t synced/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Switch account on this browser" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Sign-in gamertag"), { target: { value: "original" } });
+  expect(screen.queryByRole("region", { name: "Switch saved account" })).toBeNull();
+  actions.signInPassword.mockRejectedValueOnce(new Error("Two devices are already signed in. Sign out on one, then try again."));
+  fireEvent.click(screen.getByRole("button", { name: "Sign in with password" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Two devices");
 });
 it("sets and resets passwords only after recovery-code verification, clearing secrets on success", async () => {
   render(<PasswordSetup data={emptyData()} />);

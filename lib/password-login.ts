@@ -1,6 +1,7 @@
 import { checkCode, codeVerifier, generateRecoveryCode } from "./crypto";
 import { authClient, cloudKey, connect, readCloudState, recoveryCredentials, seal, syncNow, vault, writeCloudState } from "./cloud";
-import { claimEmptyPasswordDevice, commitCloudRestore, completeDeviceSession, getItem, isAppData, passwordUnlockContext, reserveSignupReplacement, savePasswordUnlock, type SignupReplacement, type VaultBinding } from "./db";
+import { claimEmptyPasswordDevice, commitCloudRestore, completeDeviceSession, getItem, isAppData, passwordUnlockContext, reserveSignupReplacement, savePasswordUnlock, type RetainedAccount, type SignupReplacement, type VaultBinding } from "./db";
+import { AccountSwitchRequired } from "./account-switch";
 import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, signOutDevice, unlockDevice, type DeviceSession } from "./device-session";
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -106,7 +107,7 @@ export async function setLoginPassword(code: string, username: string, password:
 }
 
 type LocalPassword = Awaited<ReturnType<typeof passwordUnlockContext>>;
-async function signInEnvelope(name: string, password: string, before: DeviceSession | undefined, local: LocalPassword): Promise<PasswordWrap> {
+async function signInEnvelope(name: string, password: string, before: DeviceSession | undefined, local: LocalPassword, inspected?: PasswordWrap): Promise<PasswordWrap> {
   if (!navigator.onLine) {
     if (local.envelope?.username !== name) throw new Error("Connect to the internet to sign in on this browser for the first time.");
     return local.envelope;
@@ -115,31 +116,59 @@ async function signInEnvelope(name: string, password: string, before: DeviceSess
   let headers: Record<string, string> | undefined;
   if (before?.signedOut) headers = { "X-Drip-Resume": before.generation };
   else if (before?.generation) headers = { "X-Drip-Reconnect": before.generation };
-  const remote = await call("sign-in/gamertag", { username: name, proof: await passwordProof(name, password) }, headers);
+  const remote = await call(inspected ? "sign-in/gamertag" : "sign-in/gamertag-key", { username: name, proof: await passwordProof(name, password), ...(inspected ? { expectedOwner: inspected.owner, expectedEnvelope: inspected.ct } : {}) }, headers);
   if (!validPasswordWrap(remote.envelope) || remote.owner !== remote.envelope.owner) throw new Error("Invalid encrypted sign-in response.");
   return remote.envelope;
 }
-async function openPasswordAccount(root: string, envelope: PasswordWrap, local: LocalPassword, before: DeviceSession | undefined, replaceExisting: boolean) {
-  if (local.binding && !replaceExisting) {
+async function openPasswordAccount(root: string, envelope: PasswordWrap, local: LocalPassword, before: DeviceSession | undefined, switching: boolean) {
+  if (local.binding && !switching) {
     const verifier = await getItem<{ salt: string; hash: string }>("verifier");
-    if (!verifier || !(await checkCode(root, verifier))) throw new Error("This browser keeps a different account. Choose Use another account to restore this sign-in.");
+    if (!verifier || !(await checkCode(root, verifier))) throw new Error("Sign-in changed. Your saved accounts are kept; try again.");
     await unlockDevice(root, local.binding);
   } else {
     if (local.binding && !before?.signedOut) throw new Error("Sign out before switching accounts.");
     const generation = local.binding ? before?.generation : await claimEmptyPasswordDevice(before?.generation);
-    await restoreOtherAccount(root, { generation, userId: envelope.owner }, !local.binding);
+    await restoreOtherAccount(root, { generation, userId: envelope.owner, ...(switching ? { retained: local.switchGuard } : {}) }, !local.binding);
   }
   const fresh = await passwordUnlockContext();
-  if (fresh.binding) await savePasswordUnlock(envelope, fresh.binding);
+  const verifier = await getItem<{ salt: string; hash: string }>("verifier");
+  if (!fresh.binding || !verifier || !(await checkCode(root, verifier))) throw new Error("Your saved account changed. Sign in again.");
+  await savePasswordUnlock(envelope, fresh.binding);
   notifyDeviceSession();
 }
-export async function signInPassword(username: string, password: string, replaceExisting = false) {
+function sameRetained(actual: RetainedAccount | undefined, expected: RetainedAccount) {
+  return actual?.vaultId === expected.vaultId && actual.generation === expected.generation && actual.records === expected.records;
+}
+export async function signInPassword(username: string, password: string, replaceExisting = false, consent?: RetainedAccount) {
   const name = loginTag(username);
   if (!validLoginTag(name) || !password || password.length > 256) throw new Error("Gamertag or password is incorrect.");
-  const before = await readDeviceSession(); const local = await passwordUnlockContext();
+  let before = await readDeviceSession(); let local = await passwordUnlockContext();
+  if (consent && !sameRetained(local.switchGuard, consent)) throw new Error("Your saved account changed. Review it and sign in again.");
   const envelope = await signInEnvelope(name, password, before, local);
   const root = await unwrapPasswordRoot(envelope, name, password);
-  const current = await readDeviceSession();
+  let current = await readDeviceSession();
   if (current?.generation !== before?.generation || !!current?.signedOut !== !!before?.signedOut) throw new Error("Device session changed. Try signing in again.");
-  await openPasswordAccount(root, envelope, local, before, replaceExisting);
+  const fresh = await passwordUnlockContext();
+  if (local.switchGuard && !sameRetained(fresh.switchGuard, local.switchGuard)) throw new Error("Your saved account changed. Review it and sign in again.");
+  const verifier = local.binding ? await getItem<{ salt: string; hash: string }>("verifier") : undefined;
+  const switching = !!local.binding && (!verifier || !(await checkCode(root, verifier)));
+  if (switching && (!replaceExisting || !local.canReplace)) throw new AccountSwitchRequired(local.switchGuard!, local.canReplace);
+  if (switching && !navigator.onLine) throw new Error("Connect to the internet to restore this account.");
+  if (switching && !before?.signedOut) {
+    await signOutDevice();
+    before = await readDeviceSession();
+    const after = await passwordUnlockContext();
+    if (after.switchGuard?.vaultId !== local.switchGuard!.vaultId || after.switchGuard.records !== local.switchGuard!.records || !after.canReplace) throw new Error("Your saved account changed. Review it and sign in again.");
+    local = after;
+  }
+  if (navigator.onLine) {
+    const signed = await signInEnvelope(name, password, before, local, envelope);
+    if (JSON.stringify(signed) !== JSON.stringify(envelope)) throw new Error("Sign-in changed. Your saved accounts are kept; try again.");
+  }
+  current = await readDeviceSession();
+  if (current?.generation !== before?.generation || !!current?.signedOut !== !!before?.signedOut) throw new Error("Device session changed. Try signing in again.");
+  const latest = await passwordUnlockContext();
+  if (local.switchGuard && (!sameRetained(latest.switchGuard, local.switchGuard) || (switching && !latest.canReplace))) throw new Error("Your saved account changed. Review it and sign in again.");
+  if (!local.binding && latest.binding) throw new Error("This browser already has an account. Review it and sign in again.");
+  await openPasswordAccount(root, envelope, local, before, switching);
 }
