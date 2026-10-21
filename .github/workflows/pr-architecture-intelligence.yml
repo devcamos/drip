@@ -19,7 +19,7 @@ jobs:
     uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@v1
     with:
       rules-path: architecture-rules.json
-      node-version: "24"
+      node-version: "24.22.1"
       dependency-cruiser-dirs: app lib server
     secrets:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
