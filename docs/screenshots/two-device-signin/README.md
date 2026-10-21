@@ -43,6 +43,7 @@ PW_CHROME=/usr/bin/chromium DRIP_CLOUD_E2E=1 DRIP_SIGNIN_CAPTURE=1 \
   npm exec -- playwright test e2e/two-device-signin.spec.ts --workers=1
 ```
 
-Localhost is test infrastructure. Hosted Preview backend verification remains
-blocked by the separately documented credential-transfer authorization; physical
-iPhone/Safari and Android behavior remain unverified. No Production change was made.
+Localhost is test infrastructure. Hosted Preview backend verification subsequently
+passed after the user approved isolated Preview configuration; see the
+[verification record](../../releases/pr23-verification.md). Physical iPhone/Safari
+and Android behavior remain unverified. No Production change was made.

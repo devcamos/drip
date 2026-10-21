@@ -92,6 +92,12 @@ test("two browsers restore the same account; a third is blocked; account switchi
     b.on("dialog", dialog => dialog.accept()); await b.getByRole("button", { name: "Sign out", exact: true }).click();
     await second.setOffline(false);
     await expect(b.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0, { timeout: 30_000 });
+    // The status text can disappear before the accepted revocation is persisted.
+    // Snapshot only after that legitimate metadata write has finished.
+    await expect.poll(() => b.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open("drip"); r.onsuccess = () => resolve(r.result); });
+      return new Promise<boolean | undefined>(resolve => { const t = db.transaction("kv"); const r = t.objectStore("kv").get("deviceSession"); t.oncomplete = () => { db.close(); resolve(r.result?.remotePending); }; });
+    }), { timeout: 30_000 }).toBe(false);
     const dirty = await savedRecords(b);
     await login(b, otherName, b.getByRole("region", { name: "Switch saved account" }));
     await expect(b.getByText(/aren.t synced/)).toBeVisible();

@@ -40,8 +40,8 @@ sessions; it cannot remove exported backups or decryption keys already held offl
   Review/authorize that step and ensure retired deployments cannot issue
   Production sessions before executing it. The ordinary schema migration does
   not silently revoke existing sessions.
-- Validate hosted signup/login/recovery against the configured Preview. This
-  remains blocked by the separately documented credential-transfer authorization.
+- Hosted signup/login/recovery and safe switching passed against the configured
+  isolated Preview; see the [verification record](pr23-verification.md).
 - After readiness and explicit Production release authorization, migrate the
   Production schema, merge the verified source and deploy; verify the live
   build, sign-in and data retention without accessing customer financial data.
