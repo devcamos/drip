@@ -9,7 +9,9 @@ async function capture(page: Page, state: string) {
   for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
     await page.setViewportSize({ width, height: 1000 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: `docs/screenshots/account-options/${state}-${device}.png`, fullPage: true, scale: "css" });
+    if (state === "accounts") await page.locator(".stack").evaluate(el => el.scrollIntoView({ block: "start" }));
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await page.screenshot({ path: `docs/screenshots/account-options/${state}-${device}.png`, scale: "css" });
   }
   await page.setViewportSize({ width: 390, height: 1000 });
 }
@@ -67,6 +69,10 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
   await page.getByLabel("Rate", { exact: true }).fill("4.25");
   await page.getByLabel("Paid", { exact: true }).selectOption("quarterly");
   await page.getByRole("button", { name: "Ocean account colour" }).click();
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
   await capture(page, "custom-stock-form");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".holding")).toHaveText("Custom investment trust");
