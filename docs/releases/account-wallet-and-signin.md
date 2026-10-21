@@ -18,6 +18,9 @@ Live app: https://drip-one-xi.vercel.app/
   actual state of your data.
 - Bookmarked/home-screen copies detect new versions and offer Reload update.
   Finish editing before accepting it; saved encrypted accounts are preserved.
+- Installation guidance is now a setup task. Completing it shows a brief
+  confirmation, then removes it; completion and dismissal are remembered on that
+  browser. iOS offers “I've added Drip” for manual confirmation.
 
 Your entered balance remains authoritative. Predictions and recorded income do
 not change it automatically. A browser profile counts as one device; separate

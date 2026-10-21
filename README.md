@@ -19,6 +19,16 @@ Cloud payloads use AES-256-GCM with random IVs and PBKDF2-SHA256 (600,000 iterat
 
 Local changes and their queued-upload marker commit together. Sync runs on changes, reconnect, returning to the foreground, and periodically while the app is open. It is not a continuously running background service. Failed uploads keep local data. Local writes carry monotonically increasing revisions, and upload acknowledgements atomically preserve any newer revisions. After encryption and before upload, sync rechecks the account, connection generation and base version: a restore or reconnect completed during encryption cancels the stale upload. Connection generations also prevent a delayed acknowledgement from changing a restored/reconnected device. Every private request is bound to an expected account as well as a server session. Every upload uses compare-and-swap versions; a stale device gets a visible conflict and cannot overwrite the cloud copy. This version does not automatically merge accounts or events. Export a local backup before explicitly restoring a newer cloud copy. Expired sessions can be renewed using the code without replacing local accounts. File imports disconnect cloud recovery to prevent accidental cross-account uploads. Explicit disconnect clears connection metadata only after confirmed server sign-out, with device/connection generation checks; a failed disconnect retains the connection and queued edits. Device app-lock credentials are excluded from cloud restores.
 
+## Installing Drip
+
+Installation guidance is a contextual setup task: complete or dismiss it once per
+browser. Native installation/standalone detection completes it automatically;
+iOS also offers **I've added Drip**, because the original tab cannot reliably
+observe installation in another context. Completion briefly confirms, fades and
+disappears. Reduced-motion users get the same confirmation without animation.
+This non-secret preference is separate from encrypted financial data. Installing
+does not itself provide cloud recovery; Settings retains recovery and backup tools.
+
 ## Gamertag and password sign-in
 
 Drip separates **Sign in**, **Sign up** and **Forgot password?** into screens in
