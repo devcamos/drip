@@ -14,6 +14,12 @@ output { display:block; margin:1em 0; }
 .panel { background: var(--panel); border-radius: 16px; padding: 16px; margin: 12px 0; }
 .banner { border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; background:var(--panel); display:flex; gap:10px; align-items:center; justify-content:space-between; }
 .banner.warn { border-left: 4px solid var(--warn); } .banner.info { border-left: 4px solid var(--accent); }
+.install-task { border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:12px; padding:14px; margin:12px 0; background:var(--panel); }
+.install-task-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.install-task h2 { margin:0; font-size:17px; } .install-task p { margin:8px 0 0; font-size:14px; }
+.install-task.is-complete { animation:install-task-fade 1400ms ease forwards; }
+@keyframes install-task-fade { 0%,65% { opacity:1; } 100% { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { .install-task.is-complete { animation:none; } }
 .wallet-heading { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
 .wallet-heading h2 { margin-bottom:0; }
 .wallet-hint { margin:8px 0 0; font-size:13px; }

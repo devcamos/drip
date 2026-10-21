@@ -9,6 +9,7 @@ import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
 import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
 import { PwaStatus } from "./PwaStatus";
+import { InstallTask, useInstallTask } from "./InstallTask";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
@@ -32,6 +33,7 @@ type Verifier = { salt: string; hash: string };
 const today = () => M.ymd(new Date());
 
 export default function Drip() {
+  const installTask = useInstallTask();
   const [gate, setGate] = useState<{ status: Awaited<ReturnType<typeof localVaultStatus>>; signedOut: boolean }>();
   const [error, setError] = useState("");
   const sequence = useRef(0);
@@ -55,10 +57,10 @@ export default function Drip() {
   if (!gate) return <main><p className="muted">Loading…</p></main>;
   if (gate.signedOut) return <SignedOut mode="signedOut" onSignedIn={refresh} />;
   if (gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.status} onSignedIn={refresh} />;
-  return <UnlockedDrip />;
+  return <UnlockedDrip installTask={installTask} />;
 }
 
-function UnlockedDrip() {
+function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof useInstallTask> }>) {
   const [data, setData] = useState<AppData | null>(null);
   const latestData = useRef<AppData | null>(null);
   const dataGeneration = useRef(0);
@@ -67,9 +69,6 @@ function UnlockedDrip() {
   const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
-  const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
-  const [deferred, setDeferred] = useState<any>(null);
-  const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
   const loadSequence = useRef(0);
   const [locked, setLocked] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -101,12 +100,7 @@ function UnlockedDrip() {
         if (!already) await navigator.storage.persist();
       }
     })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (!standalone && ios) setInstallHint("ios");
-    const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e); if (!standalone) setInstallHint("android"); };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => { loadSequence.current++; window.removeEventListener("beforeinstallprompt", onPrompt); };
+    return () => { loadSequence.current++; };
   }, []);
 
   const update = useCallback((fn: (d: AppData) => AppData) => {
@@ -160,21 +154,6 @@ function UnlockedDrip() {
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
-  const banners = (
-    <>
-      {installHint && !dismissed.install && (
-        <div className="banner info">
-          {installHint === "ios"
-            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. Keep cloud recovery or exported backups too; installation alone doesn&apos;t guarantee data retention.</span>
-            : <span>Install Drip for quick access and offline tracking.</span>}
-          {installHint === "android" && deferred && <button className="btn small" onClick={async () => { deferred.prompt(); setDeferred(null); setInstallHint(null); }}>Install</button>}
-          <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, install: true })}>✕</button>
-        </div>
-      )}
-
-    </>
-  );
-
   let body: React.ReactNode;
   switch (view.name) {
   case "detail": {
@@ -209,7 +188,7 @@ function UnlockedDrip() {
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}<InstallTask state={installTask} />{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
