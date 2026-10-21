@@ -10,7 +10,7 @@ Drafts only. Nothing here has been filed. Suggested labels are listed per issue.
 The Drip v1 static build (`npm run build` → `out/`) is ready, but there's no Vercel project yet. Creating one through the API returned `403 forbidden: You don't have permission to create a project` (team `devonte-amos-projects`).
 
 **To do**
-- [ ] Create a `drip` project on the **Hobby** plan, linked to the private `devcamos/drip` repo.
+- [ ] Create a `drip` project on the **Hobby** plan, linked to the private `devonte-amos-apps/drip` repo.
 - [ ] Framework: Next.js (static export). Output directory: `out`.
 - [ ] PR and branch pushes → preview deployments only. Don't attach a production domain until Devonte says go.
 - [ ] Leave Vercel Deployment Protection on. If it blocks Devonte's iPhone, decide with him whether to use a share link or bypass.
@@ -124,7 +124,7 @@ The Playwright smoke tests cover onboarding, add account, top-up, withdraw, Tren
 ## 12. Repo and PR set-up
 **Labels:** `infra`, `blocked`
 
-- [ ] Create the private `devcamos/drip` repo and push `main`.
+- [ ] Create the private `devonte-amos-apps/drip` repo and push `main`.
 - [ ] Branch protection on `main` requiring CI (type check, unit tests with coverage limits, build, Playwright).
 - [ ] Optional: Dependabot for npm and GitHub Actions.
 
