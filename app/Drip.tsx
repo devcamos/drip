@@ -298,23 +298,27 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
       <p className="muted">Total balance</p>
       <div className="big">{M.gbp(M.totalBalance(data.accounts))}</div>
       <p className="muted">Estimated ≈ {M.gbp(M.totalMonthlyIncome(data.accounts))} a month · {M.weightedYield(data.accounts).toFixed(2)}% average</p>
-      {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
       {data.accounts.length === 0 ? (
         <div className="panel"><p>No accounts yet. Add your first savings or investment account to see what it earns.</p><button className="btn" onClick={add}>Add account</button></div>
       ) : (
-        <div className="stack">
-          {data.accounts.map((a) => {
-            const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
-            return (
-              <button key={a.id} className="card" style={accountCardStyle(a.colour)} onClick={() => open(a.id)}>
-                <div className="row"><span className="prov">{a.holdingName ?? displayProvider(a.provider)}</span><span className="bal">{M.gbp(a.balance)}</span></div>
-                <div className="row meta"><span>{a.holdingName && <>{displayProvider(a.provider)} · </>}{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
-                <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
-              </button>
-            );
-          })}
-        </div>
+        <section aria-labelledby="wallet-title">
+          <div className="wallet-heading"><h2 id="wallet-title">Accounts</h2><span className="muted">{data.accounts.length} {data.accounts.length === 1 ? "account" : "accounts"}</span></div>
+          {data.accounts.length > 1 && <p id="wallet-hint" className="muted wallet-hint">Scroll through your accounts. Tap a card to open it.</p>}
+          <div className="stack" role="region" aria-label="Account cards" aria-describedby={data.accounts.length > 1 ? "wallet-hint" : undefined} tabIndex={0}>
+            {data.accounts.map((a) => {
+              const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
+              return (
+                <button key={a.id} className="card" style={accountCardStyle(a.colour)} onClick={() => open(a.id)}>
+                  <div className="row"><span className="prov">{a.holdingName ?? displayProvider(a.provider)}</span><span className="bal">{M.gbp(a.balance)}</span></div>
+                  <div className="row meta"><span>{a.holdingName && <>{displayProvider(a.provider)} · </>}{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
+                  <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
+      {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
       {up.length > 0 && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming estimated payments</h2>
           <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.holdingName ?? displayProvider(p.account.provider)}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
