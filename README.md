@@ -27,6 +27,20 @@ form clears its unsent password. Signed-out devices retain their encrypted
 accounts; opening an auth form is not permission to replace them. **Use another
 account** requires confirmation before replacing this browser's local copy.
 
+Online password sign-in first verifies credentials without creating a session.
+If another account is saved here, it offers an inline switch only when that
+copy is already cloud-saved. Cancelling leaves it intact; unsynced or device-only
+copies must be synced before replacement. Confirmation is bound to the exact
+saved copy, so concurrent edits cancel the switch rather than being overwritten.
+
+Up to two browser profiles/devices can hold active cloud sessions per account.
+Reopening the same browser renews its slot; a third browser must wait for a sign-out.
+An opaque browser identifier is shared across tabs and retained across sign-out;
+it is not a hardware fingerprint. Password, recovery and cloud-passkey sign-in
+share server-side admission. The cap cannot revoke offline copies or keys already
+held elsewhere. See the [release preparation](docs/releases/account-wallet-and-signin.md)
+for the additive session migration and reviewed legacy-session cleanup.
+
 Normal sign-in uses a unique, case-insensitive sign-in gamertag and a password (12–256 characters; case, spaces and punctuation preserved). Password managers use standard username/current-password/new-password autocomplete. Signup requires a gamertag and matching password, then opens Accounts directly. It does not show a recovery code or a save-code checkbox. New registration needs a connection; existing encrypted accounts continue to work offline with configured credentials. Existing accounts use a recovery code once in **Settings → Sign-in & password** to add a password. **Forgot password?** opens the separate recovery screen and restores access; the same setup form sets a new password. No real name, email or phone is required.
 
 The additive `drip_password_login` table links the existing Better Auth user to a unique login gamertag, a Better Auth/scrypt-hashed domain-separated password proof, and an encrypted recovery-root wrapper. No second user/principal or homemade session is introduced. Better Auth creates/verifies ordinary sessions/cookies. The browser derives an AES-256-GCM wrapping key from the exact password with PBKDF2-SHA256/600,000 iterations and a random salt; authenticated metadata binds username, owner, version and salt. Authentication receives a separate SHA-256 proof, never the plaintext password or root. Only a successful password login returns the encrypted wrapper; unknown users and wrong passwords use the same failure, including dummy hashing. Durable global/IP/name limits, explicit same-origin checks, 4KB streamed body limits and owner/recovery-proof verification protect the new endpoints. Setup/reset preserves the original random recovery credential and all existing accounts/backups. Other cloud sessions are deleted on reset; this cannot revoke keys or old offline wrappers already held by other devices.

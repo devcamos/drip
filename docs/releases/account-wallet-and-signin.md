@@ -30,7 +30,7 @@ sessions; it cannot remove exported backups or decryption keys already held offl
   and browser checks; verify two-browser/third-rejection and safe switching
   against the isolated test database.
 - Review the inspected [wallet screenshots](../screenshots/account-wallet/README.md)
-  and the new sign-in screenshots before handoff.
+  and [sign-in screenshots](../screenshots/two-device-signin/README.md) before handoff.
 - Apply the additive `session.dripDeviceId` migration to the intended environment
   **before** serving the new authentication code. No vault records or financial
   data need to be copied from Preview to Production.
