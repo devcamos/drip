@@ -16,8 +16,9 @@ concurrency:
 
 jobs:
   review:
-    uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@v1
+    uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@v1.1.0-rc1
     with:
+      tool-ref: v1.1.0-rc1
       rules-path: architecture-rules.json
       node-version: "24"
       dependency-cruiser-dirs: app lib server
