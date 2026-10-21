@@ -16,10 +16,23 @@ output { display:block; margin:1em 0; }
 .banner.warn { border-left: 4px solid var(--warn); } .banner.info { border-left: 4px solid var(--accent); }
 .stack { position: relative; margin-top: 16px; }
 .card { background:linear-gradient(135deg, var(--accent), var(--text)); border-radius: 18px; padding: 18px; color:var(--on-accent); box-shadow: 0 -6px 20px rgba(27,21,16,.15); cursor:pointer; border:0; width:100%; text-align:left; display:block; font:inherit; }
-.stack .card { min-height: 128px; position: relative; } .stack .card + .card { margin-top: -22px; padding-top: 30px; }
-.card .row { display:flex; justify-content:space-between; align-items:baseline; }
+.stack .card { min-height: 128px; position: relative; } .stack .card + .card { margin-top: 12px; }
+.card .row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
 .card .prov { font-weight:700; font-size:17px; } .card .bal { font-size:22px; font-weight:700; }
-.card .meta { font-size:13px; opacity:.9; margin-top:6px; }
+.card .meta { font-size:13px; margin-top:6px; }
+.card .prov, .card .holding { min-width:0; overflow-wrap:anywhere; }
+.card .bal { white-space:nowrap; }
+.card .holding { font-size:20px; font-weight:700; margin-top:12px; }
+.card .meta > span:first-child { min-width:0; overflow-wrap:anywhere; }
+.account-colours { margin:20px 0; border:1px solid var(--border); border-radius:14px; padding:12px; }
+.account-colours legend { font-weight:600; padding:0 6px; }
+.colour-choices, .colour-custom { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.colour-swatch { width:42px; height:42px; border:3px solid var(--panel); border-radius:50%; cursor:pointer; }
+.colour-swatch[aria-pressed="true"] { outline:2px solid var(--text); outline-offset:2px; }
+.colour-custom { margin:14px 0; }
+.colour-custom label { margin:0; }
+.colour-custom input[type="color"] { width:60px; height:42px; padding:3px; cursor:pointer; }
+.colour-preview { cursor:default; padding:14px; box-shadow:none; }
 .list { list-style:none; padding:0; margin:0; } .list li { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
 .btn { background: var(--accent); color:var(--on-accent); border:0; border-radius:12px; padding:12px 16px; font-weight:700; font-size:16px; cursor:pointer; }
 .btn.ghost { background: transparent; color: var(--text); border:1px solid var(--border); } .btn.small { padding:6px 10px; font-size:13px; }

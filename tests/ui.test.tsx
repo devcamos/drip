@@ -248,7 +248,7 @@ describe("accounts", () => {
 
     // detail
     expect(await screen.findByText("My Bank")).toBeInTheDocument();
-    expect(screen.getByText("Estimated next payment")).toBeInTheDocument();
+    expect(await screen.findByText("Estimated next payment")).toBeInTheDocument();
 
     click("Top up");
     type(screen.getByLabelText("amount"), "300");

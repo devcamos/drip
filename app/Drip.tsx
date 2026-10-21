@@ -22,7 +22,8 @@ import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
 import { IncomeSummary } from "./IncomeSummary";
-import { productLabel } from "@/lib/products";
+import { displayProvider, productLabel } from "@/lib/products";
+import { accountCardStyle } from "@/lib/account-colour";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
@@ -305,9 +306,9 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
           {data.accounts.map((a) => {
             const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
             return (
-              <button key={a.id} className="card" onClick={() => open(a.id)}>
-                <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
-                <div className="row meta"><span>{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
+              <button key={a.id} className="card" style={accountCardStyle(a.colour)} onClick={() => open(a.id)}>
+                <div className="row"><span className="prov">{a.holdingName ?? displayProvider(a.provider)}</span><span className="bal">{M.gbp(a.balance)}</span></div>
+                <div className="row meta"><span>{a.holdingName && <>{displayProvider(a.provider)} · </>}{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
                 <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
               </button>
             );
@@ -316,7 +317,7 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
       )}
       {up.length > 0 && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming estimated payments</h2>
-          <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.provider}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
+          <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.holdingName ?? displayProvider(p.account.provider)}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
         </div>
       )}
     </>

@@ -80,4 +80,12 @@ describe("product and income calculations", () => {
     const invalid = [{ productCategory: "made-up" }, { taxWrapper: "made-up" }, { reinvestIncome: "yes" }, { bonus: null }, { bonus: { amount: Infinity, expectedDate: "2027-05-06" } }, { bonus: { amount: 1, expectedDate: "invalid" } }, { payouts: [{ incomeType: "made-up" }] }];
     for (const value of invalid) expect(isAppData({ ...emptyData(), accounts: [{ ...account(), ...value }] })).toBe(false);
   });
+  it("validates holding names without excluding existing accounts that have no individual holding", () => {
+    expect(isAppData({ ...emptyData(), accounts: [account()] })).toBe(true);
+    expect(validProductFields(account({ productCategory: "stocks-funds", holdingName: "Custom fund" }))).toBe(true);
+    for (const holdingName of [null, 123, {}, "", " ", "x".repeat(101)]) {
+      expect(isAppData({ ...emptyData(), accounts: [{ ...account(), productCategory: "stocks-funds", holdingName }] })).toBe(false);
+    }
+    expect(validProductFields(account({ productCategory: "easy-access", holdingName: "Realty Income" }))).toBe(false);
+  });
 });

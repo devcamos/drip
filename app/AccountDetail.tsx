@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { Account, IncomeType } from "@/lib/types";
-import { productLabel, validDate } from "@/lib/products";
+import { displayProvider, productLabel, validDate } from "@/lib/products";
+import { accountCardStyle } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { IncomeSummary } from "./IncomeSummary";
 const today = () => M.ymd(new Date());
@@ -102,8 +103,9 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
   const forecast = M.projection([a], 12).at(-1)!;
   return <>
     <button className="btn ghost small" onClick={onBack}>← Accounts</button>
-    <div className="card" style={{ marginTop: 12, cursor: "default" }}>
-      <div className="row"><span className="prov">{a.provider}</span><span>{productLabel(a)}</span></div>
+    <div className="card" style={{ ...accountCardStyle(a.colour), marginTop: 12, cursor: "default" }}>
+      <div className="row"><span className="prov">{displayProvider(a.provider)}</span><span>{productLabel(a)}</span></div>
+      {a.holdingName && <div className="holding">{a.holdingName}</div>}
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
     <p className="muted">Your entered balance. Predictions and recorded income never change it automatically.</p>
