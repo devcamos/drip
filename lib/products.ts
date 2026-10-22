@@ -2,8 +2,10 @@ import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "
 
 export const PROVIDERS: Record<string, string> = {
   Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
-  Vanguard: "#96151d", Marcus: "#1d2f4f", "Premium Bonds": "#3c6e47", Other: "#4a5070",
+  Vanguard: "#96151d", Marcus: "#1d2f4f", "Lloyds Bank": "#006a4d", "Premium Bonds": "#3c6e47", Other: "#4a5070",
 };
+export const TRADING_212_HOLDINGS = ["Realty Income", "Digital Realty", "Prologis", "American Tower", "Brookfield Infrastructure", "Air Products and Chemicals"] as const;
+export const displayProvider = (provider: string) => provider === "Trading212" ? "Trading 212" : provider;
 type ProductDefaults = { label: string; rateType: RateType; frequency: Frequency; taxWrapper: TaxWrapper; reinvestIncome: boolean };
 export const PRODUCTS: Record<ProductCategory, ProductDefaults> = {
   "cash-isa": { label: "Cash ISA", rateType: "interest", frequency: "monthly", taxWrapper: "cash-isa", reinvestIncome: true },
@@ -25,6 +27,7 @@ export function validDate(value: unknown): value is string {
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
   return (account.productCategory === undefined || Object.hasOwn(PRODUCTS, account.productCategory)) &&
+    (account.holdingName === undefined || (account.productCategory === "stocks-funds" && typeof account.holdingName === "string" && account.holdingName.trim().length > 0 && account.holdingName.length <= 100)) &&
     (account.taxWrapper === undefined || ["none", "cash-isa", "lifetime-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&
     (account.reinvestIncome === undefined || typeof account.reinvestIncome === "boolean") &&
     (account.bonus === undefined || (!!account.bonus && Number.isFinite(account.bonus.amount) && account.bonus.amount > 0 && validDate(account.bonus.expectedDate))) &&

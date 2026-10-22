@@ -1,10 +1,12 @@
 import { createHmac } from "node:crypto";
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
+import type { AuthContext } from "@better-auth/core";
 import { setSessionCookie } from "better-auth/cookies";
 import type { Pool } from "@neondatabase/serverless";
 import * as z from "zod";
 import { validPasswordWrap } from "../lib/password-crypto";
 import { withPasswordOwner } from "./password-transaction";
+import { admitDeviceSession, assertDeviceAdmission, type Admission } from "./device-sessions";
 
 const username = z.string().regex(/^[a-z0-9_]{3,16}$/);
 const proof = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -24,39 +26,56 @@ async function allowed(db: Pool, name: string, headers: Headers, secret: string)
  * Keep the high-entropy recovery credential intact for recovery and old devices.
  */
 export function passwordLogin(db: Pool) {
+  async function verifiedLogin(ctx: { body: { username: string; proof: string }; headers: Headers; context: AuthContext }) {
+    await allowed(db, ctx.body.username, ctx.headers, ctx.context.secret);
+    const { rows } = await db.query("SELECT user_id, password_hash, envelope FROM drip_password_login WHERE username = $1", [ctx.body.username]);
+    const entry = rows[0];
+    if (!entry) { await ctx.context.password.hash(ctx.body.proof); throw badLogin(); }
+    if (!(await ctx.context.password.verify({ hash: entry.password_hash, password: ctx.body.proof }))) throw badLogin();
+    const user = await ctx.context.internalAdapter.findUserById(entry.user_id);
+    if (!user || !validPasswordWrap(entry.envelope) || entry.envelope.owner !== user.id || entry.envelope.username !== ctx.body.username) throw badLogin();
+    return { entry, user };
+  }
   return {
     id: "drip-gamertag-password",
     endpoints: {
-      signInGamertag: createAuthEndpoint("/sign-in/gamertag", {
+      gamertagKey: createAuthEndpoint("/sign-in/gamertag-key", {
         method: "POST", requireHeaders: true, body: z.object({ username, proof }),
       }, async ctx => {
-        await allowed(db, ctx.body.username, ctx.headers, ctx.context.secret);
-        const { rows } = await db.query("SELECT user_id, password_hash, envelope FROM drip_password_login WHERE username = $1", [ctx.body.username]);
-        const entry = rows[0];
-        if (!entry) { await ctx.context.password.hash(ctx.body.proof); throw badLogin(); }
-        if (!(await ctx.context.password.verify({ hash: entry.password_hash, password: ctx.body.proof }))) throw badLogin();
-        const user = await ctx.context.internalAdapter.findUserById(entry.user_id);
-        if (!user || !validPasswordWrap(entry.envelope) || entry.envelope.owner !== user.id || entry.envelope.username !== ctx.body.username) throw badLogin();
+        const { entry, user } = await verifiedLogin(ctx);
+        const fresh = await withPasswordOwner(db, user.id, client => client.query(
+          "SELECT user_id FROM drip_password_login WHERE user_id = $1 AND username = $2 AND password_hash = $3", [user.id, ctx.body.username, entry.password_hash]));
+        if (!fresh.rows.length) throw badLogin();
+        ctx.setHeader("Cache-Control", "no-store");
+        return ctx.json({ owner: user.id, envelope: entry.envelope });
+      }),
+      signInGamertag: createAuthEndpoint("/sign-in/gamertag", {
+        method: "POST", requireHeaders: true, body: z.object({ username, proof, expectedOwner: z.string().min(1).max(128).optional(), expectedEnvelope: z.string().min(1).max(512).optional() }),
+      }, async ctx => {
+        const { entry, user } = await verifiedLogin(ctx);
+        if ((ctx.body.expectedOwner && ctx.body.expectedOwner !== user.id) || (ctx.body.expectedEnvelope && ctx.body.expectedEnvelope !== entry.envelope.ct)) throw new APIError("CONFLICT", { message: "Sign-in changed. Please try again." });
         const session = await ctx.context.internalAdapter.createSession(user.id);
         if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Could not sign in. Try again." });
         // This candidate session stays private until the credential is rechecked
         // under the same owner lock used by reset. Creating it before taking the
         // lock avoids nested pool acquisition through the Better Auth adapter.
-        let current: boolean;
+        let admission: Admission;
         try {
-          current = await withPasswordOwner(db, user.id, async client => {
+          admission = await withPasswordOwner(db, user.id, async client => {
             const fresh = await client.query(`SELECT login.user_id FROM drip_password_login login
               JOIN "session" s ON s."userId" = login.user_id
-              WHERE login.user_id = $1 AND login.username = $2 AND login.password_hash = $3 AND s.id = $4`, [user.id, ctx.body.username, entry.password_hash, session.id]);
+              WHERE login.user_id = $1 AND login.username = $2 AND login.password_hash = $3 AND s.id = $4
+              AND ($5::text IS NULL OR login.envelope->>'ct' = $5)`, [user.id, ctx.body.username, entry.password_hash, session.id, ctx.body.expectedEnvelope ?? null]);
             if (!fresh.rows.length) await client.query('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', [session.id, user.id]);
-            return fresh.rows.length > 0;
+            return fresh.rows.length ? admitDeviceSession(client, { id: session.id, userId: user.id }) : "missing";
           });
         } catch (error) {
           // No token/cookie has been exposed, even if outage cleanup also fails.
           await ctx.context.internalAdapter.deleteSession(session.token).catch(() => undefined);
           throw error;
         }
-        if (!current) throw badLogin();
+        if (admission === "missing") throw badLogin();
+        assertDeviceAdmission(admission);
         await setSessionCookie(ctx, { user, session });
         ctx.setHeader("Cache-Control", "no-store");
         return ctx.json({ owner: user.id, envelope: entry.envelope });

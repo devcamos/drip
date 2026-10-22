@@ -1,5 +1,16 @@
 import { expect, type Page, type Locator } from "@playwright/test";
 
+export async function enableCloudRecovery(page: Page) {
+  const panel = page.getByRole("region", { name: "Cloud recovery", exact: true });
+  const enable = panel.getByRole("button", { name: "Enable encrypted cloud recovery" });
+  // Connecting can succeed before a throttled first sync. Retry the existing
+  // connection rather than looking for a signup button which has disappeared.
+  await withAuthRetry(page, async () => {
+    if (await enable.isVisible()) await enable.click();
+    else await panel.getByRole("button", { name: "Sync now", exact: true }).click();
+  }, page.getByText(/^(Encrypted cloud copy saved\.|Cloud copy is up to date\.)$/).first());
+}
+
 // These journeys share a host/IP. Respect real server Retry-After when several
 // independent test users sign in quickly; never disable production auth limits.
 export async function withAuthRetry(page: Page, action: () => Promise<void>, success: Locator) {

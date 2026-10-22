@@ -51,6 +51,6 @@ describe("six alternative recovery codes", () => {
     expect(await getItem("recoveryRecords")).toEqual(records);
     vi.spyOn(db, "setItem").mockRejectedValueOnce(new Error("quota"));
     expect(await registerRecoveryCodes([], "owner")).toBe(false);
-    expect(vi.mocked(fetch).mock.lastCall![1]?.headers).toMatchObject({ "X-Drip-Owner": "owner" });
+    expect(new Headers(vi.mocked(fetch).mock.lastCall![1]?.headers).get("X-Drip-Owner")).toBe("owner");
   });
 });

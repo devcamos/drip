@@ -9,10 +9,11 @@ import type { PasswordWrap } from "./password-crypto";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
-type Device = { signedOut: boolean; generation: string };
+type Device = { signedOut: boolean; generation: string; remotePending?: boolean; signupNonce?: string };
 type Metadata = Omit<CloudState, "key">;
 type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap } };
 export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null; passwordCiphertext?: string | null }
+export interface RetainedAccount { vaultId: string; generation?: string; records: string }
 function checkBinding(value: Stored, expected: VaultBinding) {
   if (value.vault?.id !== expected.vaultId || value.gate?.generation !== expected.generation ||
     (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext) ||
@@ -81,6 +82,20 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
   }
   if (key === "localVault") throw new Error("Use the local vault interface.");
   return tx("readonly", s => s.get(key));
+}
+/** Public browser identifier, independent of accounts/keys and shared atomically by tabs. */
+export async function browserDeviceId(): Promise<string> {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(STORE, "readwrite"), s = t.objectStore(STORE);
+    const request = s.get("browserDeviceId"); let id: string;
+    request.onsuccess = () => {
+      id = typeof request.result === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.result) ? request.result : crypto.randomUUID();
+      if (id !== request.result) s.put(id, "browserDeviceId");
+    };
+    t.oncomplete = () => { db.close(); resolve(id); };
+    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not identify this browser. Try again.", { cause: t.error })); };
+  });
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
   if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
@@ -151,6 +166,8 @@ export async function passwordUnlockContext() {
   return {
     binding: value.vault ? { vaultId: value.vault.id, generation: value.gate?.generation, passwordCiphertext: value.password?.envelope.ct ?? null } satisfies VaultBinding : undefined,
     envelope: value.password?.vaultId === value.vault?.id ? value.password?.envelope : undefined,
+    switchGuard: value.vault ? { vaultId: value.vault.id, generation: value.gate?.generation, records: signupRecords(value) } satisfies RetainedAccount : undefined,
+    canReplace: !!value.cloud && !value.cloud.dirty && value.cloud.version > 0,
   };
 }
 export async function savePasswordUnlock(envelope: PasswordWrap, expected: VaultBinding) {
@@ -159,15 +176,23 @@ export async function savePasswordUnlock(envelope: PasswordWrap, expected: Vault
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean } = {}): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean; signup?: SignupReplacement; retained?: RetainedAccount } = {}): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
-    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
-    password.onsuccess = () => {
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock"), verifier = s.get("verifier");
+    verifier.onsuccess = () => {
       if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!options.allowSignedOut && gate.result?.signedOut) ||
         vault.result?.id !== before.vault?.id) {
         failure = new Error("Device session changed. Unlock Drip again before continuing."); t.abort(); return;
+      }
+      if (options.signup && (gate.result?.signedOut !== true || gate.result?.signupNonce !== options.signup.nonce ||
+        gate.result?.generation !== options.signup.generation || signupRecords({ vault: vault.result, data: data.result, cloud: cloud.result, verifier: verifier.result, passkey: passkey.result, password: password.result }) !== options.signup.records)) {
+        failure = new Error("Your current account changed during signup. Its local copy is kept; sign in and retry."); t.abort(); return;
+      }
+      if (options.retained && (!cloud.result || cloud.result.dirty || cloud.result.version < 1 ||
+        signupRecords({ vault: vault.result, data: data.result, cloud: cloud.result, verifier: verifier.result, passkey: passkey.result, password: password.result }) !== options.retained.records)) {
+        failure = new Error("Your saved account changed. Its local copy is kept; review it and sign in again."); t.abort(); return;
       }
       if ((options.passkey && JSON.stringify(passkey.result) !== JSON.stringify(before.passkey)) ||
         (options.password && JSON.stringify(password.result) !== JSON.stringify(before.password))) {
@@ -186,6 +211,7 @@ async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectS
   });
 }
 export function saveData(data: AppData): Promise<void> {
+  if (!isAppData(data)) return Promise.reject(new Error("These changes contain invalid amounts. Your saved data is unchanged."));
   if (closing) return Promise.reject(new Error("Sign-out is in progress. Unlock Drip before editing."));
   // Preserve invocation order even when encryption yields.
   const stamp = epoch;
@@ -201,7 +227,8 @@ export function saveData(data: AppData): Promise<void> {
   });
   lastWrite = save; writes = save.catch(() => {}); return save;
 }
-export async function cloudSnapshot(): Promise<{ data: AppData; state: CloudState | undefined; signedOut: boolean }> {
+type UploadState = CloudState & { vaultId: string };
+export async function cloudSnapshot(): Promise<{ data: AppData; state: UploadState | undefined; signedOut: boolean }> {
   const value = await stored();
   let local: NonNullable<typeof unlocked>;
   try { local = current(value); } catch { return { data: emptyData(), state: undefined, signedOut: !!(value.data || value.vault || value.gate?.signedOut) }; }
@@ -209,23 +236,49 @@ export async function cloudSnapshot(): Promise<{ data: AppData; state: CloudStat
   const data = value.data ? await decryptLocal<AppData>(value.data as LocalEnvelope, local.keys) : emptyData();
   if (stamp !== epoch) return { data: emptyData(), state: undefined, signedOut: true };
   current(await stored());
-  return { data, state: connected(value.cloud, local.keys), signedOut: false };
+  const state = connected(value.cloud, local.keys);
+  // Bind upload receipts to the original local vault without persisting its ID
+  // in cloud metadata or relying on keys still being available after sign-out.
+  return { data, state: state ? { ...state, vaultId: local.keys.header.id } : undefined, signedOut: false };
 }
-export async function acknowledgeCloudUpload(expected: CloudState, version: number, at: string): Promise<"saved" | "queued" | "changed"> {
-  const before = await stored();
-  try { current(before); } catch { return "changed"; }
-  let result: "saved" | "queued" | "changed" = "changed";
-  await guardedWrite(before, epoch, (s, cloud) => {
-    if (cloud?.userId !== expected.userId || cloud.generation !== expected.generation || cloud.version !== expected.version) return;
-    const dirty = cloud.revision !== expected.revision;
-    s.put({ ...cloud, version, dirty, lastSyncAt: at }, "cloudState"); result = dirty ? "queued" : "saved";
+export async function acknowledgeCloudUpload(expected: UploadState, version: number, at: string): Promise<"saved" | "queued" | "changed"> {
+  if (!expected.vaultId) return "changed";
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE);
+    let result: "saved" | "queued" | "changed" = "changed";
+    const vault = s.get("localVault"), state = s.get("cloudState");
+    state.onsuccess = () => {
+      const cloud = state.result as Metadata | undefined;
+      if (vault.result?.id !== expected.vaultId || cloud?.userId !== expected.userId ||
+        cloud.identityId !== expected.identityId || cloud.generation !== expected.generation || cloud.version !== expected.version) return;
+      // The server already accepted this upload. Record only its version while
+      // retaining newer edits and keeping a signed-out/locked vault closed.
+      const dirty = cloud.revision !== expected.revision;
+      s.put({ ...cloud, version, dirty, lastSyncAt: at }, "cloudState"); result = dirty ? "queued" : "saved";
+    };
+    t.oncomplete = () => { db.close(); resolve(result); };
+    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not record the cloud upload receipt.", { cause: t.error })); };
   });
-  return result;
 }
-export async function commitCloudRestore(data: AppData, state: CloudState | undefined, verifier: { salt: string; hash: string }, expectedGeneration?: string, resumeGeneration?: string, root?: string, signupPassword?: PasswordWrap): Promise<void> {
+export interface SignupReplacement { vaultId: string; generation: string; nonce: string; records: string }
+const signupRecords = (value: Stored) => JSON.stringify([value.vault, value.data, value.cloud, value.verifier, value.passkey, value.password]);
+/** Reserve a signed-out, fully synced copy; retain every encrypted record. */
+export async function reserveSignupReplacement(): Promise<SignupReplacement> {
+  const before = await stored();
+  if (!before.vault || !before.gate?.signedOut || before.gate.remotePending) throw new Error("Finish signing out before creating another account.");
+  if (!before.cloud || before.cloud.dirty || before.cloud.version < 1) throw new Error("Sign back in and sync your current account before creating a new one here. You can also sign up in a private browser window and keep this copy.");
+  const generation = crypto.randomUUID(), nonce = crypto.randomUUID();
+  await guardedWrite(before, epoch, s => s.put({ signedOut: true, remotePending: false, generation, signupNonce: nonce }, "deviceSession"), { allowSignedOut: true, records: true });
+  lockLocalVault(true);
+  return { vaultId: before.vault.id, generation, nonce, records: signupRecords(before) };
+}
+export async function commitCloudRestore(data: AppData, state: CloudState | undefined, verifier: { salt: string; hash: string }, expectedGeneration?: string, resumeGeneration?: string, root?: string, signupPassword?: PasswordWrap, replacement?: SignupReplacement, retained?: RetainedAccount): Promise<void> {
   if (!isAppData(data)) throw new Error("Invalid local data. Your stored copy has not changed.");
   const before = await stored(); const stamp = epoch;
-  if (signupPassword && (before.vault || before.verifier || signupPassword.owner !== state?.userId)) throw new Error("This browser already has an account. Sign in instead.");
+  if (retained && (before.vault?.id !== retained.vaultId || before.gate?.generation !== retained.generation || !before.cloud || before.cloud.dirty || before.cloud.version < 1 || signupRecords(before) !== retained.records)) throw new Error("Your saved account changed. Its local copy is kept; review it and sign in again.");
+  if (replacement && (!signupPassword || !before.gate?.signedOut || before.gate.generation !== replacement.generation || before.gate.signupNonce !== replacement.nonce || before.vault?.id !== replacement.vaultId || signupRecords(before) !== replacement.records || resumeGeneration !== replacement.generation || before.cloud?.dirty)) throw new Error("Your current account changed during signup. Its local copy is kept; sign in and retry.");
+  if (signupPassword && ((!replacement && (before.vault || before.verifier)) || signupPassword.owner !== state?.userId)) throw new Error("This browser already has an account. Sign in instead.");
   if ((before.gate?.signedOut && before.gate.generation !== resumeGeneration) || before.gate?.generation !== expectedGeneration) throw new Error("Device session changed. Sign in again before restoring.");
   const keys = root ? await createVault(root) : current(before, !!resumeGeneration).keys;
   const encrypted = await encryptLocal(data, keys);
@@ -237,7 +290,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
     if (keys.header.id !== before.vault?.id) s.delete("passwordUnlock");
     if (signupPassword) s.put({ vaultId: keys.header.id, envelope: signupPassword }, "passwordUnlock");
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
-  }, { allowSignedOut: !!resumeGeneration, records: true });
+  }, { allowSignedOut: !!resumeGeneration, records: true, signup: replacement, retained });
   if (stamp !== epoch) throw new VaultLockedError();
   epoch++; // Pending writes belong to the copy the user just replaced.
   unlocked = { keys, generation };

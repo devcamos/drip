@@ -90,6 +90,24 @@ describe("encrypted local storage", () => {
 });
 
 describe("replacement and migration races", () => {
+  it.each(["cloud", "password", "passkey", "verifier"])("keeps a confirmed account when %s changes during replacement encryption", async changed => {
+    const { passwordUnlockContext } = await import("../lib/db");
+    await seedVault(data, code, { userId: "owner", identityId: data.identity.id, key: {} as CryptoKey, version: 1, dirty: false, lastSyncAt: "now", generation: "cloud", revision: 0 });
+    await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "restore" });
+    const retained = (await passwordUnlockContext()).switchGuard!;
+    const before = await rawStore(), nextRoot = generateRecoveryCode(), verifier = await codeVerifier(nextRoot);
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    vi.spyOn(crypto.subtle, "encrypt").mockImplementationOnce(async (...args) => {
+      const result = await encrypt(...args);
+      if (changed === "cloud") await rawStore({ cloudState: { ...before.cloudState, dirty: true, revision: 1 } });
+      if (changed === "password") await rawStore({ passwordUnlock: { vaultId: before.localVault.id, envelope: { ct: "new-wrapper" } } });
+      if (changed === "passkey") await rawStore({ passkeyUnlock: { vaultId: before.localVault.id, ct: "new-passkey" } });
+      if (changed === "verifier") await rawStore({ verifier: await codeVerifier(generateRecoveryCode()) });
+      return result;
+    });
+    await expect(commitCloudRestore(emptyData(), undefined, verifier, "restore", "restore", nextRoot, undefined, undefined, retained)).rejects.toThrow(/saved account changed/);
+    const after = await rawStore(); expect(after.data).toEqual(before.data); expect(after.localVault).toEqual(before.localVault);
+  });
   it.each(["same-tab edit", "other-tab edit", "sync acknowledgement"])("rejects restore when a %s commits while its replacement key is being encrypted", async change => {
     await seedVault(data);
     const before = await rawStore();

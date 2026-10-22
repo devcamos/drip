@@ -172,8 +172,16 @@ describe("versioned offline sync", () => {
     api.getSession.mockResolvedValue({ data: null });
     await expect(cloud.syncNow()).rejects.toThrow("Sign in again");
     api.getSession.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    await saveData({ ...data, identity: { ...data.identity!, id: "other" } });
+    await saveData({ ...data, identity: { ...data.identity!, id: "8f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a11" } });
     await expect(cloud.syncNow()).rejects.toThrow("another account");
+  });
+  it.each([429, 503])("keeps queued data and reports a temporary session-check failure (%s) without asking for another login", async status => {
+    await configured(); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    api.getSession.mockResolvedValue({ data: null, error: { status } });
+    await expect(cloud.syncNow()).rejects.toThrow(status === 429 ? "temporarily rate limited" : "Could not check cloud sign-in");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await cloud.readCloudState())?.dirty).toBe(true);
+    expect(await loadData()).toEqual(data);
   });
   it("doesn't upload clean data, disabled sync or a second in-flight operation", async () => {
     expect(await cloud.syncNow()).toContain("off");
@@ -205,6 +213,16 @@ async function legacyEnvelope(value: AppData, encryptionKey = key): Promise<clou
   return { app: "drip-cloud", v: 1, iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...new Uint8Array(ct))) };
 }
 describe("device-only nickname boundary", () => {
+  it("keeps selected/custom holding identities and edited colours in encrypted recovery while nicknames remain private", async () => {
+    for (const holdingName of ["Realty Income", "Custom investment trust"]) {
+      const input = { ...labelled, accounts: [{ ...privateAccount, productCategory: "stocks-funds" as const, provider: "Trading212", holdingName, colour: "#ffeedd" }] };
+      const sealed = await cloud.seal(input, key);
+      expect(JSON.stringify(sealed)).not.toContain(holdingName);
+      const restored = await cloud.unseal(sealed, key);
+      expect(restored.accounts[0]).toMatchObject({ holdingName, colour: "#ffeedd", label: "", provider: "Trading212" });
+      expect(input.accounts[0].label).toBe("DEVICE_PRIVATE_NICKNAME");
+    }
+  });
   it("round-trips financial product and income fields while excluding new nested private fields", async () => {
     const input = { ...labelled, accounts: [{ ...privateAccount, productCategory: "cash-isa" as const, taxWrapper: "cash-isa" as const, reinvestIncome: true,
       bonus: { amount: 15.44, expectedDate: "2030-05-06", note: "PRIVATE_BONUS_NOTE" },

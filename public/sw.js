@@ -1,5 +1,6 @@
 // Public app-shell assets only. Never cache authentication, session or vault APIs.
-const CACHE = 'drip-shell-v15';
+importScripts('/sw-build.js');
+const CACHE = `drip-shell-${self.DRIP_BUILD_ID}`;
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png', '/fonts/DM-Sans.ttf'];
 const isAsset = path => path.startsWith('/_next/static/') || path.startsWith('/fonts/') || SHELL.includes(path);
 self.addEventListener('install', event => {
@@ -21,7 +22,10 @@ self.addEventListener('message', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k.startsWith('drip-') && k !== CACHE).map(k => caches.delete(k)));
+    // Another open tab may still need its previous build's immutable chunks.
+    // Reclaim old public shells on a later activation with no other open tab.
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.length <= 1) await Promise.all(keys.filter(k => k.startsWith('drip-') && k !== CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -36,6 +40,12 @@ self.addEventListener('fetch', event => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE); const hit = await cache.match(req);
     if (hit) return hit;
+    if (url.pathname.startsWith('/_next/static/')) {
+      for (const name of (await caches.keys()).filter(k => k.startsWith('drip-shell-') && k !== CACHE)) {
+        const previous = await (await caches.open(name)).match(req);
+        if (previous) return previous;
+      }
+    }
     const response = await fetch(req);
     if (response.ok && !response.redirected) await cache.put(req, response.clone());
     return response;

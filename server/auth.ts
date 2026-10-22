@@ -5,6 +5,7 @@ import WebSocket from "ws";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { passwordLogin } from "./password-login";
 import { databaseTypes } from "./database-types";
+import { deviceSessionHooks } from "./device-sessions";
 
 neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
   ? class extends WebSocket { constructor(address: string, protocols?: string | string[]) { super(address, protocols, { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY!) }); } }
@@ -28,6 +29,8 @@ export function authOptions() {
     emailAndPassword: { enabled: true, minPasswordLength: 32, requireEmailVerification: false },
     // Identifiers are generated from high-entropy recovery codes, not real email addresses.
     user: { changeEmail: { enabled: false } },
+    session: { additionalFields: { dripDeviceId: { type: "string" as const, required: false, input: false, returned: false } } },
+    databaseHooks: deviceSessionHooks(database()),
     rateLimit: { enabled: true, storage: "database" as const, window: 60, max: 30 },
     plugins: [passkey({ rpID: new URL(baseURL).hostname, rpName: "Drip", origin }), passwordLogin(database())],
   };

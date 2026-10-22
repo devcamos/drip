@@ -16,6 +16,7 @@ export interface Account {
   id: string;
   provider: string;      // e.g. "Zopa"
   label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
+  holdingName?: string; // stock/fund identity: portable with the encrypted financial record
   balance: number;       // GBP
   ratePct: number;       // annual %, e.g. 7
   rateType: RateType;

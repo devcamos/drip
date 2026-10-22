@@ -1,4 +1,5 @@
 import { getAuth, cloudConfigured } from "@/server/auth";
+import { guardDeviceAuthResponse } from "@/server/device-sessions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function boundedPasswordRequest(request: Request): Promise<Request | Response> {
@@ -16,7 +17,7 @@ async function boundedPasswordRequest(request: Request): Promise<Request | Respo
 async function handler(request: Request) {
   if (!cloudConfigured()) return Response.json({ error: "Cloud recovery is not configured." }, { status: 503 });
   const path = new URL(request.url).pathname;
-  if (request.method === "POST" && ["/api/auth/sign-in/gamertag", "/api/auth/gamertag-password"].includes(path)) {
+  if (request.method === "POST" && ["/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/gamertag-password"].includes(path)) {
     const bounded = await boundedPasswordRequest(request);
     if (bounded instanceof Response) return bounded;
     request = bounded;
@@ -26,6 +27,6 @@ async function handler(request: Request) {
     const session = await getAuth().api.getSession({ headers: request.headers });
     if (session?.user.id !== expected) return Response.json({ error: "Cloud account changed. Sign in again." }, { status: 401 });
   }
-  return getAuth().handler(request);
+  return guardDeviceAuthResponse(() => getAuth().handler(request));
 }
 export { handler as GET, handler as POST };

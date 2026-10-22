@@ -1,7 +1,7 @@
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showCloudRecovery } from "./vault-helpers";
-import { withAuthRetry } from "./auth-helpers";
+import { enableCloudRecovery, withAuthRetry } from "./auth-helpers";
 import { mkdir } from "node:fs/promises";
 
 async function createCashAccount(page: Page, category = "cash-isa", provider = "MoneyFarm") {
@@ -86,10 +86,11 @@ test(`${product.label}: income and bonus predictions survive reload and encrypte
 
 test("product and recorded income survive fresh-device encrypted cloud recovery", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database; no Production credentials in CI.");
+  test.setTimeout(120_000);
   const code = await createCashAccount(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Your saved recovery code").fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Enable encrypted cloud recovery" }).click(), page.getByText("Encrypted cloud copy saved.").first());
+  await enableCloudRecovery(page);
   const fresh = await browser.newContext();
   try {
     const restored = await fresh.newPage(); await restored.goto("http://localhost:4321");

@@ -12,9 +12,11 @@ const db = new Pool({ connectionString: process.env.DATABASE_URL });
 const options = {
   database: db, secret: process.env.BETTER_AUTH_SECRET, baseURL: process.env.BETTER_AUTH_URL,
   emailAndPassword: { enabled: true }, rateLimit: { enabled: true, storage: "database" }, plugins: [passkey()],
+  session: { additionalFields: { dripDeviceId: { type: "string", required: false, input: false, returned: false } } },
 };
 const migration = await getMigrations(options);
 await migration.runMigrations();
+await db.query('ALTER TABLE "session" ADD COLUMN IF NOT EXISTS "dripDeviceId" text');
 await db.query(`CREATE TABLE IF NOT EXISTS drip_vault (
   user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
   version integer NOT NULL CHECK (version > 0), envelope jsonb NOT NULL,

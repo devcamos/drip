@@ -8,7 +8,7 @@ test("login, signup and recovery stay separate and support browser history", asy
   await expect(page.getByTestId("code")).toHaveCount(0);
   await page.getByLabel("Password", { exact: true }).fill("synthetic unsent password");
 
-  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(page).toHaveURL(/#signup$/);
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeFocused();
   await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
