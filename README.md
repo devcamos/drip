@@ -144,4 +144,4 @@ Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## License
 
-Proprietary. Copyright Devonte Amos, all rights reserved. See [LICENSE](LICENSE).
+Proprietary. Copyright devcamos, all rights reserved. See [LICENSE](LICENSE).
