@@ -12,11 +12,11 @@ The Drip v1 static build (`npm run build` → `out/`) is ready, but there's no V
 **To do**
 - [ ] Create a `drip` project on the **Hobby** plan, linked to the private `devcamos/drip` repo.
 - [ ] Framework: Next.js (static export). Output directory: `out`.
-- [ ] PR and branch pushes → preview deployments only. Don't attach a production domain until Devonte says go.
-- [ ] Leave Vercel Deployment Protection on. If it blocks Devonte's iPhone, decide with him whether to use a share link or bypass.
+- [ ] PR and branch pushes → preview deployments only. Don't attach a production domain until the maintainer says go.
+- [ ] Leave Vercel Deployment Protection on. If it blocks the maintainer's iPhone, decide with the maintainer whether to use a share link or bypass.
 - [ ] Confirm the PWA installs from the preview URL on iOS Safari.
 
-**Done when:** a preview URL loads on Devonte's iPhone and installs to the home screen, and nothing is live in production.
+**Done when:** a preview URL loads on the maintainer's iPhone and installs to the home screen, and nothing is live in production.
 
 ---
 
