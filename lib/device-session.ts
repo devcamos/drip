@@ -1,4 +1,4 @@
-import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut, type VaultBinding } from "./db";
+import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut, type VaultBinding, type RetainedAccount } from "./db";
 import { authClient, connect, restoreCloud } from "./cloud";
 import { checkCode } from "./crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -102,7 +102,7 @@ export async function unlockDevice(code: string, expected?: VaultBinding) {
 }
 
 /** Explicitly replace this device from another cloud account, only after UI confirmation. */
-export async function restoreOtherAccount(code: string, expected?: { generation?: string; userId?: string }, quiet = false) {
+export async function restoreOtherAccount(code: string, expected?: { generation?: string; userId?: string; retained?: RetainedAccount }, quiet = false) {
   const current = await readDeviceSession();
   if (!current?.signedOut) throw new Error("Sign out before switching accounts.");
   if (expected && current.generation !== expected.generation) throw new Error("Device session changed. Try again.");
@@ -111,7 +111,9 @@ export async function restoreOtherAccount(code: string, expected?: { generation?
   if (!(await completeDeviceSession(current.generation, claimed))) throw new Error("Device session changed. Try again.");
   if (!quiet) notifyDeviceSession();
   try {
-    const data = await restoreCloud(code, expected?.userId, claimed.generation);
+    const data = expected?.retained
+      ? await restoreCloud(code, expected.userId, claimed.generation, { ...expected.retained, generation: claimed.generation })
+      : await restoreCloud(code, expected?.userId, claimed.generation);
     if (!quiet) notifyDeviceSession();
     return data;
   } catch (error) {

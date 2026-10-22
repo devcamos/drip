@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { Account, IncomeType } from "@/lib/types";
-import { productLabel, validDate } from "@/lib/products";
+import { displayProvider, productLabel, validDate } from "@/lib/products";
+import { accountCardStyle } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { IncomeSummary } from "./IncomeSummary";
 const today = () => M.ymd(new Date());
@@ -68,8 +69,11 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
       <ul className="list" data-testid="income-history">{[...groups].map(([period, total]) => <li key={period}><span>{by === "week" ? `Week of ${fmtDate(period)}` : new Date(period + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</span><b className="ok">+{M.gbp(total)}</b></li>)}</ul>
       <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" disabled={busy} aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={async () => {
         if (!confirm("Remove this recorded payment? Your balance will stay unchanged.")) return;
-        setBusy(true);
-        try { await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) })); }
+        setBusy(true); setMessage("");
+        try {
+          const saved = await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) }));
+          setMessage(saved === false ? "Payment removal could not be saved. Keep Drip open and retry." : "Payment removed. Your balance is unchanged.");
+        }
         catch { setMessage("Payment removal could not be saved. Keep Drip open and retry."); }
         finally { setBusy(false); }
       }}>Remove</button></span></li>)}</ul></details>
@@ -99,8 +103,9 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
   const forecast = M.projection([a], 12).at(-1)!;
   return <>
     <button className="btn ghost small" onClick={onBack}>← Accounts</button>
-    <div className="card" style={{ marginTop: 12, cursor: "default" }}>
-      <div className="row"><span className="prov">{a.provider}</span><span>{productLabel(a)}</span></div>
+    <div className="card" style={{ ...accountCardStyle(a.colour), marginTop: 12, cursor: "default" }}>
+      <div className="row"><span className="prov">{displayProvider(a.provider)}</span><span>{productLabel(a)}</span></div>
+      {a.holdingName && <div className="holding">{a.holdingName}</div>}
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
     <p className="muted">Your entered balance. Predictions and recorded income never change it automatically.</p>

@@ -7,6 +7,9 @@ import type { AppData } from "@/lib/types";
 import { hasPasskeyUnlock, unlockWithPasskey } from "@/lib/passkey-unlock";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
+import { SignupForm } from "./SignupForm";
+import { signUpPassword } from "@/lib/password-login";
+import { emptyData } from "@/lib/db";
 
 export function SignOutButton() {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -27,6 +30,7 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
   const [passkey, setPasskey] = useState(false);
   const { screen, navigate } = useAuthScreen();
   const recovering = mode === "migration" || screen === "recover";
+  const signingUp = mode !== "migration" && screen === "signup";
   const otherRecovery = screen === "other-recover" && mode !== "migration";
   useEffect(() => { setCode(""); setMessage(""); }, [screen]);
   useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setPasskey(value); }); return () => { active = false; }; }, []);
@@ -52,14 +56,15 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
     migration: { title: "Encrypt this device", section: "Protect local accounts", action: "Encrypt local data" },
   }[mode];
   const submitText = busy ? "Unlocking…" : copy.action;
-  const title = recovering && mode !== "migration" ? "Recover your account" : copy.title;
+  const title = signingUp ? "Create your account" : recovering && mode !== "migration" ? "Recover your account" : copy.title;
   const otherTitle = otherRecovery ? "Recover another account" : "Sign in to another account";
   let description = "Sign in with your gamertag and password. Your accounts stay encrypted while signed out.";
   if (recovering) description = "Use a recovery code if you forgot your password.";
+  if (signingUp) description = "Start a new Drip account with a gamertag and password.";
   if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
   return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : title}
     description={description}>
-    {!recovering && screen !== "other" && !otherRecovery && <>
+    {!recovering && !signingUp && screen !== "other" && !otherRecovery && <>
     <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />
     {passkey && <section className="panel" aria-label="Unlock with your passkey">
       <button className="btn" disabled={busy} onClick={async () => {
@@ -71,8 +76,13 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
       <p className="muted">Use Face ID, Touch ID or your device lock.</p>
     </section>}
     <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("recover")}>Forgot password?</button></div>
-    <div className="auth-footer"><button className="btn ghost" disabled={busy} onClick={() => navigate("other")}>Use another account</button></div>
+    <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Sign up</button>
+      <button className="text-link" disabled={busy} onClick={() => navigate("other")}>Use another account</button></div>
     </>}
+    {signingUp && <SignupForm replaceExisting onBusyChange={setBusy} onCreate={async (identity, password) => {
+      await signUpPassword(identity.handle, password, { ...emptyData(), identity }, true);
+      await onSignedIn();
+    }} />}
     {pending && <output className="banner warn">Drip is locked here. Cloud session sign-out is not yet confirmed; it will retry when you reconnect.</output>}
     {pending && <button className="btn ghost small" disabled={busy} onClick={async () => {
       setBusy(true);
@@ -104,7 +114,7 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
     {otherRecovery &&
       <CloudReturn fromSignedOut={mode === "signedOut"} replaceExisting codeLabel="Other account recovery code" onRestored={() => onSignedIn()} />
     }
-    {(recovering || screen === "other" || otherRecovery) && mode !== "migration" && <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("login")}>Back to sign in</button></div>}
+    {(recovering || signingUp || screen === "other" || otherRecovery) && mode !== "migration" && <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("login")}>Back to sign in</button></div>}
     {remoteMessage && <output className="muted">{remoteMessage}</output>}
     {message && <output className="err">{message}</output>}
   </AuthLayout>;

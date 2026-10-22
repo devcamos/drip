@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "@/lib/types";
-import { PRODUCTS, PROVIDERS, validDate } from "@/lib/products";
+import { PRODUCTS, PROVIDERS, TRADING_212_HOLDINGS, displayProvider, validDate } from "@/lib/products";
+import { accountCardStyle, normaliseColour } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 const today = () => M.ymd(new Date());
 const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
+const colourChoices = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
 function customProviderName(provider?: string) {
   if (!provider || Object.hasOwn(PROVIDERS, provider)) return "";
   return provider;
@@ -28,6 +30,10 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
   const [category, setCategory] = useState<ProductCategory>(existing?.productCategory ?? (existing ? "other" : "easy-access"));
   const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[existing?.productCategory ?? "other"].taxWrapper);
   const [label, setLabel] = useState(existing?.label ?? "");
+  const [holding, setHolding] = useState(existing?.holdingName ?? "");
+  const [customHolding, setCustomHolding] = useState(!!existing?.holdingName && !(TRADING_212_HOLDINGS as readonly string[]).includes(existing.holdingName));
+  const [colour, setColour] = useState(normaliseColour(existing ? existing.colour : PROVIDERS.Zopa));
+  const [colourChosen, setColourChosen] = useState(!!existing);
   const [balance, setBalance] = useState(existing ? String(existing.balance) : "");
   const [rate, setRate] = useState(existing ? String(existing.ratePct) : "");
   const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? "interest");
@@ -42,7 +48,8 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
-  const valid = validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
+  const validHolding = category !== "stocks-funds" || ((provider !== "Trading212" || !customHolding || !!holding.trim()) && holding.length <= 100);
+  const valid = validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
     setFrequency(defaults.frequency); setReinvest(defaults.reinvestIncome);
@@ -53,10 +60,10 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
     <form onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
-      const base: Account = { ...existing, id, provider: name, label: label.trim(), balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
+      const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,
         bonus: hasBonus ? { amount: M.round2(Number(bonusAmount)), expectedDate: bonusDate } : undefined,
-        colour: PROVIDERS[name] ?? PROVIDERS.Other, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
+        colour, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
         rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };
       const account = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
       setBusy(true); setError("");
@@ -68,10 +75,24 @@ export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?
       <select disabled={busy} id="account-category" value={category} onChange={e => chooseCategory(e.target.value as ProductCategory)}>{Object.entries(PRODUCTS).map(([value, product]) => <option value={value} key={value}>{product.label}</option>)}</select>
       <p className="muted">Sets calculation defaults for any provider. You can change the payment schedule below.</p>
       <label htmlFor="account-provider">Provider</label>
-      <select disabled={busy} id="account-provider" value={isOther ? "Other" : provider} onChange={e => setProvider(e.target.value)}>{Object.keys(PROVIDERS).map(p => <option key={p}>{p}</option>)}</select>
+      <select disabled={busy} id="account-provider" value={isOther ? "Other" : provider} onChange={e => { setProvider(e.target.value); setCustomHolding(!!holding && !(TRADING_212_HOLDINGS as readonly string[]).includes(holding)); if (!colourChosen) setColour(normaliseColour(PROVIDERS[e.target.value])); }}>{Object.keys(PROVIDERS).map(p => <option key={p} value={p}>{displayProvider(p)}</option>)}</select>
       {isOther && <><label htmlFor="custom-provider">Provider name</label><input disabled={busy} id="custom-provider" value={custom} onChange={e => setCustom(e.target.value)} /></>}
+      {category === "stocks-funds" && <>
+        {provider === "Trading212" && <><label htmlFor="account-holding">Stock / fund</label><select disabled={busy} id="account-holding" value={customHolding ? "custom" : holding} onChange={e => { const custom = e.target.value === "custom"; setCustomHolding(custom); setHolding(custom ? "" : e.target.value); }}>
+          <option value="">Whole account / no individual holding</option>
+          {TRADING_212_HOLDINGS.map(stock => <option key={stock}>{stock}</option>)}
+          <option value="custom">Other stock or fund</option>
+        </select></>}
+        {(provider !== "Trading212" || customHolding) && <><label htmlFor="holding-name">Stock / fund name{provider !== "Trading212" ? " (optional)" : ""}</label><input disabled={busy} id="holding-name" value={holding} maxLength={100} onChange={e => { setHolding(e.target.value); if (provider !== "Trading212") setCustomHolding(!!e.target.value && !(TRADING_212_HOLDINGS as readonly string[]).includes(e.target.value)); }} /></>}
+        <p className="muted">Choose a holding or track the whole account. Enter your own balance, dividend yield and payment schedule below.</p>
+      </>}
       {category === "stocks-funds" && <label className="check-label"><input disabled={busy} type="checkbox" checked={wrapper === "stocks-shares-isa"} onChange={e => setWrapper(e.target.checked ? "stocks-shares-isa" : "none")} />Held in a Stocks &amp; Shares ISA</label>}
       <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input disabled={busy} id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={e => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
+      <fieldset className="account-colours"><legend>Account colour</legend>
+        <div className="colour-choices">{Object.entries(colourChoices).map(([name, value]) => <button disabled={busy} key={name} type="button" className="colour-swatch" aria-label={`${name} account colour`} aria-pressed={colour === value} title={name} style={{ backgroundColor: value }} onClick={() => { setColour(value); setColourChosen(true); }} />)}</div>
+        <div className="colour-custom"><label htmlFor="account-colour">Custom account colour</label><input disabled={busy} id="account-colour" type="color" value={colour} onChange={e => { setColour(e.target.value); setColourChosen(true); }} /><button disabled={busy} type="button" className="btn ghost small" onClick={() => { setColour(normaliseColour(PROVIDERS[name] ?? PROVIDERS.Other)); setColourChosen(false); }}>Use provider colour</button></div>
+        <div className="card colour-preview" style={accountCardStyle(colour)} aria-label="Account card preview"><span className="prov">{displayProvider(name) || "Your account"}</span><div className="meta">{category === "stocks-funds" && holding.trim() ? holding.trim() : PRODUCTS[category].label}</div></div>
+      </fieldset>
       <div className="grid">
         <div><label htmlFor="account-balance">Balance £</label><input disabled={busy} id="account-balance" inputMode="decimal" aria-label="Balance" value={balance} onChange={e => setBalance(e.target.value)} placeholder="3000" /></div>
         <div><label htmlFor="account-rate">{rateType === "dividend" ? "Expected dividend yield % a year" : "Standard interest rate % a year"}</label><input disabled={busy} id="account-rate" inputMode="decimal" aria-label="Rate" value={rate} onChange={e => setRate(e.target.value)} placeholder="7" /></div>

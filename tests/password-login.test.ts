@@ -8,6 +8,7 @@ import { setLoginPassword, signInPassword, passwordUsername, signUpPassword, pas
 import { emptyData, loadData, lockLocalVault, passwordUnlockContext, savePasswordUnlock, setItem, getItem, commitCloudRestore } from "../lib/db";
 import { codeVerifier } from "../lib/crypto";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
+import { AccountSwitchRequired } from "../lib/account-switch";
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "tester", createdAt: "now" } };
 const password = "Green meadow 42!";
 beforeEach(async () => {
@@ -73,7 +74,7 @@ it("restores a fresh browser with just gamertag and password", async () => {
   lockLocalVault(true);
   await new Promise(resolve => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = r.onerror = () => resolve(null); });
   vi.stubGlobal("navigator", { onLine: true });
-  request.mockResolvedValueOnce(Response.json({ owner: "owner", envelope }));
+  request.mockImplementation(async () => Response.json({ owner: "owner", envelope }));
   cloud.restoreCloud.mockImplementationOnce(async (root: string, _user: unknown, generation: string) => {
     expect(root).toBe(fixtureCode); await commitCloudRestore(data, undefined, await codeVerifier(root), generation, generation, root); return data;
   });
@@ -85,8 +86,58 @@ it("requires a connection for first-time login and never restores over an existi
   const { generateRecoveryCode } = await import("../lib/crypto");
   const other = await wrapPasswordRoot(generateRecoveryCode(), "other", password, "other-owner");
   vi.stubGlobal("navigator", { onLine: true }); request.mockResolvedValueOnce(Response.json({ owner: "other-owner", envelope: other }));
-  await expect(signInPassword("other", password)).rejects.toThrow(/different account/);
+  const before = await rawStore();
+  await expect(signInPassword("other", password)).rejects.toBeInstanceOf(AccountSwitchRequired);
   expect(await loadData()).toEqual(data); expect(cloud.restoreCloud).not.toHaveBeenCalled();
+  expect(request.mock.calls.map(call => call[0])).toEqual(["/api/auth/sign-in/gamertag-key"]);
+  expect(await rawStore()).toEqual(before);
+});
+
+it("requires exact consent and a synced local copy before switching, then carries the guard into restore", async () => {
+  const state = { userId: "original-owner", identityId: data.identity.id, key: {} as CryptoKey, version: 1, dirty: false, lastSyncAt: "now", generation: "cloud", revision: 0 };
+  await seedVault(data, fixtureCode, state);
+  await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "out" });
+  const otherRoot = (await import("../lib/crypto")).generateRecoveryCode();
+  const envelope = await wrapPasswordRoot(otherRoot, "other", password, "other-owner");
+  vi.stubGlobal("navigator", { onLine: true });
+  request.mockImplementation(async () => Response.json({ owner: "other-owner", envelope }));
+  let choice: AccountSwitchRequired;
+  try { await signInPassword("other", password); throw new Error("Expected a switch choice"); } catch (error) { expect(error).toBeInstanceOf(AccountSwitchRequired); choice = error as AccountSwitchRequired; }
+  expect(choice!.canReplace).toBe(true);
+  expect(request).toHaveBeenCalledOnce();
+  await expect(signInPassword("other", password, true, { ...choice!.retained, records: "changed" })).rejects.toThrow(/saved account changed/);
+  expect(request).toHaveBeenCalledOnce();
+  cloud.restoreCloud.mockImplementationOnce(async (root: string, owner: string, generation: string, retained: unknown) => {
+    expect(root).toBe(otherRoot); expect(owner).toBe("other-owner"); expect(retained).toEqual({ ...choice!.retained, generation });
+    const restored = { ...data, identity: { ...data.identity, id: "86472567-7c55-472d-8438-4fbef8538b66", handle: "other" } };
+    await commitCloudRestore(restored, undefined, await codeVerifier(root), generation, generation, root, undefined, undefined, retained as any);
+    return restored;
+  });
+  await signInPassword("other", password, true, choice!.retained);
+  expect((await loadData()).identity?.handle).toBe("other");
+  expect(request.mock.calls.filter(call => call[0] === "/api/auth/sign-in/gamertag")).toHaveLength(1);
+  expect(JSON.parse(request.mock.calls.at(-1)![1].body)).toMatchObject({ expectedOwner: "other-owner", expectedEnvelope: envelope.ct });
+});
+
+it.each([true, false])("keeps dirty or device-only accounts when an explicit switch is attempted (cloud: %s)", async connected => {
+  if (connected) await seedVault(data, fixtureCode, { userId: "original", identityId: data.identity.id, key: {} as CryptoKey, version: 1, dirty: true, lastSyncAt: "now", generation: "cloud", revision: 2 });
+  const otherRoot = (await import("../lib/crypto")).generateRecoveryCode();
+  const envelope = await wrapPasswordRoot(otherRoot, "other", password, "other-owner");
+  vi.stubGlobal("navigator", { onLine: true }); request.mockImplementation(async () => Response.json({ owner: "other-owner", envelope }));
+  const before = await rawStore();
+  await expect(signInPassword("other", password, true)).rejects.toMatchObject({ name: "AccountSwitchRequired", canReplace: false });
+  expect(await rawStore()).toEqual(before); expect(cloud.restoreCloud).not.toHaveBeenCalled();
+  expect(request).toHaveBeenCalledOnce();
+});
+
+it("rejects a changed final encrypted wrapper without opening or replacing the local account", async () => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", password, "owner");
+  vi.stubGlobal("navigator", { onLine: true });
+  const changed = await wrapPasswordRoot(fixtureCode, "tester", password, "owner");
+  request.mockResolvedValueOnce(Response.json({ owner: "owner", envelope })).mockResolvedValueOnce(Response.json({ owner: "owner", envelope: changed }));
+  const before = await rawStore();
+  await expect(signInPassword("tester", password)).rejects.toThrow(/Sign-in changed/);
+  expect(await rawStore()).toEqual(before); expect(cloud.restoreCloud).not.toHaveBeenCalled();
 });
 
 async function freshSignupDevice() {

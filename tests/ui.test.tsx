@@ -30,6 +30,7 @@ async function seed(d: Partial<AppData>, code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF")
 }
 
 beforeEach(() => {
+  localStorage.removeItem("drip-install-task-v1");
   vi.stubGlobal("confirm", () => true);
   signup.mockImplementation(async (_name, _password, data) => { await seedVault(data); });
 });
@@ -56,7 +57,7 @@ describe("onboarding", () => {
   });
   it("keeps registration failures on signup and opens Accounts only after a successful retry", async () => {
     signup.mockRejectedValueOnce(new Error("That gamertag is already used for sign-in. Choose another."));
-    render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    render(<Drip />); fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     type(screen.getByLabelText(/Gamertag/), "devo");
     type(screen.getByLabelText("Create password"), signupPassword);
     type(screen.getByLabelText("Confirm new account password"), signupPassword);
@@ -69,7 +70,7 @@ describe("onboarding", () => {
   });
   it("needs a valid gamertag and matching password, then opens Accounts without recovery", async () => {
     render(<Drip />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     const handle = await screen.findByLabelText(/Gamertag/);
     const start = screen.getByRole("button", { name: "Create account" });
     expect(screen.queryByTestId("code")).toBeNull();
@@ -248,7 +249,7 @@ describe("accounts", () => {
 
     // detail
     expect(await screen.findByText("My Bank")).toBeInTheDocument();
-    expect(screen.getByText("Estimated next payment")).toBeInTheDocument();
+    expect(await screen.findByText("Estimated next payment")).toBeInTheDocument();
 
     click("Top up");
     type(screen.getByLabelText("amount"), "300");
@@ -389,14 +390,14 @@ describe("backup", () => {
 });
 
 describe("banners", () => {
-  it("iOS install hint, persistence warning and dismissals", async () => {
+  it("iOS install task omits old warnings and can be dismissed", async () => {
     await seed({});
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)");
     Object.defineProperty(navigator, "storage", { configurable: true, value: { persisted: async () => false, persist: async () => false } });
     render(<Drip />);
     expect(await screen.findByText(/Add to Home Screen/)).toBeInTheDocument();
     expect(screen.queryByText(/may clear Drip's data/)).toBeNull();
-    for (const b of screen.getAllByRole("button", { name: "✕" })) fireEvent.click(b);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss install task" }));
     expect(screen.queryByText(/Add to Home Screen/)).toBeNull();
     expect(screen.queryByText(/may clear Drip's data/)).toBeNull();
     delete (navigator as any).storage;
@@ -407,7 +408,7 @@ describe("banners", () => {
     await screen.findByText("Total balance");
     const prompt = vi.fn();
     act(() => { const e = new Event("beforeinstallprompt"); (e as any).prompt = prompt; window.dispatchEvent(e); });
-    expect(await screen.findByText(/Install Drip for quick access/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Install Drip task" })).toBeInTheDocument();
     click("Install");
     expect(prompt).toHaveBeenCalled();
     expect(screen.queryByText(/over 2 weeks since your last backup/)).toBeNull();
@@ -485,7 +486,7 @@ describe("app lock", () => {
 describe("onboarding draft persistence", () => {
   it("keeps the unsent gamertag in memory but clears passwords after leaving and coming back", async () => {
     const first = render(<Drip />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign up" }));
     await screen.findByLabelText(/Gamertag/);
     type(screen.getByLabelText(/Gamertag/), "devo");
     await waitFor(async () => expect((await (await import("@/lib/draft")).loadDraft())?.handle).toBe("devo"));

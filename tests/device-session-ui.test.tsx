@@ -15,6 +15,18 @@ beforeEach(() => {
   passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
 });
 describe("visible sign-out and code return", () => {
+  it.each(["signedOut", "locked"] as const)("offers Sign up from %s, supports the route and returns without replacing data", async mode => {
+    const resumed = vi.fn(); render(<SignedOut mode={mode} onSignedIn={resumed} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign up" }));
+    expect(window.location.hash).toBe("#signup");
+    expect(screen.getByRole("heading", { name: "Create your account" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Create password")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Recovery code")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+    expect(screen.getByRole("form", { name: "Password sign-in" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Create password")).toBeNull();
+    expect(resumed).not.toHaveBeenCalled(); expect(actions.restoreOtherAccount).not.toHaveBeenCalled();
+  });
   it("offers saved-passkey unlock, keeps recovery after cancellation and calls back only after success", async () => {
     passkeys.hasPasskeyUnlock.mockResolvedValue(true);
     passkeys.unlockWithPasskey.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));

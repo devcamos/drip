@@ -9,6 +9,7 @@ import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
 import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
 import { PwaStatus } from "./PwaStatus";
+import { InstallTask, useInstallTask } from "./InstallTask";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
@@ -17,12 +18,13 @@ import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
-import { passwordError } from "@/lib/password-crypto";
+import { SignupForm } from "./SignupForm";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
 import { IncomeSummary } from "./IncomeSummary";
-import { productLabel } from "@/lib/products";
+import { displayProvider, productLabel } from "@/lib/products";
+import { accountCardStyle } from "@/lib/account-colour";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
@@ -31,6 +33,7 @@ type Verifier = { salt: string; hash: string };
 const today = () => M.ymd(new Date());
 
 export default function Drip() {
+  const installTask = useInstallTask();
   const [gate, setGate] = useState<{ status: Awaited<ReturnType<typeof localVaultStatus>>; signedOut: boolean }>();
   const [error, setError] = useState("");
   const sequence = useRef(0);
@@ -54,10 +57,10 @@ export default function Drip() {
   if (!gate) return <main><p className="muted">Loading…</p></main>;
   if (gate.signedOut) return <SignedOut mode="signedOut" onSignedIn={refresh} />;
   if (gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.status} onSignedIn={refresh} />;
-  return <UnlockedDrip />;
+  return <UnlockedDrip installTask={installTask} />;
 }
 
-function UnlockedDrip() {
+function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof useInstallTask> }>) {
   const [data, setData] = useState<AppData | null>(null);
   const latestData = useRef<AppData | null>(null);
   const dataGeneration = useRef(0);
@@ -66,9 +69,6 @@ function UnlockedDrip() {
   const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
-  const [installHint, setInstallHint] = useState<"ios" | "android" | null>(null);
-  const [deferred, setDeferred] = useState<any>(null);
-  const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
   const loadSequence = useRef(0);
   const [locked, setLocked] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -100,12 +100,7 @@ function UnlockedDrip() {
         if (!already) await navigator.storage.persist();
       }
     })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (!standalone && ios) setInstallHint("ios");
-    const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e); if (!standalone) setInstallHint("android"); };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => { loadSequence.current++; window.removeEventListener("beforeinstallprompt", onPrompt); };
+    return () => { loadSequence.current++; };
   }, []);
 
   const update = useCallback((fn: (d: AppData) => AppData) => {
@@ -149,7 +144,7 @@ function UnlockedDrip() {
     setVerifier(savedVerifier); setView({ name: "home" }); replaceData(d);
   }} />;
   if (!data.identity) return <main><h1>Pick your gamertag</h1>
-    <p className="muted">Drip now gives you a gamertag. It&apos;s stored on this device only and will become your account name when sync arrives.</p>
+    <p className="muted">Choose a display gamertag for your existing accounts. This label does not create password sign-in. You can add a sign-in gamertag and password later in Settings → Sign-in &amp; password.</p>
     <div className="panel"><HandlePicker onPick={async (identity) => {
       if (!identity) return;
       const d = { ...data, identity };
@@ -158,21 +153,6 @@ function UnlockedDrip() {
     }} cta="Save gamertag" /></div></main>;
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
-
-  const banners = (
-    <>
-      {installHint && !dismissed.install && (
-        <div className="banner info">
-          {installHint === "ios"
-            ? <span>Install Drip: tap <b>Share</b> then <b>Add to Home Screen</b>. Keep cloud recovery or exported backups too; installation alone doesn&apos;t guarantee data retention.</span>
-            : <span>Install Drip for quick access and offline tracking.</span>}
-          {installHint === "android" && deferred && <button className="btn small" onClick={async () => { deferred.prompt(); setDeferred(null); setInstallHint(null); }}>Install</button>}
-          <button className="btn ghost small" onClick={() => setDismissed({ ...dismissed, install: true })}>✕</button>
-        </div>
-      )}
-
-    </>
-  );
 
   let body: React.ReactNode;
   switch (view.name) {
@@ -208,7 +188,7 @@ function UnlockedDrip() {
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}{banners}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}<InstallTask state={installTask} />{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -238,7 +218,6 @@ function HandlePicker({ onPick, cta, initial = "", onRaw }: Readonly<{ onPick: (
 
 function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, restored?: AppData, identity?: I.Identity, fromCloud?: boolean, expectedGeneration?: string, root?: string, password?: string) => void | Promise<void> }>) {
   const [draft, setDraft] = useState<{ handle: string } | null>(null);
-  const [identity, setIdentity] = useState<I.Identity | null>(null);
   const [draftAttempt, setDraftAttempt] = useState(0);
   useEffect(() => {
     let active = true;
@@ -248,11 +227,10 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     })().catch(() => { if (active) setError("Could not prepare signup on this device. Try again."); });
     return () => { active = false; };
   }, [draftAttempt]);
-  const [password, setPassword] = useState(""); const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const { screen: route, navigate } = useAuthScreen();
   const screen = route === "other" || route === "other-recover" ? "login" : route;
-  useEffect(() => { setPassword(""); setConfirmation(""); setError(""); }, [screen]);
+  useEffect(() => { setError(""); }, [screen]);
   if (!draft) return <main>{error ? <><p role="alert">{error}</p><button className="btn" onClick={() => { setError(""); setDraftAttempt(n => n + 1); }}>Try again</button></> : <p className="muted">Loading…</p>}</main>;
   const screenCopy = {
     login: { title: "Welcome back", description: "Sign in to your Drip account." },
@@ -260,14 +238,6 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     recover: { title: "Recover your account", description: "Get back to your accounts using a saved recovery code." },
     backup: { title: "Restore a backup", description: "Get back to your accounts using a saved recovery code." },
   }[screen];
-  async function createAccount(event: React.SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!identity || password !== confirmation || passwordError(password)) return;
-    setBusy(true); setError("");
-    try { await onDone(undefined, undefined, identity, false, undefined, undefined, password); setPassword(""); setConfirmation(""); }
-    catch (error) { setError((error as Error).message || "Could not create your account. Try again."); }
-    finally { setBusy(false); }
-  }
   return (
     <AuthLayout title={screenCopy.title} description={screenCopy.description}>
       <PwaStatus />
@@ -278,26 +248,15 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
         await onDone(v, restored, undefined, true);
       }} />
       <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("recover")}>Forgot password?</button></div>
-      <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Create account</button></div>
+      <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Sign up</button></div>
       </>}
       {screen === "recover" && <>
         <CloudReturn onRestored={async (d, c) => onDone(await C.codeVerifier(c), d, undefined, true)} />
         <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("backup")}>Restore a backup</button></div>
       </>}
       {screen === "signup" && (
-        <form className="panel auth-signup" onSubmit={createAccount}>
-          <h2>Your gamertag</h2>
-          <HandlePicker onPick={setIdentity} initial={draft.handle} onRaw={(h) => saveDraft({ handle: h })} />
-          <label htmlFor="new-account-password">Create password</label>
-          <input id="new-account-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} value={password} onChange={event => setPassword(event.target.value)} />
-          <label htmlFor="new-account-confirm">Confirm new account password</label>
-          <input id="new-account-confirm" type="password" autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />
-          <p className="muted">Use at least 12 characters. You can save it in your password manager.</p>
-          <div className="row-gap">
-            <button type="submit" className="btn" disabled={busy || !identity || !!passwordError(password) || password !== confirmation}>{busy ? "Creating account…" : "Create account"}</button>
-          </div>
-          {error && <p role="alert" className="err">{error}</p>}
-        </form>
+        <SignupForm initialHandle={draft.handle} onHandleChange={h => { void saveDraft({ handle: h }); }} onBusyChange={setBusy}
+          onCreate={async (identity, password) => { await onDone(undefined, undefined, identity, false, undefined, undefined, password); }} />
       )}
       {screen === "backup" && (
         <div className="panel">
@@ -318,26 +277,30 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
       <p className="muted">Total balance</p>
       <div className="big">{M.gbp(M.totalBalance(data.accounts))}</div>
       <p className="muted">Estimated ≈ {M.gbp(M.totalMonthlyIncome(data.accounts))} a month · {M.weightedYield(data.accounts).toFixed(2)}% average</p>
-      {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
       {data.accounts.length === 0 ? (
         <div className="panel"><p>No accounts yet. Add your first savings or investment account to see what it earns.</p><button className="btn" onClick={add}>Add account</button></div>
       ) : (
-        <div className="stack">
-          {data.accounts.map((a) => {
-            const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
-            return (
-              <button key={a.id} className="card" onClick={() => open(a.id)}>
-                <div className="row"><span className="prov">{a.provider}</span><span className="bal">{M.gbp(a.balance)}</span></div>
-                <div className="row meta"><span>{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
-                <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
-              </button>
-            );
-          })}
-        </div>
+        <section aria-labelledby="wallet-title">
+          <div className="wallet-heading"><h2 id="wallet-title">Accounts</h2><span className="muted">{data.accounts.length} {data.accounts.length === 1 ? "account" : "accounts"}</span></div>
+          {data.accounts.length > 1 && <p id="wallet-hint" className="muted wallet-hint">Scroll through your accounts. Tap a card to open it.</p>}
+          <div className="stack" role="region" aria-label="Account cards" aria-describedby={data.accounts.length > 1 ? "wallet-hint" : undefined} tabIndex={0}>
+            {data.accounts.map((a) => {
+              const next = M.nextPayout(a.nextPayoutDate, a.frequency, t);
+              return (
+                <button key={a.id} className="card" style={accountCardStyle(a.colour)} onClick={() => open(a.id)}>
+                  <div className="row"><span className="prov">{a.holdingName ?? displayProvider(a.provider)}</span><span className="bal">{M.gbp(a.balance)}</span></div>
+                  <div className="row meta"><span>{a.holdingName && <>{displayProvider(a.provider)} · </>}{productLabel(a)}{a.label && <> · <span>{a.label}</span></>}</span><span>{a.ratePct}%</span></div>
+                  <div className="meta" style={{ marginTop: 18 }}>Estimated ≈ {M.gbp(M.monthlyIncome(a.balance, a.ratePct))} a month · {a.frequency === "daily" ? "Daily payments" : `next expected ${fmtDate(next)}`}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
+      {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
       {up.length > 0 && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming estimated payments</h2>
-          <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.provider}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
+          <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.holdingName ?? displayProvider(p.account.provider)}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
         </div>
       )}
     </>

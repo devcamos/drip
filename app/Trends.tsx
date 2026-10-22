@@ -30,8 +30,9 @@ function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   return { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path };
 }
 
-export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssumptions: (value: Assumptions) => void }>) {
+export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssumptions: (value: Assumptions) => boolean | Promise<boolean> }>) {
   const [range, setRange] = useState<Range>("Future"); const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState("");
   const assumptions = data.projection ?? { monthlyDeposit: 0, years: 1 };
   const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
   const fillId = useId();
@@ -70,11 +71,20 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
       {actual.length < 2 && <p className="muted">Your history starts today. Recorded balances will build as you use Drip.</p>}
       {future && <>
         <p className="muted">Uses current rates or dividend yields and each account&apos;s reinvestment setting. Income is averaged monthly; future-dated pending bonuses are included once. Top-ups arrive at month end, split by today&apos;s account balances, with no withdrawals or investment price changes. Estimates are before tax and fees; actual returns can differ. Income paid out isn&apos;t added to the projected account balance.</p>
-        <button className="btn ghost" aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit projection</button>
-        {editing && <form onSubmit={event => { event.preventDefault(); if (validDeposit) { onAssumptions({ monthlyDeposit: Number(deposit), years }); setEditing(false); } }}>
-          <label htmlFor="projection-deposit">Planned monthly top-up (£)</label><input id="projection-deposit" type="number" min="0" max="1000000" step="0.01" value={deposit} onChange={e => setDeposit(e.target.value)} />
-          <label htmlFor="projection-years">Project ahead</label><select id="projection-years" value={years} onChange={e => setYears(Number(e.target.value))}>{[1, 3, 5].map(n => <option key={n} value={n}>{n} {n === 1 ? "year" : "years"}</option>)}</select>
-          <div className="row-gap"><button type="submit" className="btn" disabled={!validDeposit}>Save projection</button></div>
+        <button className="btn ghost" disabled={saving} aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit projection</button>
+        {editing && <form aria-label="Projection assumptions" onSubmit={async event => {
+          event.preventDefault(); if (!validDeposit || saving) return;
+          setSaving(true); setSaveError("");
+          try {
+            if (await onAssumptions({ monthlyDeposit: Number(deposit), years })) setEditing(false);
+            else setSaveError("Projection could not be saved. Your entries are kept; retry Save projection.");
+          } catch { setSaveError("Projection could not be saved. Your entries are kept; retry Save projection."); }
+          finally { setSaving(false); }
+        }}>
+          <label htmlFor="projection-deposit">Planned monthly top-up (£)</label><input disabled={saving} id="projection-deposit" type="number" min="0" max="1000000" step="0.01" value={deposit} onChange={e => setDeposit(e.target.value)} />
+          <label htmlFor="projection-years">Project ahead</label><select disabled={saving} id="projection-years" value={years} onChange={e => setYears(Number(e.target.value))}>{[1, 3, 5].map(n => <option key={n} value={n}>{n} {n === 1 ? "year" : "years"}</option>)}</select>
+          <div className="row-gap"><button type="submit" className="btn" disabled={!validDeposit || saving}>{saving ? "Saving projection…" : "Save projection"}</button></div>
+          {saveError && <p role="alert" className="err">{saveError}</p>}
         </form>}
       </>}
       <details className="chart-table"><summary>View chart figures</summary><table><thead><tr><th>Date</th><th>Balance</th><th>Type</th></tr></thead><tbody>{actual.map(p => <tr key={p.date}><td>{p.date === today ? "Today" : dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Recorded</td></tr>)}{future && forecast.slice(1).map(p => <tr key={p.date}><td>{dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Estimate</td></tr>)}</tbody></table></details>
