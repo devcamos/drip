@@ -1,0 +1,6 @@
+# Changes to these paths always need review by the maintainer (@devcamos).
+/.github/ @devcamos
+/.env.example @devcamos
+/lib/crypto.ts @devcamos
+/server/auth.ts @devcamos
+/app/api/auth/ @devcamos
