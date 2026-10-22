@@ -1,8 +1,17 @@
 # Drip
 
-A local-first savings tracker and installable PWA. Nexus colours and self-hosted DM Sans. No real name, email address or phone number is requested.
+A local-first savings and passive-income tracker, installable as a PWA. Track ISAs, savers and investments, record interest and dividends, and see projections. Data is encrypted on the device, with optional end-to-end encrypted cloud recovery. No real name, email address or phone number is requested.
 
-## Run and test
+**Live:** https://drip-one-xi.vercel.app
+
+## Stack
+
+- Next.js 16 (App Router), React 19, TypeScript, Node 24
+- IndexedDB with AES-256-GCM encryption on the device; Better Auth (passwords and passkeys) and PostgreSQL (Neon) for optional encrypted cloud recovery
+- Self-hosted DM Sans; warm ivory / terracotta / espresso palette
+- Vitest with coverage, Playwright (mobile Chromium, offline reload); deployed on Vercel
+
+## Run and test locally
 
 Node **24.22.1** (the current Vercel-supported LTS; see `.nvmrc`). `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, then `npm start`.
 CI and PR Intelligence use the pinned runtime. Vercel supports the 24.x major and manages its patch rollout. Keep `@types/node` on 24.x to match the runtime; update within that major. Assess newer-major dependency suggestions against host and framework support before upgrading.
@@ -128,3 +137,11 @@ Use **Sign out** beside your gamertag. It locks Drip on this device, pauses clou
 Offline/failed cloud revocation stays visibly pending, retries on reconnect, and offers Retry cloud sign-out. Reload and other tabs keep the gate. Unlocking one tab does not give keys to another; each unlocks independently. Private requests and sign-out use the browser's shared Web Lock where available (per-tab queue fallback); generation checks reject stale sign-in/sign-out and restore completion. File/cloud restores commit data, verifier and connection atomically only while the initiating device session remains active. Sign-out does not delete the cloud account or cloud copy.
 
 From the signed-out screen, **Use another account** offers gamertag/password sign-in for an existing cloud account; **Forgot password?** there opens recovery with a saved code. Both restore the latest successfully synced copy after confirmation that it replaces this browser's local accounts. Unsynced edits are not transferred: sign back in to the current account and sync or export a backup before replacing it. A failed restore keeps the previous copy intact. The new account's ciphertext, verifier, wrapped data key and active device generation commit together; usable keys are activated only in memory after the commit. Cancelling the prompt leaves the device signed out. Sign-out retains local data; confirmed account replacement is a different action.
+
+## Security
+
+Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
+
+## License
+
+Proprietary. Copyright Devonte Amos, all rights reserved. See [LICENSE](LICENSE).
