@@ -33,7 +33,7 @@ export async function resolveRecoveryCode(code: string): Promise<string> {
 export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: string) {
   const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }) });
   if (!response.ok) throw new Error("Could not save recovery codes. Your existing codes still work. Sign in again and retry.");
-  try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !records.some(record => record.locator === old.locator)), ...records].slice(-12)); return true; } catch { return false; }
+  const replaced = new Set(records.map(record => record.locator)); try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !replaced.has(old.locator)), ...records].slice(-12)); return true; } catch { return false; }
 }
 export function downloadRecoveryCodes(codes: string[], handle?: string) {
   const heading = handle ? `DRIP RECOVERY CODES\nGamertag: ${handle}` : "DRIP RECOVERY CODES";

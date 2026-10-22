@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "project": "Drip",
+  "reviewPrinciples": [
+    "Report only findings supported by the changed files, diff, or diagnostic output.",
+    "Prefer small, actionable findings over speculative redesigns.",
+    "Treat authentication, authorization, billing, and data integrity changes as high-risk boundaries.",
+    "Do not treat generated files, lockfiles, or diagnostic noise as architectural violations by themselves."
+  ],
+  "rules": [
+    {
+      "id": "ARCH-001",
+      "severity": "high",
+      "title": "Preserve application boundaries",
+      "description": "UI components should not own persistence, billing, or authentication logic. Route handlers should validate transport input and delegate reusable business logic to services or domain modules.",
+      "evidence": [
+        "app/api/**",
+        "components/**",
+        "lib/services/**",
+        "lib/**"
+      ]
+    },
+    {
+      "id": "ARCH-002",
+      "severity": "critical",
+      "title": "Enforce authentication and authorization server-side",
+      "description": "Protected routes and mutations must establish identity and authorization on the server. Client-provided user IDs, roles, tiers, or ownership claims must not be trusted.",
+      "evidence": [
+        "app/api/**",
+        "lib/auth*.ts",
+        "middleware.ts"
+      ]
+    },
+    {
+      "id": "ARCH-003",
+      "severity": "high",
+      "title": "Validate external input",
+      "description": "API parameters, request bodies, webhook payloads, environment-derived values, and third-party responses must be validated before entering domain or persistence code.",
+      "evidence": [
+        "app/api/**",
+        "lib/**",
+        "config/**"
+      ]
+    },
+    {
+      "id": "ARCH-004",
+      "severity": "high",
+      "title": "Keep persistence changes compatible and atomic",
+      "description": "Schema and migration changes must preserve existing data, define intentional nullability and defaults, and use transactions when a business operation requires multiple writes to succeed together.",
+      "evidence": [
+        "prisma/schema.prisma",
+        "prisma/migrations/**",
+        "lib/services/**"
+      ]
+    },
+    {
+      "id": "ARCH-005",
+      "severity": "high",
+      "title": "Protect billing and subscription invariants",
+      "description": "Entitlements must derive from trusted server-side subscription state. Billing mutations and webhooks must be authenticated, idempotent, and resilient to retries or out-of-order delivery.",
+      "evidence": [
+        "app/api/**",
+        "lib/stripe*.ts",
+        "lib/saas/**"
+      ]
+    },
+    {
+      "id": "ARCH-006",
+      "severity": "medium",
+      "title": "Avoid dependency and module cycles",
+      "description": "New dependencies must have a clear purpose, and module changes must not introduce circular imports, forbidden layer crossings, duplicate platform capabilities, or unnecessary client bundle weight.",
+      "evidence": [
+        "package.json",
+        "package-lock.json",
+        "dependency-cruiser output",
+        "npm ls output"
+      ]
+    },
+    {
+      "id": "ARCH-007",
+      "severity": "high",
+      "title": "Keep secrets and sensitive data out of outputs",
+      "description": "Secrets, tokens, credentials, private customer data, and sensitive authentication details must not be committed, logged, returned by APIs, or exposed to browser bundles.",
+      "evidence": [
+        "config/**",
+        "app/api/**",
+        "lib/**",
+        "NEXT_PUBLIC_* usage"
+      ]
+    },
+    {
+      "id": "ARCH-008",
+      "severity": "medium",
+      "title": "Verify behavior at the correct layer",
+      "description": "Behavioral changes need focused tests. Tests should cover authorization failures, validation boundaries, domain invariants, and error paths in addition to the successful path.",
+      "evidence": [
+        "tests/**",
+        "changed production files",
+        "test output"
+      ]
+    },
+    {
+      "id": "ARCH-009",
+      "severity": "medium",
+      "title": "Make failures observable and safe",
+      "description": "External calls and background work need bounded failure handling, useful structured logs without sensitive data, and user-facing errors that do not leak internals.",
+      "evidence": [
+        "app/api/**",
+        "lib/services/**",
+        "lib/**"
+      ]
+    }
+  ]
+}

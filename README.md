@@ -4,7 +4,9 @@ A local-first savings tracker and installable PWA. Nexus colours and self-hosted
 
 ## Run and test
 
-Node 24. `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, then `npm start`.
+Node **24.22.1** (the current Vercel-supported LTS; see `.nvmrc`). `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, then `npm start`.
+CI and PR Intelligence use the pinned runtime. Vercel supports the 24.x major and manages its patch rollout. Keep `@types/node` on 24.x to match the runtime; update within that major. Assess newer-major dependency suggestions against host and framework support before upgrading.
+
 `npm run e2e` exercises mobile Chromium, including an offline reload. This is now a full-stack Next.js app, not a static `out/` export.
 
 ## Optional encrypted cloud recovery

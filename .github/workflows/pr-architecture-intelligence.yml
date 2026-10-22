@@ -1,0 +1,25 @@
+name: PR Architecture Intelligence
+
+on:
+  pull_request:
+    # `synchronize` reruns the review whenever new commits are pushed to an open PR.
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-architecture-intelligence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@v1
+    with:
+      rules-path: architecture-rules.json
+      node-version: "24.22.1"
+      dependency-cruiser-dirs: app lib server
+    secrets:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

@@ -32,13 +32,21 @@ export function weightedYield(accts: Pick<Account, "balance" | "ratePct">[]): nu
   return w / total;
 }
 
-/** Month-on-month growth of total balance as a %, or null if not enough history. */
-export function momGrowth(snaps: Snapshot[]): number | null {
+/** The previous and current month snapshots, or null when there is not enough usable history. */
+function lastTwoSnapshots(snaps: Snapshot[]): [prev: Snapshot, cur: Snapshot] | null {
   const s = [...snaps].sort((a, b) => a.month.localeCompare(b.month));
   if (s.length < 2) return null;
-  const prev = s[s.length - 2].totalBalance, cur = s[s.length - 1].totalBalance;
-  if (prev <= 0) return null;
-  return ((cur - prev) / prev) * 100;
+  const prev = s[s.length - 2];
+  if (prev.totalBalance <= 0) return null;
+  return [prev, s[s.length - 1]];
+}
+
+/** Month-on-month growth of total balance as a %, or null if not enough history. */
+export function momGrowth(snaps: Snapshot[]): number | null {
+  const pair = lastTwoSnapshots(snaps);
+  if (!pair) return null;
+  const [prev, cur] = pair;
+  return ((cur.totalBalance - prev.totalBalance) / prev.totalBalance) * 100;
 }
 
 type ForecastAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
@@ -137,8 +145,14 @@ const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8
 
 /** Rate in force on `date` (latest period whose `from` <= date; earliest period if before all). */
 export function rateOn(history: RatePeriod[], date: string): number {
-  if (history.length === 0) return 0;
-  const h = [...history].sort((a, b) => a.from.localeCompare(b.from));
+  return rateOnSorted(sortRates(history), date);
+}
+
+const sortRates = (history: RatePeriod[]) => [...history].sort((a, b) => a.from.localeCompare(b.from));
+
+/** rateOn for history already sorted by `from`; lets hot loops sort once instead of every call. */
+function rateOnSorted(h: RatePeriod[], date: string): number {
+  if (h.length === 0) return 0;
   let r = h[0].ratePct;
   for (const p of h) if (p.from <= date) r = p.ratePct;
   return r;
@@ -150,7 +164,8 @@ export function rateOn(history: RatePeriod[], date: string): number {
  * so interest before them uses the old balance and compounding continues from the new one.
  */
 export function accrue(opening: number, rates: number | RatePeriod[], events: Pick<BalanceEvent, "type" | "date" | "amount">[], start: string, end: string) {
-  const hist: RatePeriod[] = typeof rates === "number" ? [{ from: "0000-01-01", ratePct: rates }] : rates;
+  // Sorted once here: rateOn is called for every day in the period.
+  const hist = sortRates(typeof rates === "number" ? [{ from: "0000-01-01", ratePct: rates }] : rates);
   const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw") && x.date >= start && x.date < end && x.amount > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
   const open = Math.max(opening, 0);
@@ -161,7 +176,7 @@ export function accrue(opening: number, rates: number | RatePeriod[], events: Pi
       if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
       else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
     }
-    const inc = bal * (Math.max(rateOn(hist, d), 0) / 100 / 365);
+    const inc = bal * (Math.max(rateOnSorted(hist, d), 0) / 100 / 365);
     bal += inc; interest += inc;
   }
   return { opening: open, deposits, withdrawals, interest, closing: bal };
@@ -172,17 +187,22 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
   return accrue(opening, rates, topups.map((x) => ({ type: "topup" as const, ...x })), start, end);
 }
 
+/** Set a new balance and append the matching event, leaving the original account untouched. */
+function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
+  return { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+}
+
 /** Apply a top-up: adds to balance and logs the event. */
 export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
   if (!(amount > 0)) throw new Error("Top-up must be more than £0");
-  return { ...a, balance: round2(a.balance + amount), events: [...(a.events ?? []), { type: "topup", date, amount: round2(amount) }] };
+  return withEvent(a, a.balance + amount, "topup", date, amount);
 }
 
 /** Apply a withdrawal: reduces balance from that date and logs it. Can't exceed the balance. */
 export function applyWithdraw<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
   if (!(amount > 0)) throw new Error("Withdrawal must be more than £0");
   if (amount > a.balance + 1e-9) throw new Error("You can't withdraw more than the balance");
-  return { ...a, balance: round2(a.balance - amount), events: [...(a.events ?? []), { type: "withdraw", date, amount: round2(amount) }] };
+  return withEvent(a, a.balance - amount, "withdraw", date, amount);
 }
 
 /** Record a rate change effective from `date`; ratePct becomes the rate in force on `today`. */
@@ -207,7 +227,7 @@ export function migrateData(d: AppData, today: string): AppData {
 /** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. */
 export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, date: string): A {
   if (!(balance >= 0)) throw new Error("Balance can't be negative");
-  return { ...a, balance: round2(balance), events: [...(a.events ?? []), { type: "set", date, amount: round2(balance) }] };
+  return withEvent(a, balance, "set", date, balance);
 }
 
 /** Sum of top-ups across accounts in a YYYY-MM month. */
@@ -218,10 +238,9 @@ export const withdrawalsInMonth = (accts: Pick<Account, "events">[], month: stri
 
 /** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */
 export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: number; withdrawals: number; growth: number; growthPct: number } | null {
-  const s = [...snaps].sort((a, b) => a.month.localeCompare(b.month));
-  if (s.length < 2) return null;
-  const prev = s[s.length - 2], cur = s[s.length - 1];
-  if (prev.totalBalance <= 0) return null;
+  const pair = lastTwoSnapshots(snaps);
+  if (!pair) return null;
+  const [prev, cur] = pair;
   const change = cur.totalBalance - prev.totalBalance, deposits = cur.deposits ?? 0, withdrawals = cur.withdrawals ?? 0;
   const growth = change - deposits + withdrawals;
   return { change, deposits, withdrawals, growth, growthPct: (growth / prev.totalBalance) * 100 };
