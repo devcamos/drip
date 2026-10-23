@@ -14,9 +14,16 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
   const [hasPassword, setHasPassword] = useState(false); const [usePassword, setUsePassword] = useState(false);
   const [hasPasskey, setHasPasskey] = useState(false); const [usePasskey, setUsePasskey] = useState(false);
   const [downloaded, setDownloaded] = useState(false); const [saved, setSaved] = useState(false);
+  const [showCodes, setShowCodes] = useState(false);
   const [codesVaultId, setCodesVaultId] = useState<string>();
   useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) { setHasPassword(true); setUsePassword(true); } }).catch(() => {}); return () => { active = false; }; }, []);
   useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setHasPasskey(value); }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => {
+    const hide = () => setShowCodes(false);
+    const visibility = () => { if (document.visibilityState === "hidden") hide(); };
+    window.addEventListener("blur", hide); document.addEventListener("visibilitychange", visibility);
+    return () => { window.removeEventListener("blur", hide); document.removeEventListener("visibilitychange", visibility); };
+  }, []);
   async function generate() {
     setBusy(true); setMessage("");
     try {
@@ -31,7 +38,7 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
       if (ownerId !== state.userId) throw new Error("That is not the connected cloud account.");
       const created = await createRecoveryCodes(root);
       const cached = await registerRecoveryCodes(created.records, state.userId);
-      setCodes(created.codes); setCodesVaultId(binding?.vaultId); setCode("");
+      setCodes(created.codes); setShowCodes(false); setCodesVaultId(binding?.vaultId); setCode("");
       setMessage(`Six recovery codes are ready. Download the file and keep it somewhere safe.${cached ? "" : " This device could not cache them for offline unlock; online recovery still works."}`);
     } catch (e) { setMessage((e as Error).name === "NotAllowedError" ? "Passkey confirmation was cancelled. No recovery codes were changed." : (e as Error).message); } finally { setBusy(false); }
   }
@@ -39,15 +46,16 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
     <h2>Six ways back in</h2>
     <p className="muted">Save six separate recovery codes in one file. Any one can restore your latest synced cloud copy on a new device. Each code can be reused; keep them private.</p>
     {codes.length ? <>
-      <ol className="recovery-list">{codes.map(c => <li key={c}><code>{c}</code></li>)}</ol>
-      <button className="btn" onClick={() => { downloadRecoveryCodes(codes, data.identity?.handle); setDownloaded(true); }}>Download recovery codes</button>
+      <ol id="recovery-code-list" className="recovery-list" data-revealed={showCodes}>{codes.map(c => <li key={c}><code>{showCodes ? c : "••••-••••-••••-••••-••••-••••"}</code></li>)}</ol>
+      <button className="text-link" aria-expanded={showCodes} aria-controls="recovery-code-list" onClick={() => setShowCodes(!showCodes)}>{showCodes ? "Hide recovery codes" : "Show recovery codes"}</button>
+      <div className="row-gap"><button className="btn" onClick={() => { downloadRecoveryCodes(codes, data.identity?.handle); setShowCodes(false); setDownloaded(true); }}>Download recovery codes</button></div>
       {downloaded && !saved && <button className="btn ghost" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
-        try { await confirmRecoveryCodesSaved(codesVaultId); setSaved(true); setMessage("Recovery setup complete. Keep the file somewhere you can access without this device."); }
+        try { await confirmRecoveryCodesSaved(codesVaultId); setShowCodes(false); setSaved(true); setMessage("Recovery setup complete. Keep the file somewhere you can access without this device."); }
         catch { setMessage("Could not save your confirmation. Your downloaded recovery codes still work."); }
         finally { setBusy(false); }
       }}>I’ve saved my recovery codes</button>}
-      <p className="muted">This set is only shown here during this visit. Download it before leaving this screen. Your original recovery code still works.</p>
+      <p className="muted">Download the file before leaving. Codes stay hidden unless you choose to show them, and hide again when you leave the window. Your original recovery code still works.</p>
     </> : <>
       {usePasskey ? <p className="muted">Confirm with your saved unlock passkey to create codes without your password or an old code.</p> : <>
         <label htmlFor="create-recovery-code">{usePassword ? "Confirm your password" : "Your current recovery code"}</label>

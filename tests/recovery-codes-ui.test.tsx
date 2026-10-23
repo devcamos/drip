@@ -30,6 +30,15 @@ async function panel(value = code) {
   fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
 }
 describe("recovery codes experience", () => {
+  it("keeps generated codes hidden until explicitly revealed and hides them again when the window loses focus", async () => {
+    await panel(); await screen.findByRole("list");
+    expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Show recovery codes" }));
+    expect(screen.getByRole("list")).toHaveTextContent(codes[0]);
+    fireEvent(window, new Event("blur"));
+    expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
+    expect(screen.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
+  });
   it("creates codes with a freshly verified passkey when the password and old codes are missing", async () => {
     passkeys.hasPasskeyUnlock.mockResolvedValue(true);
     passkeys.passkeyRecoveryRoot.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));

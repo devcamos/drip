@@ -17,7 +17,7 @@ async function capture(page: Page, state: string) {
   for (const [device, width, height] of [["mobile", 390, 844], ["desktop", 1280, 900]] as const) {
     await page.setViewportSize({ width, height });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${dir}/${state}-${device}.png`, fullPage: true, scale: "css", style: 'input[type="password"], .recovery-list { color:transparent !important; text-shadow:none !important; caret-color:transparent !important; }' });
+    await page.screenshot({ path: `${dir}/${state}-${device}.png`, fullPage: true, scale: "css", style: 'input[type="password"], .recovery-list[data-revealed="true"] { color:transparent !important; text-shadow:none !important; caret-color:transparent !important; }' });
   }
   await page.setViewportSize({ width: 390, height: 844 });
 }
@@ -94,6 +94,8 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   const codes = page.getByRole("region", { name: "Recovery codes", exact: true });
   await codes.getByRole("button", { name: "Confirm with saved passkey" }).click();
   await withAuthRetry(page, () => codes.getByRole("button", { name: "Create six recovery codes" }).click(), codes.getByRole("button", { name: "Download recovery codes" }));
+  await expect(codes.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
+  await capture(page, "recovery-codes-ready");
   const downloadEvent = page.waitForEvent("download"); await codes.getByRole("button", { name: "Download recovery codes" }).click();
   const download = await downloadEvent; expect(download.suggestedFilename()).toBe("drip-recovery-codes.txt");
   await codes.getByRole("button", { name: "I’ve saved my recovery codes" }).click();
