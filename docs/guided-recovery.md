@@ -48,3 +48,10 @@ cannot reconstruct an already-lost encryption key. Existing recovery-code reuse,
 old-device access and root-revocation limitations are unchanged.
 
 Verification and screenshots: [guided recovery evidence](screenshots/guided-recovery/README.md).
+
+Signup failures now distinguish account creation from recovery. Only Better
+Auth's explicit invalid-credentials HTTP 401 permits the optional registration
+fallback; service failures, denied requests and rate limits stop the operation.
+HTTP 429 is handled at both stages, and server/transport internals are not shown
+to the user. [Signup failure tests and screenshots](screenshots/signup-errors/README.md)
+document the separate, still-unidentified hosted signup report.
