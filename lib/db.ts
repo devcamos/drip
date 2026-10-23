@@ -6,6 +6,12 @@ import { checkCode, codeVerifier } from "./crypto";
 import { createVault, openVault, encryptLocal, decryptLocal, type LocalKeys, type VaultHeader, type LocalEnvelope } from "./local-vault";
 import type { PasskeyWrap } from "./passkey-crypto";
 import type { PasswordWrap } from "./password-crypto";
+import { logFailure, type DiagnosticOperation } from "./diagnostics";
+
+function storageFailure(operation: DiagnosticOperation, message: string, cause: unknown) {
+  logFailure(operation, cause);
+  return new Error(message, { cause });
+}
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
@@ -36,7 +42,7 @@ function open(): Promise<IDBDatabase> {
     const r = indexedDB.open(DB, 2);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
-    r.onerror = () => rej(new Error("Could not open local storage.", { cause: r.error }));
+    r.onerror = () => rej(storageFailure("storage.open", "Could not open local storage.", r.error));
   });
 }
 async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -44,7 +50,7 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
   return new Promise((res, rej) => {
     const t = db.transaction(STORE, mode); const req = fn(t.objectStore(STORE));
     t.oncomplete = () => { db.close(); res(req.result); };
-    t.onerror = t.onabort = () => { db.close(); rej(new Error("Local storage transaction failed.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); rej(storageFailure(mode === "readonly" ? "storage.read" : "storage.write", "Local storage transaction failed.", t.error)); };
   });
 }
 async function stored(): Promise<Stored> {
@@ -53,7 +59,7 @@ async function stored(): Promise<Stored> {
     const t = db.transaction(STORE, "readonly"); const s = t.objectStore(STORE);
     const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
     t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result, password: password.result }); };
-    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not read local storage.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); reject(storageFailure("storage.read", "Could not read local storage.", t.error)); };
   });
 }
 function current(value: Stored, allowSignedOut = false) {
@@ -94,7 +100,7 @@ export async function browserDeviceId(): Promise<string> {
       if (id !== request.result) s.put(id, "browserDeviceId");
     };
     t.oncomplete = () => { db.close(); resolve(id); };
-    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not identify this browser. Try again.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); reject(storageFailure("storage.write", "Could not identify this browser. Try again.", t.error)); };
   });
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
@@ -207,7 +213,7 @@ async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectS
       catch (error) { failure = error instanceof Error ? error : new Error("Local storage write failed."); t.abort(); }
     };
     t.oncomplete = () => { db.close(); resolve(); };
-    t.onerror = t.onabort = () => { db.close(); reject(failure ?? new Error("Local storage write failed.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); reject(failure ?? storageFailure("storage.write", "Local storage write failed.", t.error)); };
   });
 }
 export function saveData(data: AppData): Promise<void> {
@@ -258,7 +264,7 @@ export async function acknowledgeCloudUpload(expected: UploadState, version: num
       s.put({ ...cloud, version, dirty, lastSyncAt: at }, "cloudState"); result = dirty ? "queued" : "saved";
     };
     t.oncomplete = () => { db.close(); resolve(result); };
-    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not record the cloud upload receipt.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); reject(storageFailure("storage.write", "Could not record the cloud upload receipt.", t.error)); };
   });
 }
 export interface SignupReplacement { vaultId: string; generation: string; nonce: string; records: string }
@@ -312,7 +318,7 @@ export async function completeDeviceSession(generation: string, value: unknown):
     const request = s.get("deviceSession");
     request.onsuccess = () => { if (request.result?.generation === generation) { s.put(value, "deviceSession"); changed = true; } };
     t.oncomplete = () => { db.close(); resolve(changed); };
-    t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not update the device session.", { cause: t.error })); };
+    t.onerror = t.onabort = () => { db.close(); reject(storageFailure("storage.write", "Could not update the device session.", t.error)); };
   });
 }
 
@@ -327,7 +333,7 @@ export async function claimEmptyPasswordDevice(expectedGeneration?: string): Pro
       s.put({ signedOut: true, remotePending: false, generation }, "deviceSession");
     };
     t.oncomplete = () => { db.close(); lockLocalVault(true); resolve(generation); };
-    t.onabort = t.onerror = () => { db.close(); reject(new Error(failed ? "Device session changed. Try again." : "Could not reserve this device.")); };
+    t.onabort = t.onerror = () => { db.close(); reject(failed ? new Error("Device session changed. Try again.") : storageFailure("storage.write", "Could not reserve this device.", t.error)); };
   });
 }
 export async function storeCloudConnection(state: CloudState | undefined, expectedGeneration?: string, expectedConnectionGeneration?: string): Promise<void> {

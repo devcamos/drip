@@ -7,6 +7,7 @@ export type { CloudState } from "./types";
 import { migrateData } from "./maths";
 import { safeFetch } from "./worker-safety";
 import { cloudPayload, fromCloudPayload } from "./cloud-payload";
+import { responseError } from "./diagnostics";
 
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
 export interface Envelope { app: "drip-cloud"; v: 1; iv: string; ct: string }
@@ -61,7 +62,7 @@ export async function vault(method = "GET", body?: unknown, ownerId?: string, re
       409: "Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.",
       401: "Sign in again to sync. Your local data is safe.",
     };
-    throw new Error(messages[response.status] ?? "Cloud is unavailable. Your local data is safe; try again online.");
+    throw responseError(response, messages[response.status] ?? "Cloud is unavailable. Your local data is safe; try again online.");
   }
   return response.json() as Promise<{ version: number; envelope: Envelope | null; updated_at?: string }>;
 }

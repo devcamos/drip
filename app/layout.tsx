@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import Diagnostics from "./Diagnostics";
 
 export const metadata: Metadata = {
   title: "Drip",
@@ -15,5 +16,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#fffaf1", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en-GB"><body>{children}</body></html>;
+  return <html lang="en-GB"><body><Diagnostics />{children}</body></html>;
 }

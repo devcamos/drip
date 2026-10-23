@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { APIError } from "better-auth/api";
 import type { Pool, PoolClient } from "@neondatabase/serverless";
 import { withPasswordOwner } from "./password-transaction";
+import { reportException, unavailable } from "./http-errors";
 
 export const DEVICE_LIMIT_MESSAGE = "Two devices are already signed in. Sign out on one, then try again.";
 const requestAdmission = new AsyncLocalStorage<{ failure?: APIError }>();
@@ -55,7 +56,8 @@ export function deviceSessionHooks(db: Pool) {
       if (context?.path === "/sign-in/gamertag") return;
       let result: Admission;
       try { result = await withPasswordOwner(db, session.userId, client => admitDeviceSession(client, session)); }
-      catch {
+      catch (error) {
+        reportException(error);
         await db.query('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', [session.id, session.userId]).catch(() => undefined);
         fail(new APIError("SERVICE_UNAVAILABLE", { code: "DEVICE_ADMISSION_UNAVAILABLE", message: "Could not confirm available devices. Try again shortly." }));
       }
@@ -72,7 +74,7 @@ export async function guardDeviceAuthResponse(work: () => Promise<Response>): Pr
   return requestAdmission.run({}, async () => {
     let response: Response;
     try { response = await work(); }
-    catch { response = Response.json({ code: "AUTH_UNAVAILABLE", message: "Could not complete sign-in. Try again shortly." }, { status: 503, headers: { "Cache-Control": "no-store" } }); }
+    catch (error) { reportException(error); response = unavailable("AUTH_UNAVAILABLE", "Could not complete sign-in. Try again shortly."); }
     const failure = requestAdmission.getStore()?.failure;
     if (!failure) return response;
     return Response.json(failure.body, { status: failure.statusCode, headers: { "Cache-Control": "no-store" } });

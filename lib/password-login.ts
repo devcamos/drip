@@ -7,10 +7,13 @@ import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginT
 import { resolveRecoveryCode } from "./recovery-codes";
 import { safeFetch } from "./worker-safety";
 import type { AppData } from "./types";
+import { responseError } from "./diagnostics";
 
 async function call(path: string, body: unknown, headers?: Record<string, string>) {
   const response = await safeFetch(`/api/auth/${path}`, { method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
-  const value = await response.json();
+  if (response.status >= 500) throw responseError(response, "Could not complete sign-in. Try again shortly.");
+  let value;
+  try { value = await response.json(); } catch { throw responseError(response, "Could not sign in. Try again online."); }
   if (response.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
   if (!response.ok) throw new Error(value.message ?? "Could not sign in. Try again online.");
   return value;

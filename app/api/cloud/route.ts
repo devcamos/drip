@@ -1,5 +1,6 @@
 import { cloudConfigured, database, getAuth } from "@/server/auth";
 import { isCloudEnvelope, MAX_CLOUD_BYTES } from "@/server/cloud-store";
+import { withApiErrors } from "@/server/http-errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -15,14 +16,14 @@ async function allowed(id: string) {
       bucket = date_trunc('minute', now()) RETURNING hits`, [id]);
   return rows[0].hits <= 60;
 }
-export async function GET(request: Request) {
+async function read(request: Request) {
   const id = await owner(request);
   if (!id) return reply({ error: "Sign in to access your cloud copy." }, 401);
   if (!(await allowed(id))) return reply({ error: "Too many sync requests. Try again shortly." }, 429);
   const { rows } = await database().query('SELECT version, envelope, updated_at FROM drip_vault WHERE user_id = $1', [id]);
   return reply(rows[0] ?? { version: 0, envelope: null });
 }
-export async function PUT(request: Request) {
+async function write(request: Request) {
   // Same-origin writes only, before parsing or touching the authenticated vault.
   if (request.headers.get("origin") !== new URL(process.env.BETTER_AUTH_URL ?? request.url).origin) return reply({ error: "Invalid origin." }, 403);
   const id = await owner(request);
@@ -52,3 +53,6 @@ export async function PUT(request: Request) {
   if (!rows.length) return reply({ error: "Cloud copy changed on another device. Restore it before saving again." }, 409);
   return reply(rows[0]);
 }
+const fallback = { code: "CLOUD_UNAVAILABLE", message: "Cloud is unavailable. Try again shortly." };
+export const GET = (request: Request) => withApiErrors("cloud", () => read(request), fallback);
+export const PUT = (request: Request) => withApiErrors("cloud", () => write(request), fallback);

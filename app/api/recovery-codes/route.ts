@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { cloudConfigured, database, getAuth } from "@/server/auth";
+import { withApiErrors } from "@/server/http-errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -28,7 +29,7 @@ async function allowed(request: Request) {
 }
 // Public lookup reveals only an encrypted root wrapper, never account data or a usable login secret.
 // Locator has the entropy of a random 24-character code; raw codes are never sent to the server.
-export async function POST(request: Request) {
+async function lookup(request: Request) {
   if (!sameOrigin(request)) return reply({ error: "Invalid origin." }, 403);
   if (!cloudConfigured()) return reply({ error: "Recovery unavailable." }, 503);
   if (!(await allowed(request))) return reply({ error: "Too many recovery requests. Try again shortly." }, 429);
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     WHERE records @> $1::jsonb AND item->>'locator' = $2 LIMIT 1`, [JSON.stringify([{ locator: body.locator }]), body.locator]);
   return rows.length ? reply(rows[0]) : reply({ error: "Code not found." }, 404);
 }
-export async function PUT(request: Request) {
+async function rotate(request: Request) {
   if (!sameOrigin(request)) return reply({ error: "Invalid origin." }, 403);
   if (!cloudConfigured()) return reply({ error: "Recovery unavailable." }, 503);
   const userId = (await getAuth().api.getSession({ headers: request.headers }))?.user.id;
@@ -58,3 +59,6 @@ export async function PUT(request: Request) {
     ON CONFLICT (user_id) DO UPDATE SET records = EXCLUDED.records RETURNING user_id`, [userId, JSON.stringify(safe)]);
   return rows.length ? reply({ saved: true }) : reply({ error: "Save your cloud copy first." }, 409);
 }
+const fallback = { code: "RECOVERY_UNAVAILABLE", message: "Recovery is unavailable. Try again shortly." };
+export const POST = (request: Request) => withApiErrors("recovery", () => lookup(request), fallback);
+export const PUT = (request: Request) => withApiErrors("recovery", () => rotate(request), fallback);
