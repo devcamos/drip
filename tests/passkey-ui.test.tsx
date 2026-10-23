@@ -2,11 +2,33 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 const actions = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), enablePasskeyUnlock: vi.fn(), disablePasskeyUnlock: vi.fn() }));
+const passwords = vi.hoisted(() => ({ passwordUsername: vi.fn(), passwordRecoveryRoot: vi.fn() }));
 vi.mock("../lib/passkey-unlock", () => actions);
+vi.mock("../lib/password-login", () => passwords);
 import { PasskeyUnlock } from "../app/PasskeyUnlock";
 beforeEach(() => {
   vi.clearAllMocks(); actions.hasPasskeyUnlock.mockResolvedValue(false);
   actions.enablePasskeyUnlock.mockResolvedValue(undefined); actions.disablePasskeyUnlock.mockResolvedValue(undefined);
+  passwords.passwordUsername.mockResolvedValue(undefined); passwords.passwordRecoveryRoot.mockResolvedValue("verified-root");
+});
+it("sets up encrypted passkey unlock with a confirmed password when recovery codes are missing", async () => {
+  passwords.passwordUsername.mockResolvedValue("tester");
+  render(<PasskeyUnlock name="tester" />);
+  const input = await screen.findByLabelText("Confirm your password to set up passkey unlock");
+  fireEvent.change(input, { target: { value: "Some password 123!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Set up passkey unlock" }));
+  expect(await screen.findByText(/Passkey saved and verified/)).toBeInTheDocument();
+  expect(passwords.passwordRecoveryRoot).toHaveBeenCalledWith("Some password 123!");
+  expect(actions.enablePasskeyUnlock).toHaveBeenCalledWith("verified-root", "tester");
+});
+it("does not create a passkey when the password is wrong", async () => {
+  passwords.passwordUsername.mockResolvedValue("tester"); passwords.passwordRecoveryRoot.mockRejectedValue(new Error("Gamertag or password is incorrect."));
+  render(<PasskeyUnlock name="tester" />);
+  const input = await screen.findByLabelText("Confirm your password to set up passkey unlock");
+  fireEvent.change(input, { target: { value: "wrong password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Set up passkey unlock" }));
+  expect(await screen.findByText(/is incorrect/)).toBeInTheDocument();
+  expect(actions.enablePasskeyUnlock).not.toHaveBeenCalled();
 });
 it("sets up a saved passkey, clears the code only after verification, and removes the local wrapper", async () => {
   render(<PasskeyUnlock name="rampage201" />);

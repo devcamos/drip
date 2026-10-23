@@ -67,6 +67,15 @@ output { display:block; margin:1em 0; }
 .auth-footer { border-top:1px solid var(--border); margin-top:24px; padding-top:16px; text-align:center; }
 .auth-footer p { color:var(--muted); font-size:14px; }
 .auth-footer .btn { width:100%; }
+.recovery-methods { display:flex; flex-wrap:wrap; gap:8px; border:1px solid var(--border); border-radius:12px; padding:12px; margin:18px 0; min-width:0; }
+.recovery-methods legend { font-size:13px; color:var(--muted); padding:0 6px; }
+.recovery-methods [aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.recovery-help { line-height:1.65; margin-top:18px; }
+.recovery-help ol { padding-left:22px; }
+.recovery-help li + li { margin-top:12px; }
+.recovery-help li { overflow-wrap:anywhere; }
+.recovery-code-input output { display:block; margin-top:10px; }
+.recovery-code-input + button[type="submit"] { margin-top:16px; }
 .signup-consent { display:flex; gap:10px; align-items:flex-start; line-height:1.5; }
 .signup-consent input { width:18px; min-width:18px; margin-top:2px; }
 button:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }

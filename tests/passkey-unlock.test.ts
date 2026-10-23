@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const cloud = vi.hoisted(() => ({ authClient: { signOut: vi.fn() }, connect: vi.fn() }));
 vi.mock("../lib/cloud", () => cloud);
-import { enablePasskeyUnlock, disablePasskeyUnlock, hasPasskeyUnlock, unlockWithPasskey } from "../lib/passkey-unlock";
+import { enablePasskeyUnlock, disablePasskeyUnlock, hasPasskeyUnlock, unlockWithPasskey, passkeyRecoveryRoot } from "../lib/passkey-unlock";
 import { decode, encode, unwrapRoot, wrapRoot } from "../lib/passkey-crypto";
 import { commitCloudRestore, emptyData, loadData, lockLocalVault, passkeyUnlockContext, saveData, setItem } from "../lib/db";
 import { codeVerifier } from "../lib/crypto";
@@ -19,6 +19,41 @@ beforeEach(async () => {
   vi.stubGlobal("navigator", { onLine: false, credentials: credentials() });
   cloud.authClient.signOut.mockResolvedValue({ error: null });
   await seedVault(data);
+});
+
+it("reauthenticates a saved passkey to recover the key without a password or code, leaving records unchanged", async () => {
+  const creds = credentials();
+  await enablePasskeyUnlock(fixtureCode, "passkey_user", creds);
+  const before = await rawStore();
+  expect(await passkeyRecoveryRoot(creds)).toBe(fixtureCode);
+  expect(creds.get).toHaveBeenCalledTimes(2);
+  expect(await rawStore()).toEqual(before);
+  lockLocalVault();
+  await expect(passkeyRecoveryRoot(creds)).rejects.toThrow(/Unlock/);
+});
+
+it("does not release a recovery key after cancellation, wrong PRF or a session change during confirmation", async () => {
+  await enablePasskeyUnlock(fixtureCode, "passkey_user", credentials());
+  const cancelled = credentials(); cancelled.get.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));
+  await expect(passkeyRecoveryRoot(cancelled)).rejects.toThrow(/Cancelled/);
+  const wrong = credentials(); wrong.get.mockResolvedValueOnce(credential(new Uint8Array(32).fill(5)));
+  await expect(passkeyRecoveryRoot(wrong)).rejects.toThrow();
+  const changed = credentials(); changed.get.mockImplementationOnce(async () => {
+    await setItem("deviceSession", { signedOut: true, remotePending: true, generation: "changed" });
+    return credential();
+  });
+  await expect(passkeyRecoveryRoot(changed)).rejects.toThrow(/changed|Unlock/);
+  expect(JSON.stringify(await rawStore())).not.toContain(fixtureCode);
+});
+
+it("rejects a recovery confirmation when wrapper metadata changes during the passkey prompt", async () => {
+  await enablePasskeyUnlock(fixtureCode, "passkey_user", credentials());
+  const wrap = (await passkeyUnlockContext()).wrap!;
+  const changed = credentials(); changed.get.mockImplementationOnce(async () => {
+    await rawStore({ passkeyUnlock: { ...wrap, salt: encode(new Uint8Array(32).fill(9)) } });
+    return credential();
+  });
+  await expect(passkeyRecoveryRoot(changed)).rejects.toThrow(/changed/);
 });
 
 it("saves only a sealed root, uses a saved PRF credential after reload and sign-out, and preserves offline edits", async () => {

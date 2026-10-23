@@ -1,5 +1,5 @@
 import { checkCode } from "./crypto";
-import { getItem, passkeyUnlockContext, savePasskeyUnlock } from "./db";
+import { getItem, loadData, passkeyUnlockContext, savePasskeyUnlock } from "./db";
 import { unlockDevice } from "./device-session";
 import { resolveRecoveryCode } from "./recovery-codes";
 import { decode, encode, unwrapRoot, validWrap, wrapRoot, type PasskeyWrap } from "./passkey-crypto";
@@ -62,11 +62,31 @@ export async function enablePasskeyUnlock(code: string, name: string, creds: Cre
 
 export async function unlockWithPasskey(creds: Credentials = navigator.credentials) {
   const { wrap, binding } = await passkeyUnlockContext();
-  if (!wrap || !validWrap(wrap, location.origin, location.hostname)) throw new Error("Set up passkey unlock in Recovery after signing in with a recovery code.");
+  if (!wrap || !validWrap(wrap, location.origin, location.hostname)) throw new Error("Set up passkey unlock in Settings after signing in with your password or a recovery code.");
   const secret = await secretFor(creds, wrap);
   try {
     const root = await unwrapRoot(wrap, secret, location.origin, location.hostname);
     await unlockDevice(root, binding);
+  } finally { secret.fill(0); }
+}
+
+/** Fresh user verification before changing credentials on an already unlocked device.
+ * No root or PRF result is persisted. Recheck the vault, session and wrapper after
+ * the password-manager prompt so another tab cannot change the account beneath it.
+ */
+export async function passkeyRecoveryRoot(creds: Credentials = navigator.credentials) {
+  await loadData();
+  const { wrap, binding } = await passkeyUnlockContext();
+  if (!wrap || !validWrap(wrap, location.origin, location.hostname)) throw new Error("Set up passkey unlock on this browser first.");
+  const secret = await secretFor(creds, wrap);
+  try {
+    const root = await unwrapRoot(wrap, secret, location.origin, location.hostname);
+    const fresh = await passkeyUnlockContext();
+    if (fresh.binding.vaultId !== binding.vaultId || fresh.binding.generation !== binding.generation || JSON.stringify(fresh.wrap) !== JSON.stringify(wrap)) throw new Error("Device session changed. Unlock Drip again before continuing.");
+    const verifier = await getItem<{ salt: string; hash: string }>("verifier");
+    if (!verifier || !(await checkCode(root, verifier))) throw new Error("Passkey does not match your saved account.");
+    await loadData();
+    return root;
   } finally { secret.fill(0); }
 }
 export async function disablePasskeyUnlock() {

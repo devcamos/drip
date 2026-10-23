@@ -7,7 +7,11 @@ import { emptyData } from "../lib/db";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
 const mocks = vi.hoisted(() => ({ readCloudState: vi.fn(), connect: vi.fn(), registerRecoveryCodes: vi.fn(), createRecoveryCodes: vi.fn(), authClient: { getSession: vi.fn() } }));
 const passwords = vi.hoisted(() => ({ passwordUsername: vi.fn(), passwordRecoveryRoot: vi.fn() }));
+const passkeys = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), passkeyRecoveryRoot: vi.fn() }));
+const readiness = vi.hoisted(() => ({ confirmRecoveryCodesSaved: vi.fn() }));
 vi.mock("../lib/password-login", () => passwords);
+vi.mock("../lib/passkey-unlock", () => passkeys);
+vi.mock("../lib/recovery-readiness", () => readiness);
 vi.mock("../lib/cloud", () => ({ readCloudState: mocks.readCloudState, connect: mocks.connect, authClient: mocks.authClient }));
 vi.mock("../lib/recovery-codes", async importOriginal => ({ ...await importOriginal<typeof import("../lib/recovery-codes")>(), registerRecoveryCodes: mocks.registerRecoveryCodes, createRecoveryCodes: mocks.createRecoveryCodes }));
 import { downloadRecoveryCodes } from "../lib/recovery-codes";
@@ -16,6 +20,7 @@ const data = { ...emptyData(), identity: { id: "id", handle: "devo", createdAt: 
 beforeEach(() => {
   vi.clearAllMocks(); mocks.authClient.getSession.mockResolvedValue({ data: null }); vi.stubGlobal("confirm", () => true);
   passwords.passwordUsername.mockResolvedValue(undefined); passwords.passwordRecoveryRoot.mockResolvedValue(code);
+  passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.passkeyRecoveryRoot.mockResolvedValue(code); readiness.confirmRecoveryCodesSaved.mockResolvedValue(undefined);
   mocks.readCloudState.mockResolvedValue({ userId: "owner", version: 1 }); mocks.connect.mockResolvedValue({ user: { id: "owner" } });
   mocks.createRecoveryCodes.mockResolvedValue({ codes, records: [] }); mocks.registerRecoveryCodes.mockResolvedValue(true);
 });
@@ -25,6 +30,42 @@ async function panel(value = code) {
   fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
 }
 describe("recovery codes experience", () => {
+  it("keeps generated codes hidden until explicitly revealed and hides them again when the window loses focus", async () => {
+    await panel(); await screen.findByRole("list");
+    expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Show recovery codes" }));
+    expect(screen.getByRole("list")).toHaveTextContent(codes[0]);
+    fireEvent(window, new Event("blur"));
+    expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
+    expect(screen.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
+  });
+  it("creates codes with a freshly verified passkey when the password and old codes are missing", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    passkeys.passkeyRecoveryRoot.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));
+    render(<RecoveryCodes data={data} verifier={await codeVerifier(code)} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm with saved passkey" }));
+    expect(screen.queryByLabelText("Your current recovery code")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
+    await screen.findByRole("status"); expect(mocks.registerRecoveryCodes).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Create six recovery codes" }));
+    expect(await screen.findAllByRole("listitem")).toHaveLength(6);
+    expect(passkeys.passkeyRecoveryRoot).toHaveBeenCalledTimes(2);
+    expect(passwords.passwordRecoveryRoot).not.toHaveBeenCalled();
+  });
+  it("requires a download and explicit saved-file confirmation before completing setup", async () => {
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:test", revokeObjectURL: vi.fn() }));
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await panel(); await screen.findByRole("list");
+    expect(screen.queryByRole("button", { name: "I’ve saved my recovery codes" })).toBeNull();
+    expect(readiness.confirmRecoveryCodesSaved).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Download recovery codes" }));
+    readiness.confirmRecoveryCodesSaved.mockRejectedValueOnce(new Error("Storage unavailable"));
+    const confirm = screen.getByRole("button", { name: "I’ve saved my recovery codes" });
+    fireEvent.click(confirm);
+    expect(await screen.findByText(/Could not save your confirmation/)).toBeInTheDocument();
+    fireEvent.click(confirm);
+    expect(await screen.findByText(/Recovery setup complete/)).toBeInTheDocument();
+  });
   it("creates the first code set with password confirmation and keeps wrong passwords from registering codes", async () => {
     passwords.passwordUsername.mockResolvedValue("devo");
     passwords.passwordRecoveryRoot.mockRejectedValueOnce(new Error("Gamertag or password is incorrect."));

@@ -43,14 +43,43 @@ describe("encrypted recovery", () => {
   });
   it("signs in existing users; creates only on explicit enable and reports auth failure", async () => {
     expect((await cloud.connect(code, data)).user.id).toBe("user-1");
-    api.signIn.email.mockResolvedValue({ data: null, error: { message: "no" } });
+    api.signIn.email.mockResolvedValue({ data: null, error: { status: 401, code: "INVALID_EMAIL_OR_PASSWORD" } });
     expect((await cloud.connect(code, data, true)).user.id).toBe("user-1");
     expect(api.signUp.email).toHaveBeenCalledWith(expect.objectContaining({ name: "devo" }));
     api.signUp.email.mockResolvedValue({ data: null, error: {} });
-    await expect(cloud.connect(code, data, true)).rejects.toThrow("Could not sign in");
+    await expect(cloud.connect(code, data, true)).rejects.toThrow("Could not create your account");
     await expect(cloud.connect(code, data)).rejects.toThrow("Could not sign in");
     api.signIn.email.mockResolvedValue({ data: null, error: { status: 429 } });
     await expect(cloud.connect(code, data)).rejects.toThrow("Too many sign-in attempts");
+  });
+  it.each([403, 409, 429, 500, 503, undefined])("does not attempt account creation after an authentication failure with status %s", async status => {
+    api.signIn.email.mockResolvedValue({ data: null, error: { status, message: "PRIVATE_SERVER_DETAIL" } });
+    await expect(cloud.connect(code, data, true)).rejects.toThrow(status === 429 ? /Too many/ : status && status >= 500 ? /service is unavailable/ : /Could not create your account/);
+    expect(api.signUp.email).not.toHaveBeenCalled();
+  });
+  it("does not create an account for other unauthorised responses", async () => {
+    api.signIn.email.mockResolvedValue({ data: null, error: { status: 401, code: "SESSION_EXPIRED" } });
+    await expect(cloud.connect(code, data, true)).rejects.toThrow("Could not create your account");
+    expect(api.signUp.email).not.toHaveBeenCalled();
+  });
+  it.each([429, 503, 400])("reports signup status %s without blaming a user-supplied recovery code or revealing server details", async status => {
+    api.signIn.email.mockResolvedValue({ data: null, error: { status: 401, code: "INVALID_EMAIL_OR_PASSWORD" } });
+    api.signUp.email.mockResolvedValue({ data: null, error: { status, message: "PRIVATE_SERVER_DETAIL" } });
+    let failure: Error | undefined;
+    try { await cloud.connect(code, data, true); } catch (error) { failure = error as Error; }
+    expect(failure?.message).toMatch(status === 429 ? /Too many/ : status === 503 ? /service is unavailable/ : /Could not create your account/);
+    expect(failure?.message).not.toMatch(/recovery code|PRIVATE_SERVER_DETAIL/);
+    expect(api.signUp.email).toHaveBeenCalledOnce();
+  });
+  it("reports unreachable authentication without attempting signup", async () => {
+    api.signIn.email.mockRejectedValue(new TypeError("PRIVATE_NETWORK_DETAIL"));
+    await expect(cloud.connect(code, data, true)).rejects.toThrow("Could not reach Drip");
+    expect(api.signUp.email).not.toHaveBeenCalled();
+  });
+  it("preserves local device safety errors and does not retry them as signup", async () => {
+    api.signIn.email.mockRejectedValue(new Error("Device session changed. Try signing in again."));
+    await expect(cloud.connect(code, data, true)).rejects.toThrow("Device session changed");
+    expect(api.signUp.email).not.toHaveBeenCalled();
   });
   it("restores after local data loss using code, including a matching passkey session", async () => {
     const envelope = await cloud.seal(data, key);

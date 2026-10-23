@@ -34,6 +34,7 @@ async function setPassword(page: Page, handle: string, code: string, secret: str
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   const form = page.getByRole("region", { name: "Sign-in and password" });
   await form.getByLabel("Sign-in gamertag").fill(handle);
+  await form.getByRole("button", { name: "Recovery code", exact: true }).click();
   await form.getByLabel("Recovery code to set or reset your password").fill(code);
   await form.getByLabel("New password", { exact: true }).fill(secret); await form.getByLabel("Confirm password", { exact: true }).fill(secret);
   await withAuthRetry(page, () => form.getByRole("button", { name: "Save password" }).click(), form.getByText(/Password saved. Sign in as/));
