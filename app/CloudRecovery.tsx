@@ -7,6 +7,7 @@ import { resolveRecoveryCode } from "@/lib/recovery-codes";
 import * as C from "@/lib/crypto";
 import { authClient, connect, readCloudState, restoreCloud, syncNow, vault, writeCloudState } from "@/lib/cloud";
 import { PasswordSignIn } from "./PasswordSignIn";
+import { RecoveryCodeInput, RecoveryHelp } from "./RecoveryCodeInput";
 type OnRestored = (data: AppData, code: string) => void | Promise<void>;
 
 export function CloudSync({ hasData = false }: Readonly<{ hasData?: boolean }>) {
@@ -76,12 +77,15 @@ export function CloudReturn({ onRestored, replaceExisting = false, fromSignedOut
   return <section className="panel" aria-label="Return to your cloud account">
     <h2>Recover with a code</h2>
     <p className="muted">Forgot your password? Restore your encrypted cloud copy using a saved recovery code. For everyday access, use your gamertag and password on the sign-in screen.</p>
-    {!fromSignedOut && <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>}
-    <label htmlFor="cloud-return-code">{codeLabel ?? (fromSignedOut ? "Other account recovery code" : "Recovery code")}</label>
-    <input id="cloud-return-code" type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} />
+    <RecoveryCodeInput id="cloud-return-code" value={code} onChange={setCode} label={codeLabel ?? (fromSignedOut ? "Other account recovery code" : "Recovery code")} disabled={busy} />
     <p className="muted">{fromSignedOut ? "Use a code for the account you want to restore. This replaces the local accounts on this device." : "This recovery flow needs a saved code to decrypt your data, even after cloud passkey sign-in. Your gamertag alone cannot recover your accounts."}</p>
     <button className="btn" disabled={busy || !C.isValidCode(code)} onClick={() => run(false)}>{busy ? "Connecting…" : "Restore cloud accounts"}</button>
+    {!fromSignedOut && <details className="cloud-options"><summary>Have an older cloud sign-in passkey?</summary>
+      <p className="muted">This verifies cloud sign-in only. You still need a recovery code to decrypt your accounts on this device.</p>
+      <button className="btn ghost" disabled={busy} onClick={() => run(true)}>Sign in with passkey</button>
+    </details>}
     {message && <output className="muted">{message}</output>}
+    <RecoveryHelp />
   </section>;
 }
 
