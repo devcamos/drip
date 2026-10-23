@@ -66,17 +66,37 @@ export async function vault(method = "GET", body?: unknown, ownerId?: string, re
   }
   return response.json() as Promise<{ version: number; envelope: Envelope | null; updated_at?: string }>;
 }
+function authFailure(error: unknown, create: boolean) {
+  const status = (error as { status?: number } | null)?.status;
+  if (status === 429) return new Error("Too many sign-in attempts. Wait a minute, then try again.");
+  if (status && status >= 500) return new Error(create
+    ? "Could not create your account because Drip's sign-in service is unavailable. Try again shortly."
+    : "Drip's sign-in service is unavailable. Try again shortly.");
+  return new Error(create
+    ? "Could not create your account. Refresh the app and try again."
+    : "Could not sign in. Check your recovery code and connection.");
+}
 export async function connect(code: string, data: AppData, create = false, resumeGeneration?: string, reconnectGeneration?: string, signupNonce?: string) {
   const credentials = await recoveryCredentials(code);
   let headers: Record<string, string> | undefined;
   if (resumeGeneration) headers = { "X-Drip-Resume": resumeGeneration };
   else if (reconnectGeneration) headers = { "X-Drip-Reconnect": reconnectGeneration };
   if (signupNonce) headers = { ...headers, "X-Drip-Signup": signupNonce };
-  let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email({ ...credentials, ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
-  if ((result.error as { status?: number } | null)?.status === 429) throw new Error("Too many sign-in attempts. Wait a few seconds, then try again.");
-  if (result.error && create) result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user", ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
-  if (result.error || !result.data?.user) throw new Error("Could not sign in. Check your recovery code and connection.");
-  return { user: result.data.user, key: await cloudKey(code) };
+  try {
+    let result: { error: unknown; data: { user: { id: string; email: string } } | null } = await authClient.signIn.email({ ...credentials, ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
+    const error = result.error as { status?: number; code?: string } | null;
+    // Only an unknown recovery identity permits explicit registration. Outages,
+    // denied requests and device/session failures must never trigger signup.
+    if (create && error?.status === 401 && error.code === "INVALID_EMAIL_OR_PASSWORD") {
+      result = await authClient.signUp.email({ ...credentials, name: data.identity?.handle ?? "Drip user", ...(headers ? { fetchOptions: { headers, timeout: 8000, retry: 0 } } : {}) });
+    }
+    if (result.error || !result.data?.user) throw authFailure(result.error, create);
+    return { user: result.data.user, key: await cloudKey(code) };
+  } catch (error) {
+    // Keep local session/worker safety instructions; hide transport internals.
+    if (error instanceof TypeError || (error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name))) throw new Error("Could not reach Drip. Check your connection and try again.");
+    throw error;
+  }
 }
 
 export async function restoreCloud(code: string, userId?: string, resumeGeneration?: string, retained?: RetainedAccount) {
