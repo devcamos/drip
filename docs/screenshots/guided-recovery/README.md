@@ -1,6 +1,6 @@
 # Guided recovery evidence
 
-Source: `00c31d4f0693684e3b065f689cf1375bc0c42408`, based on main
+Source: `7b9eb458982c42e87f2e743551f13c345784cb0f`, based on main
 `275cc467b991722fae69463ec0a328f06572bce9`. Captured 23 October 2026 from
 the optimized local build at localhost:4343. The evidence commit adds only these
 screenshots and documentation; the tested app/lib/server source is unchanged.
@@ -13,8 +13,9 @@ screenshots and documentation; the tested app/lib/server source is unchanged.
 | Missing password/codes guidance | [390 × 844](missing-credentials-mobile.png) | [1280 × 900](missing-credentials-desktop.png) |
 | Configured passkey on Forgot password | [390 × 844](passkey-recovery-mobile.png) | [1280 × 900](passkey-recovery-desktop.png) |
 | Passkey-confirmed password reset | [390 × 844](passkey-password-reset-mobile.png) | [1280 × 900](passkey-password-reset-desktop.png) |
+| Six generated codes masked by default | [390 × 844](recovery-codes-ready-mobile.png) | [1280 × 900](recovery-codes-ready-desktop.png) |
 
-All eight captures were opened and visually inspected. These are full-page
+All ten captures were opened and visually inspected. These are full-page
 screenshots, so image height can exceed viewport height. The existing fixed
 bottom navigation appears at its viewport position. Desktop captures resize
 the same Pixel 7 Chromium context; they do not establish native desktop or iOS
@@ -28,9 +29,10 @@ No screen is a generated mockup.
 
 ## Verification
 
-- Four new regressions failed before implementation and passed after it.
-- 364 unit/component tests passed with existing coverage gates: 94.11%
-  statements, 91.67% branches, 93.61% functions and 97.69% lines globally.
+- Four initial regressions, the autofill regression and the code-visibility
+  regression failed before their fixes and passed afterward.
+- 367 unit/component tests passed with existing coverage gates: 94.07%
+  statements, 91.62% branches, 93.51% functions and 97.70% lines globally.
 - Three new browser journeys passed, including an isolated-backend signup →
   password-confirmed passkey setup → forgotten-password passkey unlock → new
   password → old-password rejection → fresh-browser restore of the same £3,200.
@@ -41,8 +43,10 @@ No screen is a generated mockup.
 - Typecheck, optimized build, dependency import checks and security audit passed
   (zero vulnerabilities; no lint script is configured). Import scanning reports
   the existing generated `/sw-build.js` route as informational only.
+- Next.js 16.4.3 was applied after reading the [patch release notes](https://github.com/vercel/next.js/releases/tag/v16.4.3).
+  Node remains the supported 24 LTS line with matching Node 24 types.
 
-The final spacing adjustment was rebuilt and the two screenshot journeys rerun.
+All 15 browser journeys were rerun together on the final Next.js 16.4.3 build.
 This does not claim a hosted Preview/Production login test, physical iPhone test,
 new email reset, cross-device passkey-key restoration or recovery of an already
 lost encryption key. See [recovery design and limits](../../guided-recovery.md).

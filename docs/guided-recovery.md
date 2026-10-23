@@ -16,7 +16,9 @@ cannot decrypt data on a fresh browser without a code.
   revokes other server sessions. The vault root and financial data are retained.
 - Recovery codes can be created using a freshly verified unlock passkey, even
   if the old password and code are unavailable. Existing confirmation and
-  registration safeguards remain in place.
+  registration safeguards remain in place. Generated codes are masked by default;
+  explicit reveal is available, and download, saved-file confirmation, window blur
+  and hiding the tab conceal them again.
 - Code-file import runs entirely in the browser, accepts up to six distinct
   supported codes, caps input at 32 KB, masks codes in the selector, and never
   submits the original text file. A later manual edit cancels a pending read.
@@ -24,6 +26,9 @@ cannot decrypt data on a fresh browser without a code.
   encrypted unlock passkey or an explicitly confirmed saved-code download.
   A download click alone does not count as confirmation. The receipt contains
   only a vault identifier and timestamp, and cannot complete another vault's task.
+- Signed-out screens reset private form state as part of route navigation. They
+  do not run a delayed reset after the new form becomes interactive, which could
+  erase a password-manager autofill. Leaving and returning still clears secrets.
 
 ## Security boundaries and limits
 
