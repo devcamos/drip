@@ -26,6 +26,7 @@ import { IncomeSummary } from "./IncomeSummary";
 import { displayProvider, productLabel } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
+import { logFailure } from "@/lib/diagnostics";
 
 type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
 type Verifier = { salt: string; hash: string };
@@ -44,7 +45,7 @@ export default function Drip() {
       if (id !== sequence.current) return;
       if (status === "unlocked" && !session?.signedOut && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
       setGate({ status, signedOut: !!session?.signedOut }); setError("");
-    } catch { if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
+    } catch (error) { logFailure("app.load", error); if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
   }, []);
   useEffect(() => {
     refresh();
@@ -99,7 +100,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         const already = await navigator.storage.persisted?.();
         if (!already) await navigator.storage.persist();
       }
-    })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
+    })().catch(error => { logFailure("app.load", error); setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."); });
     return () => { loadSequence.current++; };
   }, []);
 
@@ -118,7 +119,8 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         if (latestData.current !== previous || generation !== dataGeneration.current) return false;
         latestData.current = withSnap; setData(withSnap); setSaveError("");
         return true;
-      } catch {
+      } catch (error) {
+        logFailure("app.save", error);
         setSaveError("Changes could not be saved. Your saved data is unchanged; retry the action.");
         return false;
       } finally { setPendingSaves(n => n - 1); }

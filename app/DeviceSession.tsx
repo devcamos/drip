@@ -6,10 +6,12 @@ import { finishDeviceSignOut, readDeviceSession, resumeDevice, signOutDevice, un
 import type { AppData } from "@/lib/types";
 import { hasPasskeyUnlock, unlockWithPasskey } from "@/lib/passkey-unlock";
 import { PasswordSignIn } from "./PasswordSignIn";
-import { AuthLayout, useAuthScreen } from "./AuthScreen";
+import { AuthLayout, useAuthScreen, type AuthScreen as AuthRoute } from "./AuthScreen";
 import { SignupForm } from "./SignupForm";
 import { signUpPassword } from "@/lib/password-login";
 import { emptyData } from "@/lib/db";
+import { logFailure } from "@/lib/diagnostics";
+import { PwaStatus } from "./PwaStatus";
 
 export function SignOutButton() {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -20,28 +22,34 @@ export function SignOutButton() {
       const pending = state?.dirty ? "You have unsynced changes. They will stay on this device and can sync after you sign back in. " : "";
       if (!confirm(`${pending}Sign out and lock Drip on this device? Your local accounts are kept. Sign back in with your gamertag and password or configured passkey. Recovery codes are available if you forgot your password.`)) return;
       await signOutDevice();
-    } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { logFailure("auth", e); setMessage((e as Error).message); } finally { setBusy(false); }
   }
   return <><button className="btn ghost small" disabled={busy} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{message && <output className="err">{message}</output>}</>;
 }
 
-export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>) {
+type SignedOutProps = Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>;
+export function SignedOut(props: SignedOutProps) {
+  const { screen, navigate } = useAuthScreen();
+  // Reset private form state as part of navigation, before the new screen is
+  // interactive. A passive reset effect could erase a password-manager autofill.
+  return <SignedOutScreen key={props.mode === "migration" ? "migration" : `${props.mode ?? "signedOut"}:${screen}`} {...props} screen={screen} navigate={navigate} />;
+}
+
+function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", screen, navigate }: SignedOutProps & Readonly<{ screen: AuthRoute; navigate: (next: AuthRoute) => void }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [remoteMessage, setRemoteMessage] = useState(""); const [pending, setPending] = useState(false); const [busy, setBusy] = useState(false);
   const [passkey, setPasskey] = useState(false);
-  const { screen, navigate } = useAuthScreen();
   const recovering = mode === "migration" || screen === "recover";
   const signingUp = mode !== "migration" && screen === "signup";
   const otherRecovery = screen === "other-recover" && mode !== "migration";
-  useEffect(() => { setCode(""); setMessage(""); }, [screen]);
-  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setPasskey(value); }); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setPasskey(value); }).catch(error => { logFailure("auth", error); }); return () => { active = false; }; }, []);
   useEffect(() => {
     let active = true;
     const refresh = async () => {
       try { const session = await readDeviceSession(); if (active) setPending(!!session?.remotePending); }
-      catch (error) { if (active) setRemoteMessage((error as Error).message); }
+      catch (error) { logFailure("auth", error); if (active) setRemoteMessage((error as Error).message); }
     };
     const finish = async () => {
-      try { await finishDeviceSignOut(); if (active) setRemoteMessage(""); } catch (e) { if (active) setRemoteMessage((e as Error).message); }
+      try { await finishDeviceSignOut(); if (active) setRemoteMessage(""); } catch (e) { logFailure("auth", e); if (active) setRemoteMessage((e as Error).message); }
       await refresh();
     };
     const onOnline = () => { void finish(); };
@@ -64,13 +72,14 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
   if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
   return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : title}
     description={description}>
+    <PwaStatus />
     {!recovering && !signingUp && screen !== "other" && !otherRecovery && <>
     <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />
     {passkey && <section className="panel" aria-label="Unlock with your passkey">
       <button className="btn" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
         try { await unlockWithPasskey(); await onSignedIn(); }
-        catch (error) { setMessage((error as Error).name === "NotAllowedError" ? "Passkey unlock was cancelled or unavailable. Try again or use a recovery code." : "Could not unlock with this passkey. Try again or use a recovery code."); }
+        catch (error) { logFailure("auth", error); setMessage((error as Error).name === "NotAllowedError" ? "Passkey unlock was cancelled or unavailable. Try again or use a recovery code." : "Could not unlock with this passkey. Try again or use a recovery code."); }
         finally { setBusy(false); }
       }}>{busy ? "Unlocking…" : "Unlock with passkey"}</button>
       <p className="muted">Use Face ID, Touch ID or your device lock.</p>
@@ -87,7 +96,7 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
     {pending && <button className="btn ghost small" disabled={busy} onClick={async () => {
       setBusy(true);
       try { await finishDeviceSignOut(); setPending(!!(await readDeviceSession())?.remotePending); setRemoteMessage(""); }
-      catch (error) { setRemoteMessage((error as Error).message); }
+      catch (error) { logFailure("auth", error); setRemoteMessage((error as Error).message); }
       finally { setBusy(false); }
     }}>Retry cloud sign-out</button>}
     {recovering && <section className="panel">
@@ -97,7 +106,7 @@ export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Re
         if (verifier) { await resumeDevice(code, verifier, data); }
         else { await unlockDevice(code); }
         setCode(""); await onSignedIn();
-      } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
+      } catch (error) { logFailure("auth", error); setMessage((error as Error).message); } finally { setBusy(false); }
     }}>
       <h2>{copy.section}</h2>
       {mode !== "migration" && <p className="muted">Use a recovery code to regain access, then set a new password in Settings → Sign-in &amp; password. Existing accounts need this once to set their first password.</p>}

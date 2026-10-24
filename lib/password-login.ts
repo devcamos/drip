@@ -7,12 +7,21 @@ import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginT
 import { resolveRecoveryCode } from "./recovery-codes";
 import { safeFetch } from "./worker-safety";
 import type { AppData } from "./types";
+import { responseError } from "./diagnostics";
 
 async function call(path: string, body: unknown, headers?: Record<string, string>) {
-  const response = await safeFetch(`/api/auth/${path}`, { method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
-  const value = await response.json();
-  if (response.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
-  if (!response.ok) throw new Error(value.message ?? "Could not sign in. Try again online.");
+  let response: Response;
+  try {
+    response = await safeFetch(`/api/auth/${path}`, { method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+  } catch (error) {
+    if (error instanceof TypeError || (error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name))) throw new Error("Could not connect to Drip. Check your connection and try again.");
+    throw error;
+  }
+  if (response.status >= 500) throw responseError(response, "Could not complete sign-in. Try again shortly.");
+  if (response.status === 429) throw responseError(response, "Too many sign-in attempts. Try again shortly.");
+  let value;
+  try { value = await response.json(); } catch { throw responseError(response, "Could not sign in. Try again online."); }
+  if (!response.ok) throw responseError(response, typeof value?.message === "string" ? value.message : "Could not sign in. Try again online.");
   return value;
 }
 export async function passwordUsername() { return (await passwordUnlockContext()).envelope?.username; }
@@ -117,7 +126,7 @@ async function signInEnvelope(name: string, password: string, before: DeviceSess
   if (before?.signedOut) headers = { "X-Drip-Resume": before.generation };
   else if (before?.generation) headers = { "X-Drip-Reconnect": before.generation };
   const remote = await call(inspected ? "sign-in/gamertag" : "sign-in/gamertag-key", { username: name, proof: await passwordProof(name, password), ...(inspected ? { expectedOwner: inspected.owner, expectedEnvelope: inspected.ct } : {}) }, headers);
-  if (!validPasswordWrap(remote.envelope) || remote.owner !== remote.envelope.owner) throw new Error("Invalid encrypted sign-in response.");
+  if (!validPasswordWrap(remote?.envelope) || remote.owner !== remote.envelope.owner) throw new Error("Invalid encrypted sign-in response.");
   return remote.envelope;
 }
 async function openPasswordAccount(root: string, envelope: PasswordWrap, local: LocalPassword, before: DeviceSession | undefined, switching: boolean) {
