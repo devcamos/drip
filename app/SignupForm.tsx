@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { handleError, newIdentity, type Identity } from "@/lib/identity";
 import { passwordError } from "@/lib/password-crypto";
+import { PasswordInput } from "./PasswordInput";
 
 export function SignupForm({ onCreate, initialHandle = "", onHandleChange, onBusyChange, replaceExisting = false }: Readonly<{
   onCreate: (identity: Identity, password: string) => Promise<void>;
@@ -29,9 +30,10 @@ export function SignupForm({ onCreate, initialHandle = "", onHandleChange, onBus
     {validHandle && <p className="muted" data-testid="tag-preview">You&apos;ll be <b>{handle}</b></p>}
     <p className="muted">No real name, email or phone needed.</p>
     <label htmlFor="new-account-password">Create password</label>
-    <input id="new-account-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} disabled={busy} value={password} onChange={event => setPassword(event.target.value)} />
+    <PasswordInput id="new-account-password" autoComplete="new-password" minLength={12} maxLength={256} disabled={busy} value={password} onChange={event => setPassword(event.target.value)} />
     <label htmlFor="new-account-confirm">Confirm new account password</label>
-    <input id="new-account-confirm" type="password" autoComplete="new-password" disabled={busy} value={confirmation} onChange={event => setConfirmation(event.target.value)} />
+    <PasswordInput id="new-account-confirm" visibilityLabel="password confirmation" autoComplete="new-password" disabled={busy} value={confirmation} onChange={event => setConfirmation(event.target.value)} aria-invalid={!!confirmation && password !== confirmation} aria-describedby={confirmation && password !== confirmation ? "signup-password-mismatch" : undefined} />
+    {confirmation && password !== confirmation && <p id="signup-password-mismatch" className="err">Passwords do not match.</p>}
     <p className="muted">Use at least 12 characters. You can save it in your password manager.</p>
     {replaceExisting && <>
       <p className="muted">This browser keeps another account. Sign back in and finish syncing it first. A successful signup will open a new, empty account here; your existing cloud copy stays available.</p>

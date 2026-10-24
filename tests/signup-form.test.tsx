@@ -7,6 +7,17 @@ function fill() {
   fireEvent.change(screen.getByLabelText("Create password"), { target: { value: "Synthetic meadow 2026!" } });
   fireEvent.change(screen.getByLabelText("Confirm new account password"), { target: { value: "Synthetic meadow 2026!" } });
 }
+it("explains why confirmation blocks signup and clears the hint when corrected", () => {
+  render(<SignupForm onCreate={vi.fn()} />); fill();
+  const confirmation = screen.getByLabelText("Confirm new account password");
+  fireEvent.change(confirmation, { target: { value: "A different password!" } });
+  expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
+  expect(confirmation).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+  fireEvent.change(confirmation, { target: { value: "Synthetic meadow 2026!" } });
+  expect(screen.queryByText("Passwords do not match.")).toBeNull();
+  expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+});
 it("requires explicit retained-account consent and keeps entered values on failure for retry", async () => {
   const create = vi.fn().mockRejectedValueOnce(new Error("Your current account has unsynced changes")).mockResolvedValueOnce(undefined);
   render(<SignupForm replaceExisting onCreate={create} />); fill();

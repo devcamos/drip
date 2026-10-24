@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { passwordUsername, signInPassword } from "@/lib/password-login";
 import { AccountSwitchRequired } from "@/lib/account-switch";
 import { logFailure } from "@/lib/diagnostics";
+import { PasswordInput } from "./PasswordInput";
 
 export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled = false, onBusyChange, showTitle = true }: Readonly<{ onSignedIn: () => void | Promise<void>; replaceExisting?: boolean; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean }>) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
@@ -25,7 +26,7 @@ export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled =
     <label htmlFor={replaceExisting ? "other-login-tag" : "login-tag"}>Sign-in gamertag</label>
     <input id={replaceExisting ? "other-login-tag" : "login-tag"} autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={event => { setUsername(event.target.value); setSwitchRequest(undefined); setMessage(""); }} disabled={busy || disabled} />
     <label htmlFor={replaceExisting ? "other-login-password" : "login-password"}>Password</label>
-    <input id={replaceExisting ? "other-login-password" : "login-password"} type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy || disabled} />
+    <PasswordInput id={replaceExisting ? "other-login-password" : "login-password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy || disabled} />
     {switchRequest && <section className="account-switch" aria-label="Switch saved account">
       <h2>Another account is saved here</h2>
       {switchRequest.canReplace

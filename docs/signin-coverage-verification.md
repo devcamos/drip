@@ -10,12 +10,12 @@ Existing type-only/CSS exclusions are unchanged. CI uploads the coverage report.
 
 | Metric | Whole application | Server |
 | --- | ---: | ---: |
-| Statements | 94.71% | 97.89% |
-| Branches | 91.85% | 93.42% |
-| Functions | 95.02% | 98.30% |
-| Lines | 97.88% | 99.05% |
+| Statements | 94.72% | 97.89% |
+| Branches | 91.94% | 93.42% |
+| Functions | 95.04% | 98.30% |
+| Lines | 97.89% | 99.05% |
 
-445 tests across 60 files pass. New regression tests reproduce seven failures
+448 tests across 61 files pass. New regression tests reproduce seven failures
 against the previous sign-in client and pass with the correction: non-JSON429,
 null/non-string error responses, null success, and network/abort/timeout errors.
 Malformed JSON and server-outage references also have regressions. Failed
@@ -129,3 +129,20 @@ mounted there. Three regressions fail before and pass afterward. A real optimize
 old-build→new-build transition verifies update acceptance, encrypted local-record
 retention and offline unlock of the same synthetic account. [Screenshots and
 transition limits](screenshots/auth-app-update/README.md).
+
+## Password-entry follow-up
+
+Login, signup and password setup now have accessible Show/Hide controls, preserving
+password values and password-manager autocomplete. Signup explains mismatched
+confirmation while the submit button is disabled.448 tests pass; nine focused
+browser journeys pass, including the two new entry checks, auth navigation and
+signup error handling. Build/typecheck/import checks pass. [Inspected screenshots
+and password-policy scope](screenshots/password-entry/README.md).
+
+The minimum is still12, pending the user's choice after clarification of current
+OWASP guidance; no character-mix restrictions were added or removed. Reducing
+the signup/reset minimum would not change an existing password-login rejection.
+The user requested hosted Preview testing, but the deployment redirects to
+Vercel Authentication. The CLI is logged out; its ordinary device login is
+pending. No protection settings or temporary share links were changed/created.
+Local success is not reported as hosted Preview verification.
