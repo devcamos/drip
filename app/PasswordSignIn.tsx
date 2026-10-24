@@ -2,12 +2,13 @@
 import { useEffect, useState } from "react";
 import { passwordUsername, signInPassword } from "@/lib/password-login";
 import { AccountSwitchRequired } from "@/lib/account-switch";
+import { logFailure } from "@/lib/diagnostics";
 
 export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled = false, onBusyChange, showTitle = true }: Readonly<{ onSignedIn: () => void | Promise<void>; replaceExisting?: boolean; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean }>) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [switchRequest, setSwitchRequest] = useState<AccountSwitchRequired>();
-  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) setUsername(name); }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) setUsername(name); }).catch(error => { logFailure("auth", error); }); return () => { active = false; }; }, []);
   return <form className="panel password-form" aria-label={replaceExisting ? "Other account password sign-in" : "Password sign-in"} onSubmit={async event => {
     event.preventDefault();
     if (switchRequest && !switchRequest.canReplace) return;
@@ -16,7 +17,7 @@ export function PasswordSignIn({ onSignedIn, replaceExisting = false, disabled =
     try { await signInPassword(username, password, replaceExisting || !!switchRequest, switchRequest?.retained); setPassword(""); setSwitchRequest(undefined); await onSignedIn(); }
     catch (error) {
       if (error instanceof AccountSwitchRequired) { setSwitchRequest(error); setMessage(""); }
-      else { setMessage((error as Error).message); }
+      else { logFailure("auth", error); setMessage(error instanceof Error ? error.message : "Could not sign in. Try again shortly."); }
     }
     finally { setBusy(false); onBusyChange?.(false); }
   }}>
