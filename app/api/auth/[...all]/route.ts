@@ -30,5 +30,5 @@ async function handler(request: Request) {
   }
   return guardDeviceAuthResponse(() => getAuth().handler(request));
 }
-const guarded = (request: Request) => withApiErrors("auth", () => handler(request), { code: "AUTH_UNAVAILABLE", message: "Could not complete sign-in. Try again shortly." });
+const guarded = (request: Request) => withApiErrors("auth", () => handler(request), { code: "AUTH_UNAVAILABLE", message: "Could not complete sign-in. Try again shortly." }, request);
 export { guarded as GET, guarded as POST };

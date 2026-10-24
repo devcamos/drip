@@ -16,9 +16,10 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.12",
     "@neondatabase/serverless": "1.2.0",
+    "@vercel/queue": "0.10.0",
     "better-auth": "1.7.12",
     "https-proxy-agent": "9.1.0",
-    "next": "16.4.2",
+    "next": "16.4.3",
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -45,6 +46,7 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
+    "@vercel/cli-config": { "zod": "$zod" },
     "postcss": "^8.5.30",
     "compression": "^1.8.2"
   },

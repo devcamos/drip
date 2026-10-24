@@ -60,5 +60,5 @@ async function rotate(request: Request) {
   return rows.length ? reply({ saved: true }) : reply({ error: "Save your cloud copy first." }, 409);
 }
 const fallback = { code: "RECOVERY_UNAVAILABLE", message: "Recovery is unavailable. Try again shortly." };
-export const POST = (request: Request) => withApiErrors("recovery", () => lookup(request), fallback);
-export const PUT = (request: Request) => withApiErrors("recovery", () => rotate(request), fallback);
+export const POST = (request: Request) => withApiErrors("recovery", () => lookup(request), fallback, request);
+export const PUT = (request: Request) => withApiErrors("recovery", () => rotate(request), fallback, request);

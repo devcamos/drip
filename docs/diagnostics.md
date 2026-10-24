@@ -1,5 +1,9 @@
 # Errors and diagnostics
 
+Server 5xx can additionally trigger signed, queued Slack alerts when explicitly
+configured. See [incident delivery and activation](incidents.md). Browser console
+records stay local; Slack does not receive raw exceptions or application data.
+
 Drip records structured failures at the API, browser request, local storage and
 render boundaries. Server records appear in Vercel runtime logs. Browser records
 stay in the browser console: there is no telemetry upload or third-party SDK.

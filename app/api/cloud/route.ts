@@ -54,5 +54,5 @@ async function write(request: Request) {
   return reply(rows[0]);
 }
 const fallback = { code: "CLOUD_UNAVAILABLE", message: "Cloud is unavailable. Try again shortly." };
-export const GET = (request: Request) => withApiErrors("cloud", () => read(request), fallback);
-export const PUT = (request: Request) => withApiErrors("cloud", () => write(request), fallback);
+export const GET = (request: Request) => withApiErrors("cloud", () => read(request), fallback, request);
+export const PUT = (request: Request) => withApiErrors("cloud", () => write(request), fallback, request);

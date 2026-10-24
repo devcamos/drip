@@ -77,6 +77,7 @@ export async function guardDeviceAuthResponse(work: () => Promise<Response>): Pr
     catch (error) { reportException(error); response = unavailable("AUTH_UNAVAILABLE", "Could not complete sign-in. Try again shortly."); }
     const failure = requestAdmission.getStore()?.failure;
     if (!failure) return response;
+    if (failure.statusCode >= 500) return unavailable("DEVICE_ADMISSION_UNAVAILABLE", "Could not confirm available devices. Try again shortly.");
     return Response.json(failure.body, { status: failure.statusCode, headers: { "Cache-Control": "no-store" } });
   });
 }
