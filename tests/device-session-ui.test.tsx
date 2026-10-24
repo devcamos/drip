@@ -15,6 +15,19 @@ beforeEach(() => {
   passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
 });
 describe("visible sign-out and code return", () => {
+  it.each(["signedOut", "locked", "migration"] as const)("offers the available app update while %s without requiring authentication", async mode => {
+    const worker = { state: "installed", postMessage: vi.fn() };
+    const registration = Object.assign(new EventTarget(), { waiting: worker, update: vi.fn().mockResolvedValue(undefined) });
+    const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: {} });
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
+    const resumed = vi.fn();
+    try {
+      render(<SignedOut mode={mode} onSignedIn={resumed} />);
+      fireEvent.click(await screen.findByRole("button", { name: "Reload update" }));
+      expect(worker.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+      expect(resumed).not.toHaveBeenCalled();
+    } finally { delete (navigator as any).serviceWorker; }
+  });
   it("records a failed sign-out without serializing the exception or stored account", async () => {
     const output = vi.spyOn(console, "error").mockImplementation(() => {});
     actions.signOutDevice.mockRejectedValueOnce(new Error("Could not lock device. private-synthetic-detail"));

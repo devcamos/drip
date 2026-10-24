@@ -15,7 +15,7 @@ Existing type-only/CSS exclusions are unchanged. CI uploads the coverage report.
 | Functions | 95.02% | 98.30% |
 | Lines | 97.88% | 99.05% |
 
-442 tests across 60 files pass. New regression tests reproduce seven failures
+445 tests across 60 files pass. New regression tests reproduce seven failures
 against the previous sign-in client and pass with the correction: non-JSON429,
 null/non-string error responses, null success, and network/abort/timeout errors.
 Malformed JSON and server-outage references also have regressions. Failed
@@ -102,3 +102,30 @@ effect results retain unmount guards, rejected lookup promises are caught, sessi
 listener cleanup and password-manager attributes remain intact. This follow-up
 changes error handling rather than screen layout or navigation. Production UI
 screenshots could not be captured because the browser never reached the app.
+
+## Production browser follow-up and signed-out update regression
+
+Production signup and login were subsequently exercised in rendered Chromium
+using a TLS-verifying Node HTTPS transport for browser requests. Service workers
+were blocked in that remote check; the Node client validated TLS and fulfilled
+the browser's same-origin requests. Both an existing synthetic account's login
+and a new synthetic signup→Accounts→sign-out→password-login→sign-out flow passed.
+Two empty synthetic accounts now remain for test reuse; neither session remains
+signed in. This verifies the rendered web flows through that transport, while
+installed-PWA/native Safari behavior remains unverified.
+
+Production auth runtime-error aggregation for the recent24 hours returned no
+errors. The latest50-minute function-log window contained one expected invalid
+recovery-identity warning from the new synthetic signup. These logs cannot
+identify a browser failure that never reached the server; they do not establish
+that the user's issue is resolved. A request-metric query failed400 and supplied
+no additional evidence. The existing released code lacks this PR's structured
+request/error diagnostics.
+
+A confirmed separate defect was found: the update/status controls were missing
+from signed-out, locked and migration screens, despite old-worker authentication
+protection being able to require an update. The existing controls are now also
+mounted there. Three regressions fail before and pass afterward. A real optimized
+old-build→new-build transition verifies update acceptance, encrypted local-record
+retention and offline unlock of the same synthetic account. [Screenshots and
+transition limits](screenshots/auth-app-update/README.md).

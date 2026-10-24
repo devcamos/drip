@@ -11,6 +11,7 @@ import { SignupForm } from "./SignupForm";
 import { signUpPassword } from "@/lib/password-login";
 import { emptyData } from "@/lib/db";
 import { logFailure } from "@/lib/diagnostics";
+import { PwaStatus } from "./PwaStatus";
 
 export function SignOutButton() {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -71,6 +72,7 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
   if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
   return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : title}
     description={description}>
+    <PwaStatus />
     {!recovering && !signingUp && screen !== "other" && !otherRecovery && <>
     <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />
     {passkey && <section className="panel" aria-label="Unlock with your passkey">
