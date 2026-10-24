@@ -6,7 +6,7 @@ import { finishDeviceSignOut, readDeviceSession, resumeDevice, signOutDevice, un
 import type { AppData } from "@/lib/types";
 import { hasPasskeyUnlock, unlockWithPasskey } from "@/lib/passkey-unlock";
 import { PasswordSignIn } from "./PasswordSignIn";
-import { AuthLayout, useAuthScreen } from "./AuthScreen";
+import { AuthLayout, useAuthScreen, type AuthScreen as AuthRoute } from "./AuthScreen";
 import { SignupForm } from "./SignupForm";
 import { signUpPassword } from "@/lib/password-login";
 import { emptyData } from "@/lib/db";
@@ -25,14 +25,20 @@ export function SignOutButton() {
   return <><button className="btn ghost small" disabled={busy} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{message && <output className="err">{message}</output>}</>;
 }
 
-export function SignedOut({ data, verifier, onSignedIn, mode = "signedOut" }: Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>) {
+type SignedOutProps = Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>;
+export function SignedOut(props: SignedOutProps) {
+  const { screen, navigate } = useAuthScreen();
+  // Reset private form state as part of navigation, before the new screen is
+  // interactive. A passive reset effect could erase a password-manager autofill.
+  return <SignedOutScreen key={props.mode === "migration" ? "migration" : `${props.mode ?? "signedOut"}:${screen}`} {...props} screen={screen} navigate={navigate} />;
+}
+
+function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", screen, navigate }: SignedOutProps & Readonly<{ screen: AuthRoute; navigate: (next: AuthRoute) => void }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [remoteMessage, setRemoteMessage] = useState(""); const [pending, setPending] = useState(false); const [busy, setBusy] = useState(false);
   const [passkey, setPasskey] = useState(false);
-  const { screen, navigate } = useAuthScreen();
   const recovering = mode === "migration" || screen === "recover";
   const signingUp = mode !== "migration" && screen === "signup";
   const otherRecovery = screen === "other-recover" && mode !== "migration";
-  useEffect(() => { setCode(""); setMessage(""); }, [screen]);
   useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setPasskey(value); }); return () => { active = false; }; }, []);
   useEffect(() => {
     let active = true;
