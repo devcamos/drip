@@ -38,8 +38,8 @@ The two [sign-in error screenshots](screenshots/error-handling/README.md) were
 recaptured and visually inspected. They use a synthetic identifier and mocked503;
 the password is cleared. They do not establish hosted or native-iPhone behavior.
 
-No Slack post, bot installation, runtime secret transfer, hosted deployment,
-Production access, migration, merge or release was performed. New commits are
-local until publishing is authorized under the repository timing rule. Existing
-PR35 does not yet contain these local changes. Activation and delivery limits:
-[incident runbook](incidents.md).
+This verification phase used no Slack post, bot installation, runtime secret
+transfer, hosted deployment, Production access, migration, merge or release.
+Publication, current-head hosted checks and runtime activation are tracked in
+[PR35](https://github.com/devcamos/drip/pull/35), separately from this local proof.
+Activation and delivery limits: [incident runbook](incidents.md).
