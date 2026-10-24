@@ -53,3 +53,8 @@ transfer, hosted deployment, Production access, migration, merge or release.
 Publication, current-head hosted checks and runtime activation are tracked in
 [PR35](https://github.com/devcamos/drip/pull/35), separately from this local proof.
 Activation and delivery limits: [incident runbook](incidents.md).
+
+Subsequent sign-in/coverage work expands measurement to the server and enforces
+an 85% minimum, with 438 tests and real-auth HTTP integration evidence. See
+[current coverage and sign-in verification](signin-coverage-verification.md)
+for the updated metrics and separate Production investigation limits.
