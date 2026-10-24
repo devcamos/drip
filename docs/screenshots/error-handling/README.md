@@ -4,6 +4,12 @@ Captured 23 October 2026 from the running optimized local build on
 `fix/structured-error-handling`, based on Production source `275cc467`.
 The implementation and captures are committed together on this branch.
 
+Recaptured and visually inspected on 24 October against tested source
+`4e2993df8ddfcd935f951730030a17b1e7823ed0`; the image contents are unchanged.
+The current run passed 19 selected browser journeys. See
+[incident verification](../../incident-verification.md) for the separate local
+API/queue/HTTP-fixture evidence and hosted delivery limitations.
+
 - [Mobile sign-in outage](signin-outage-mobile.png): Pixel 7 Chromium emulation,
   412 × 839 CSS viewport, full-page capture.
 - [Desktop-width sign-in outage](signin-outage-desktop.png): same Chromium
