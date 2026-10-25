@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run validate:deployment && npm run build",
   "functions": {
     "app/api/queues/incidents/route.ts": {
       "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "drip-incidents" }]

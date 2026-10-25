@@ -1,0 +1,46 @@
+name: Auth release verification
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: auth-verification-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  auth:
+    name: Deployed signup and login
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Must be configured with a required reviewer before secrets are installed.
+    # Approval covers the exact head executed below. Missing configuration fails.
+    environment: preview-auth-verification
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Verify deployment identity before using browser credentials
+        id: target
+        run: node scripts/verify-preview-deployment.mjs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_PREVIEW_READ_TOKEN }}
+          DRIP_AUTH_PREVIEW_ORIGIN: ${{ vars.DRIP_AUTH_PREVIEW_ORIGIN }}
+          DRIP_AUTH_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          DRIP_AUTH_EXPECTED_BRANCH: ${{ github.head_ref || github.ref_name }}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify existing accounts, signup, sign-out and cloud restoration
+        run: npm run verify:auth
+        env:
+          DRIP_AUTH_VERIFIED_ORIGIN: ${{ steps.target.outputs.origin }}
+          DRIP_AUTH_EXPECTED_SHA: ${{ steps.target.outputs.sha }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DRIP_AUTH_EXISTING_TAG: ${{ secrets.DRIP_AUTH_EXISTING_TAG }}
+          DRIP_AUTH_EXISTING_PASSWORD: ${{ secrets.DRIP_AUTH_EXISTING_PASSWORD }}
+          DRIP_AUTH_EXISTING_BALANCE: ${{ vars.DRIP_AUTH_EXISTING_BALANCE }}
+      # No screenshots, traces, browser state or raw errors are uploaded.

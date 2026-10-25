@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "validate:deployment": "node scripts/validate-deployment.mjs",
+    "verify:auth": "playwright test --config release/playwright.config.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
