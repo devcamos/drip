@@ -51,6 +51,27 @@ the existing named component cases below. No specific failing method was given.
 confirmation for password changes. That path is in `PasswordSetup` and its tests.
 Underlying crypto and server-negative tests are listed in the next section.
 
+## ARCH-007: time-limited recovery-code reveal
+
+The final report asked for strong confirmation and temporary visibility.
+Generation already verifies a password, recovery code or fresh unlock passkey;
+the verified root, connected cloud owner and successful registration are checked
+before codes can be revealed. The list starts masked, requires an explicit Show
+action and hides on download, confirmation, window blur and tab hiding.
+
+One concrete visibility gap remained: the list could stay revealed indefinitely
+while this window retained focus. It now hides automatically after 30 seconds.
+The regression test fails before the timeout and passes afterward; existing
+masking/blur/confirmation tests are retained. No root/PRF persistence, additional
+credential endpoint or auth-policy change is introduced.
+
+| Guardrail | Current gap | Potential fix |
+| --- | --- | --- |
+| Recovery-code visibility | Confirmed before this fix: explicit reveal had no time limit while the window stayed focused. | Implemented: 30-second auto-hide, retaining default masking, explicit reveal and blur/tab/download hiding. |
+
+Evidence: [recovery-code component](../app/RecoveryCodes.tsx) and
+[focused-window timeout regression](../tests/recovery-codes-ui.test.tsx).
+
 ## Security verification requests from the automated report
 
 After the coverage updates, the report raised ARCH-002 and ARCH-003 as requests
@@ -136,8 +157,8 @@ Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3
 
 ## Local verification
 
-- 393 unit/component tests pass across 50 files. Global coverage is 94.19%
-  statements, 91.79% branches, 93.51% functions and 97.71% lines.
+- 394 unit/component tests pass across 50 files. Global coverage is 94.20%
+  statements, 91.80% branches, 93.54% functions and 97.71% lines.
 - `RecoveryCodeInput`, `RecoveryTask`, `recovery-file` and `recovery-readiness`
   each have 100% statement, branch and function coverage. This supplements their
   behavior assertions; coverage alone is not a guarantee of correctness.
@@ -156,8 +177,9 @@ Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3
 
 ## Scope and limits
 
-This update changes tests, dependency versions and review evidence. Existing
+This update changes tests, dependency versions, review evidence and the recovery
+reveal timeout/help text. Existing
 [UI screenshots](screenshots/guided-recovery/README.md) describe their original
-capture commit; no UI was changed by this review. A Chromium virtual authenticator
+capture commit; no layout or new UI flow was added by this review. A Chromium virtual authenticator
 does not establish physical iPhone compatibility. No customer data, Production
 database, schema, credentials, release or shared reporting service is changed.

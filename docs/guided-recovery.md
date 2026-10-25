@@ -17,7 +17,7 @@ cannot decrypt data on a fresh browser without a code.
 - Recovery codes can be created using a freshly verified unlock passkey, even
   if the old password and code are unavailable. Existing confirmation and
   registration safeguards remain in place. Generated codes are masked by default;
-  explicit reveal is available, and download, saved-file confirmation, window blur
+  explicit reveal lasts up to 30 seconds, and download, saved-file confirmation, window blur
   and hiding the tab conceal them again.
 - Code-file import runs entirely in the browser, accepts up to six distinct
   supported codes, caps input at 32 KB, masks codes in the selector, and never

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Blob as NodeBlob } from "node:buffer";
 import { RecoveryCodes } from "../app/RecoveryCodes";
 import { emptyData } from "../lib/db";
@@ -38,6 +38,17 @@ describe("recovery codes experience", () => {
     fireEvent(window, new Event("blur"));
     expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
     expect(screen.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
+  });
+  it("automatically hides revealed codes after 30 seconds while the window remains focused", async () => {
+    await panel(); await screen.findByRole("list");
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Show recovery codes" }));
+      expect(screen.getByRole("list")).toHaveTextContent(codes[0]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      expect(screen.getByRole("list")).not.toHaveTextContent(codes[0]);
+      expect(screen.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
+    } finally { vi.useRealTimers(); }
   });
   it("creates codes with a freshly verified passkey when the password and old codes are missing", async () => {
     passkeys.hasPasskeyUnlock.mockResolvedValue(true);

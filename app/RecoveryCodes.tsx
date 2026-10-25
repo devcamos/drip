@@ -24,6 +24,11 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
     window.addEventListener("blur", hide); document.addEventListener("visibilitychange", visibility);
     return () => { window.removeEventListener("blur", hide); document.removeEventListener("visibilitychange", visibility); };
   }, []);
+  useEffect(() => {
+    if (!showCodes) return;
+    const timer = setTimeout(() => setShowCodes(false), 30_000);
+    return () => clearTimeout(timer);
+  }, [showCodes]);
   async function generate() {
     setBusy(true); setMessage("");
     try {
@@ -55,7 +60,7 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
         catch { setMessage("Could not save your confirmation. Your downloaded recovery codes still work."); }
         finally { setBusy(false); }
       }}>I’ve saved my recovery codes</button>}
-      <p className="muted">Download the file before leaving. Codes stay hidden unless you choose to show them, and hide again when you leave the window. Your original recovery code still works.</p>
+      <p className="muted">Download the file before leaving. Codes stay hidden unless you choose to show them, and hide again after 30 seconds or when you leave the window. Your original recovery code still works.</p>
     </> : <>
       {usePasskey ? <p className="muted">Confirm with your saved unlock passkey to create codes without your password or an old code.</p> : <>
         <label htmlFor="create-recovery-code">{usePassword ? "Confirm your password" : "Your current recovery code"}</label>
