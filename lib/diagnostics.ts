@@ -1,5 +1,5 @@
 /** Allowlisted diagnostics only. Never serialize errors, messages, URLs or app data. */
-const operations = ["auth", "cloud", "recovery", "cloud.status", "network", "storage.open", "storage.read", "storage.write", "app.load", "app.save", "app.render", "app.unhandled"] as const;
+const operations = ["auth", "cloud", "recovery", "cloud.status", "network", "storage.open", "storage.read", "storage.write", "app.load", "app.save", "app.render", "app.unhandled", "backup.export", "backup.restore"] as const;
 export type DiagnosticOperation = typeof operations[number];
 type ErrorKind = "schema_mismatch" | "database_unavailable" | "storage_full" | "cancelled" | "network" | "unexpected";
 type Context = { status?: number; requestId?: string; durationMs?: number };

@@ -8,6 +8,7 @@ import RootLayout, { metadata, viewport } from "@/app/layout";
 import { saveData, setItem, loadData, emptyData } from "@/lib/db";
 import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
+import * as Diagnostics from "@/lib/diagnostics";
 import type { AppData, Account } from "@/lib/types";
 
 const signup = vi.hoisted(() => vi.fn());
@@ -48,9 +49,12 @@ describe("layout and page", () => {
 describe("onboarding", () => {
   it("offers a retry instead of staying on Loading when signup initialization fails", async () => {
     const drafts = await import("../lib/draft");
-    vi.spyOn(drafts, "loadDraft").mockRejectedValueOnce(new Error("Storage unavailable"));
+    const failure = new Error("Storage unavailable");
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
+    vi.spyOn(drafts, "loadDraft").mockRejectedValueOnce(failure);
     render(<Drip />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare signup on this device. Try again.");
+    expect(logged).toHaveBeenCalledWith("app.load", failure);
     click("Try again");
     expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(screen.queryByTestId("code")).toBeNull();
@@ -361,7 +365,9 @@ describe("backup", () => {
 
   it("uses the share sheet when available and handles share errors", async () => {
     const code = await seed({ accounts: [acct()] });
-    const share = vi.fn().mockRejectedValueOnce(Object.assign(new Error("x"), { name: "AbortError" })).mockRejectedValueOnce(new Error("boom"));
+    const failure = new Error("boom");
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
+    const share = vi.fn().mockRejectedValueOnce(Object.assign(new Error("x"), { name: "AbortError" })).mockRejectedValueOnce(failure);
     Object.assign(navigator, { canShare: () => true, share });
     render(<Drip />);
     await screen.findByText("Total balance");
@@ -371,12 +377,15 @@ describe("backup", () => {
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1), { timeout: 10_000 });
     await waitFor(() => expect(screen.getByRole("button", { name: "Export backup" })).toBeEnabled());
     expect(screen.queryByText("Backup failed. Please try again.")).toBeNull();
+    expect(logged).not.toHaveBeenCalledWith("backup.export", expect.anything());
     click("Export backup");
     expect(await screen.findByText("Backup failed. Please try again.", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith("backup.export", failure);
     delete (navigator as any).canShare; delete (navigator as any).share;
   });
 
   it("restore rejects invalid backup contents", async () => {
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
     const code = await seed({});
     const bad = await C.encryptBackup({ version: 9 }, code, 100_000);
     render(<Drip />);
@@ -386,6 +395,7 @@ describe("backup", () => {
     type(screen.getByLabelText("Restore recovery code"), code);
     click("Restore");
     expect(await screen.findByText("The backup's contents aren't valid.")).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith("backup.restore", expect.any(C.BackupError));
   });
 });
 
@@ -437,6 +447,7 @@ describe("app lock", () => {
     expect(await screen.findByText("App lock is off.")).toBeInTheDocument();
   });
   it("reports failure to create a passkey, and unsupported devices", async () => {
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
     await seed({});
     vi.stubGlobal("PublicKeyCredential", { isUserVerifyingPlatformAuthenticatorAvailable: async () => true });
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create: async () => null, get: vi.fn() } });
@@ -446,6 +457,7 @@ describe("app lock", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
     expect(await screen.findByText("Couldn't set up the passkey.")).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith("auth", expect.any(Error));
     unmount();
     vi.stubGlobal("PublicKeyCredential", undefined);
     render(<Drip />);
@@ -454,12 +466,21 @@ describe("app lock", () => {
     expect(await screen.findByText(/doesn't support a passkey lock/)).toBeInTheDocument();
   });
   it("locks on open, unlocks by passkey or recovery code, and relocks after 5 minutes hidden", async () => {
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
     const code = await seed({ lock: { credentialId: credId, enabledAt: "x" } });
     const get = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ rawId: raw });
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create: vi.fn(), get } });
     render(<Drip />);
     expect(await screen.findByRole("heading", { name: /locked/ })).toBeInTheDocument();
     expect(await screen.findByText(/Face ID didn't work/)).toBeInTheDocument();
+    const recovery = await import("../lib/recovery-codes");
+    const failure = new Error("Synthetic recovery lookup failure");
+    vi.spyOn(recovery, "resolveRecoveryCode").mockRejectedValueOnce(failure);
+    type(screen.getByLabelText("Unlock recovery code"), code);
+    click("Unlock with code");
+    expect(await screen.findByText(failure.message)).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith("auth", failure);
+    expect(screen.getByRole("heading", { name: /locked/ })).toBeInTheDocument();
     type(screen.getByLabelText("Unlock recovery code"), "WRONG");
     click("Unlock with code");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();

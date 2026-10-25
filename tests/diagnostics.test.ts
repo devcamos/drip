@@ -3,6 +3,14 @@ import { errorKind, logFailure, requestReference, responseError } from "../lib/d
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it.each(["backup.export", "backup.restore"] as const)("allows %s diagnostics without serializing file contents or unlock codes", operation => {
+  vi.stubGlobal("window", undefined);
+  const output = vi.spyOn(console, "error").mockImplementation(() => {});
+  logFailure(operation, new Error("private-file-content and recovery-code"));
+  expect(JSON.parse(output.mock.calls[0][0])).toEqual({ app: "drip", event: "operation_failed", operation, kind: "unexpected" });
+  expect(JSON.stringify(output.mock.calls)).not.toMatch(/private-file-content|recovery-code/);
+});
+
 it("classifies nested causes without serializing secret-bearing errors or metadata", () => {
   vi.stubGlobal("window", undefined);
   const output = vi.spyOn(console, "error").mockImplementation(() => {});
