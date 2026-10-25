@@ -36,6 +36,21 @@ files without strengthening code verification. Unsupported content is neither
 executed nor submitted to authentication. This addresses the follow-up file-type
 finding without treating picker metadata as an authorization control.
 
+The later report's request for confirmation-method tests is already covered by
+the existing named component cases below. No specific failing method was given.
+
+| Component | Confirmation | Existing behavior test |
+| --- | --- | --- |
+| `PasswordSetup` | Recovery code | [Recovery-verified save/reset, mismatch, failure and secret clearing](../tests/password-ui.test.tsx) |
+| `PasswordSetup` | Current password | [Password-confirmed change passes only the verified root to the setter](../tests/password-ui.test.tsx) |
+| `PasswordSetup` | Saved unlock passkey | [Fresh passkey confirmation; cancellation makes no credential change; retry succeeds](../tests/password-ui.test.tsx) |
+| `PasskeyUnlock` | Recovery code | [Setup, cancellation, unsupported encryption, retry and wrapper removal](../tests/passkey-ui.test.tsx) |
+| `PasskeyUnlock` | Current password | [Password-confirmed enrollment and wrong-password rejection](../tests/passkey-ui.test.tsx) |
+
+`PasskeyUnlock` enrolls/removes the local wrapper; it does not offer saved-passkey
+confirmation for password changes. That path is in `PasswordSetup` and its tests.
+Underlying crypto and server-negative tests are listed in the next section.
+
 ## Security verification requests from the automated report
 
 After the coverage updates, the report raised ARCH-002 and ARCH-003 as requests
@@ -133,6 +148,11 @@ Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3
 - Fresh `npm ci`, `npm ls --all`, typecheck, optimized build and dependency import
   checks pass. The generated `/sw-build.js` route remains informational only
   in import scanning. A fresh audit reports zero known vulnerabilities.
+- A later CI run exposed a timing race in the existing account CRUD test:
+  `findByText("My Bank")` could resolve the form's card preview immediately
+  before it was removed after saving. The test now waits for the detail-only
+  Income predictions region and retains both provider/payment assertions.
+  No retry, timeout increase, skip or app behavior change was used.
 
 ## Scope and limits
 
