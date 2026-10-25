@@ -12,11 +12,13 @@ clearing credentials when leaving the recovery screen. Recovery password changes
 passkey cancellation, code registration, download confirmation and vault binding
 also have component or crypto/persistence tests.
 
-Ten additional component cases now exercise previously uncovered edge paths:
+Fourteen additional component cases now exercise edge paths and file boundaries:
 
 - File import: newest selection wins when an older read fails; safe filesystem
   failure with credential clearing and retry; pending imports ignored after
   disabling, unmounting or cancelling; manual edits clear the imported selector.
+  Named text, JSON and PNG fixtures reject malformed or unsupported content;
+  a valid downloaded text file also works with a generic file-manager MIME type.
 - Setup task: initial storage failure offers setup without claiming completion;
   stale readiness results cannot override a newer saved-code result; leaving
   Accounts discards pending checks and removes the listener; removing a recovery
@@ -26,6 +28,13 @@ These tests exercise failure handling, competing asynchronous actions and
 credential lifetime. They require no production behavior change. No existing
 test or coverage threshold was relaxed. Existing browser recovery journeys
 continue to test the running application separately from the component mocks.
+
+File extension and MIME type are untrusted metadata. The input's `accept` hint
+helps the picker; the size limit and supported-code parser validate content.
+Requiring a particular MIME value would reject some legitimate downloaded text
+files without strengthening code verification. Unsupported content is neither
+executed nor submitted to authentication. This addresses the follow-up file-type
+finding without treating picker metadata as an authorization control.
 
 ## Dependencies compared with main
 
@@ -70,7 +79,7 @@ Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3
 
 ## Local verification
 
-- 389 unit/component tests pass across 50 files. Global coverage is 94.19%
+- 393 unit/component tests pass across 50 files. Global coverage is 94.19%
   statements, 91.79% branches, 93.51% functions and 97.71% lines.
 - `RecoveryCodeInput`, `RecoveryTask`, `recovery-file` and `recovery-readiness`
   each have 100% statement, branch and function coverage. This supplements their

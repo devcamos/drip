@@ -101,3 +101,31 @@ it("clears the imported selection and its status when a code is edited manually"
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.queryByRole("status")).toBeNull();
 });
+
+it.each([
+  ["drip-recovery-codes.txt", "text/plain", "1. ABCD-EFGH"],
+  ["backup.json", "application/json", '{"accounts":[]}'],
+  ["photo.png", "image/png", "\u0089PNG\u0000\u0000binary data"],
+])("rejects unsupported content in %s without accepting the file type as proof", async (name, type, content) => {
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  const file = new File([content], name, { type });
+  // jsdom File supplies metadata but not the browser's Blob.text() method.
+  Object.defineProperty(file, "text", { value: async () => content });
+  render(<Panel />);
+  fireEvent.change(screen.getByLabelText("Recovery codes file"), { target: { files: [file] } });
+  expect(await screen.findByRole("status")).toHaveTextContent("No supported recovery-code list");
+  expect(screen.getByLabelText("Recovery code", { exact: true })).toHaveValue("");
+  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("accepts a valid downloaded text file with a generic file-manager MIME type", async () => {
+  const code = generateRecoveryCode(); const content = `Drip recovery codes\n1. ${code}`;
+  const file = new File([content], "drip-recovery-codes.txt", { type: "application/octet-stream" });
+  Object.defineProperty(file, "text", { value: async () => content });
+  render(<Panel />);
+  fireEvent.change(screen.getByLabelText("Recovery codes file"), { target: { files: [file] } });
+  expect(await screen.findByRole("status")).toHaveTextContent("1 recovery code loaded");
+  expect(screen.getByLabelText("Recovery code", { exact: true })).toHaveValue(code);
+  expect(screen.getByLabelText("Recovery code", { exact: true })).toHaveAttribute("type", "password");
+});
