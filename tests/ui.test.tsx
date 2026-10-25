@@ -247,9 +247,11 @@ describe("accounts", () => {
     expect(screen.getByText("≈ £5.00 a month")).toBeInTheDocument();
     click("Save");
 
-    // detail
-    expect(await screen.findByText("My Bank")).toBeInTheDocument();
-    expect(await screen.findByText("Estimated next payment")).toBeInTheDocument();
+    // The form preview also contains the provider name. Wait for saved-detail
+    // navigation before asserting, so the query cannot return a detached preview.
+    const predictions = await screen.findByRole("region", { name: "Income predictions" });
+    expect(screen.getByText("My Bank")).toBeInTheDocument();
+    expect(within(predictions).getByText("Estimated next payment")).toBeInTheDocument();
 
     click("Top up");
     type(screen.getByLabelText("amount"), "300");

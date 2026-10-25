@@ -19,6 +19,7 @@ import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
 import { SignupForm } from "./SignupForm";
+import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
 import { AccountDetail } from "./AccountDetail";
@@ -188,7 +189,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}<InstallTask state={installTask} />{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}<InstallTask state={installTask} />{view.name === "home" && <RecoveryTask onSetup={() => setView({ name: "settings" })} />}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
         {(["home", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
@@ -235,7 +236,7 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
   const screenCopy = {
     login: { title: "Welcome back", description: "Sign in to your Drip account." },
     signup: { title: "Create your account", description: "Track your money and the income it earns. No real name, email or phone needed." },
-    recover: { title: "Recover your account", description: "Get back to your accounts using a saved recovery code." },
+    recover: { title: "Recover your account", description: "Find your saved credentials or use a recovery code to get back in." },
     backup: { title: "Restore a backup", description: "Get back to your accounts using a saved recovery code." },
   }[screen];
   return (
