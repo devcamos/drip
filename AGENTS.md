@@ -1,3 +1,5 @@
 # AGENTS.md
 
-> **Agent guardrails:** all agents must follow the shared rulebook at https://github.com/devonte-amos-apps/pr-intelligence/blob/main/AGENT_RULES.md. It overrides anything in this file that conflicts with it.
+## Shared foundation
+
+Read [engineering principles](https://github.com/devonte-amos-apps/pr-intelligence/blob/main/docs/engineering-principles.md) and [shared agent controls](https://github.com/devonte-amos-apps/pr-intelligence/blob/main/AGENT_RULES.md), then [this repository's rules](docs/governance/repository-rules.md). The shared controls define precedence and approval boundaries. Adoption is proposed until the prerequisite shared PR is merged; do not treat links to an unmerged document as an effective rule.
