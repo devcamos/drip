@@ -26,6 +26,10 @@ cannot decrypt data on a fresh browser without a code.
   encrypted unlock passkey or an explicitly confirmed saved-code download.
   A download click alone does not count as confirmation. The receipt contains
   only a vault identifier and timestamp, and cannot complete another vault's task.
+  Starting a replacement code set clears that confirmation before the server
+  can invalidate the old file. Save and confirm the replacement file to complete
+  setup again. An uncertain network outcome leaves setup unconfirmed; a local
+  receipt-write failure prevents sending the replacement request.
 - Signed-out screens reset private form state as part of route navigation. They
   do not run a delayed reset after the new form becomes interactive, which could
   erase a password-manager autofill. Leaving and returning still clears secrets.

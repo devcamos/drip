@@ -31,6 +31,11 @@ export async function resolveRecoveryCode(code: string): Promise<string> {
   return value.root;
 }
 export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: string) {
+  // Clear the saved-file claim before the server can invalidate that file.
+  // If this write fails, do not rotate cloud records and leave a stale receipt.
+  try { await setItem("recoveryCodesSaved", undefined); }
+  catch (error) { throw new Error("Could not prepare recovery codes on this device. Your existing codes have not changed.", { cause: error }); }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-recovery-changed"));
   const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }) });
   if (!response.ok) throw new Error("Could not save recovery codes. Your existing codes still work. Sign in again and retry.");
   const replaced = new Set(records.map(record => record.locator)); try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !replaced.has(old.locator)), ...records].slice(-12)); return true; } catch { return false; }
