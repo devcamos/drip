@@ -36,6 +36,48 @@ files without strengthening code verification. Unsupported content is neither
 executed nor submitted to authentication. This addresses the follow-up file-type
 finding without treating picker metadata as an authorization control.
 
+## Security verification requests from the automated report
+
+After the coverage updates, the report raised ARCH-002 and ARCH-003 as requests
+to verify controls, while marking all guardrails Pass. No bypass or failing input
+was identified. A source/test review found no additional confirmed defect in
+these two paths. This is a targeted code assessment, not a penetration test.
+
+| Guardrail | Current gap | Potential fix |
+| --- | --- | --- |
+| Password changes (ARCH-002) | No missing server authorization check confirmed. `passkeyRecoveryRoot` decrypts the existing root after fresh PRF confirmation and rechecks the local vault/session/wrapper. It does not itself grant a server session or set a password. | Preserve the existing session, owner and recovery-proof checks; retain their negative tests. No duplicate WebAuthn endpoint is needed for this local encrypted-key unlock. |
+| Recovery-file validation (ARCH-003) | No unbounded or unvalidated parsing confirmed. The parser caps UTF-8 input at 32,768 bytes, accepts a fixed code grammar/alphabet, deduplicates and requires 1–6 codes. The original file is never sent to auth. | Retain byte/grammar/list limits and malformed/oversized tests. Treat extension/MIME as picker metadata, not proof that a recovery code is valid. |
+
+The password-change path is:
+`passkeyRecoveryRoot` → `setLoginPassword` → `/api/auth/gamertag-password`.
+The server uses `sessionMiddleware`, derives the owner from that session,
+checks `X-Drip-Owner`, verifies the recovery-derived credential against the
+account's stored hash, validates envelope ownership/username, and only then
+stores the new password hash and revokes other sessions. Client state or
+successful file parsing alone cannot satisfy these checks.
+
+Evidence:
+
+- [Fresh local passkey confirmation](../lib/passkey-unlock.ts#L77) and
+  [password-change client](../lib/password-login.ts#L93).
+- [Server authorization/proof validation](../server/password-login.ts#L83);
+  [wrong-proof/owner rejection tests](../tests/password-server.test.ts#L81).
+- [Passkey cancellation, wrong PRF and session-change tests](../tests/passkey-unlock.test.ts#L35)
+  and [wrapper-change rejection](../tests/passkey-unlock.test.ts#L49).
+- [Bounded file parser](../lib/recovery-file.ts#L7),
+  [parser boundary tests](../tests/recovery-file.test.ts#L12) and
+  [file-input behavior tests](../tests/recovery-input-ui.test.tsx).
+
+**Not verified:** physical-device/password-manager behavior, hosted login on the
+final Preview, an independent penetration test or a whole-app security
+certification. Existing browser-bound wrapper and lost-key limitations remain
+documented in [guided recovery](guided-recovery.md).
+
+Review principles now distinguish a sensitive change from a demonstrated
+violation and require inspecting the existing server/helper/test path before
+claiming a missing control. Missing context belongs in an unverified follow-up.
+No rule severity, gate, test or coverage threshold was reduced or disabled.
+
 ## Dependencies compared with main
 
 | Dependency | Main | PR | Decision |
