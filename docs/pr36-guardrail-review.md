@@ -34,11 +34,23 @@ continue to test the running application separately from the component mocks.
 | `@types/node` | 26.6.5 | 26.6.5 | Merge main's approved PR #17; do not undo its major upgrade or repeat it here. |
 | `next`, `@next/env`, platform SWC packages | 16.4.2 | 16.4.3 | Retain the existing patch upgrade. The release contains bug-fix backports. |
 | `fast-uri` (development dependency through Ajv) | 3.1.8 | 3.1.9 | Apply the security patch for four URI parsing/normalization advisories. PR #38 proposes the same patch. |
+| `better-auth`, `@better-auth/passkey`, core and adapters | 1.7.12 | 1.7.13 | Upgrade together after reviewing the declaration fix and matching passkey peer requirements. |
+| `@better-auth/utils`, `@better-fetch/fetch` | 0.5.0 / 1.3.2 | 0.5.1 / 1.3.3 | Required by the updated auth packages. |
+| `set-cookie-parser` | 3.1.4 | 3.2.1 | Transitive resolution within better-call's existing `^3.1.2` range; real Better Auth handler/session tests cover cookie handling. |
 
 No other locked package versions differ from main. Fresh installation, dependency
 tree validation, typecheck, unit/component coverage, optimized build and browser
 journeys verify the combined dependency set. There is no configured lint script;
 the existing dependency import scan is run separately.
+
+The fresh report on the first review commit confirms no material architecture
+findings. It also identified the newly available Better Auth patch. Its release
+notes fix type-only exports incorrectly declared as runtime values; the core's
+provider options concern social providers Drip does not configure. The server
+and passkey packages stay paired, without new plugins, providers, auth options
+or schema changes. Full local verification was repeated after this update,
+including the real Better Auth HTTP handler integration tests with a memory
+adapter (synthetic SQL for device-cap coordination), as well as component tests.
 
 The runtime remains Node 24.22.1 / `24.x`, as configured on main. Node 26 type
 definitions are compile-time declarations, not a runtime upgrade, and can expose
@@ -53,6 +65,7 @@ suggestion, not evidence of a security advisory against `@types/node`.
 
 Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3),
 [fast-uri 3.1.9](https://github.com/fastify/fast-uri/releases/tag/v3.1.9),
+[Better Auth 1.7.13](https://github.com/better-auth/better-auth/releases/tag/v1.7.13),
 [merged Node types PR #17](https://github.com/devcamos/drip/pull/17).
 
 ## Local verification
