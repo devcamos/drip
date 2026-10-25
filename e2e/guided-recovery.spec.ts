@@ -64,7 +64,10 @@ test("forgotten-password screen offers the configured encrypted unlock passkey",
 });
 
 test("password setup creates a verified passkey, which resets a forgotten password and restores the same cloud data", async ({ page, context, browser, baseURL }) => {
-  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(180_000);
+  // Opt-in integration: creates synthetic cloud records; ordinary CI has no database credentials.
+  // Run with DRIP_CLOUD_E2E=1 only against the isolated Preview database.
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database.");
+  test.setTimeout(180_000);
   await authenticator(page, context);
   const handle = "rec_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
   const oldPassword = "Synthetic old meadow 42!", newPassword = "Synthetic new waterfall 73!";

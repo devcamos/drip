@@ -17,6 +17,7 @@ output { display:block; margin:1em 0; }
 .install-task { border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:12px; padding:14px; margin:12px 0; background:var(--panel); }
 .install-task-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .install-task h2 { margin:0; font-size:17px; } .install-task p { margin:8px 0 0; font-size:14px; }
+.install-task .recovery-task-complete { margin:8px 0 0; font-size:14px; }
 .install-task.is-complete { animation:install-task-fade 1400ms ease forwards; }
 @keyframes install-task-fade { 0%,65% { opacity:1; } 100% { opacity:0; } }
 @media (prefers-reduced-motion: reduce) { .install-task.is-complete { animation:none; } }

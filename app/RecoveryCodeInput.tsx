@@ -23,8 +23,8 @@ export function RecoveryCodeInput({ id, value, onChange, label = "Recovery code"
         setCodes(found); onChange(found[0]); setMessage(`${found.length} recovery ${found.length === 1 ? "code loaded" : "codes loaded"}. Your file stays on this device.`);
       } catch (error) { if (sequence === request.current) { onChange(""); setMessage(error instanceof RecoveryFileError ? error.message : "Could not read this file. Try again or paste a code."); } }
     }} />
-    {codes.length > 1 && <><label htmlFor={`${id}-choice`}>Choose a code from your file</label><select id={`${id}-choice`} disabled={disabled} value={String(codes.indexOf(value))} onChange={event => onChange(codes[Number(event.target.value)])}>{codes.map((_, index) => <option key={index} value={index}>Recovery code {index + 1}</option>)}</select></>}
-    {message && <output role="status" className="muted">{message}</output>}
+    {codes.length > 1 && <><label htmlFor={`${id}-choice`}>Choose a code from your file</label><select id={`${id}-choice`} disabled={disabled} value={String(codes.indexOf(value))} onChange={event => onChange(codes[Number(event.target.value)])}>{codes.map((code, index) => <option key={code} value={index}>Recovery code {index + 1}</option>)}</select></>}
+    {message && <output className="muted">{message}</output>}
   </div>;
 }
 

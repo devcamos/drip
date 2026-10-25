@@ -34,12 +34,29 @@ export function SignedOut(props: SignedOutProps) {
   return <SignedOutScreen key={props.mode === "migration" ? "migration" : `${props.mode ?? "signedOut"}:${screen}`} {...props} screen={screen} navigate={navigate} />;
 }
 
+function signedOutCopy(mode: NonNullable<SignedOutProps["mode"]>, recovering: boolean, signingUp: boolean) {
+  const copy = {
+    signedOut: { title: "Drip is signed out", section: "Sign back in", action: "Sign in" },
+    locked: { title: "Unlock Drip", section: "Open your accounts", action: "Unlock Drip" },
+    migration: { title: "Encrypt this device", section: "Protect local accounts", action: "Encrypt local data" },
+  }[mode];
+  let title = copy.title;
+  if (signingUp) title = "Create your account";
+  else if (recovering && mode !== "migration") title = "Recover your account";
+  let description = "Sign in with your gamertag and password. Your accounts stay encrypted while signed out.";
+  if (recovering) description = "Choose a way back in. Your saved accounts stay on this device.";
+  if (signingUp) description = "Start a new Drip account with a gamertag and password.";
+  if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
+  return { ...copy, title, description };
+}
+
 function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", screen, navigate }: SignedOutProps & Readonly<{ screen: AuthRoute; navigate: (next: AuthRoute) => void }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [remoteMessage, setRemoteMessage] = useState(""); const [pending, setPending] = useState(false); const [busy, setBusy] = useState(false);
   const [passkey, setPasskey] = useState(false);
   const recovering = mode === "migration" || screen === "recover";
   const signingUp = mode !== "migration" && screen === "signup";
   const otherRecovery = screen === "other-recover" && mode !== "migration";
+  const signingIn = !recovering && !signingUp && screen !== "other" && !otherRecovery;
   useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setPasskey(value); }); return () => { active = false; }; }, []);
   useEffect(() => {
     let active = true;
@@ -57,24 +74,13 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
     window.addEventListener("online", onOnline); window.addEventListener("drip-session-changed", onChange);
     return () => { active = false; window.removeEventListener("online", onOnline); window.removeEventListener("drip-session-changed", onChange); };
   }, []);
-  const copy = {
-    signedOut: { title: "Drip is signed out", section: "Sign back in", action: "Sign in" },
-    locked: { title: "Unlock Drip", section: "Open your accounts", action: "Unlock Drip" },
-    migration: { title: "Encrypt this device", section: "Protect local accounts", action: "Encrypt local data" },
-  }[mode];
+  const copy = signedOutCopy(mode, recovering, signingUp);
   const submitText = busy ? "Unlocking…" : copy.action;
-  const title = signingUp ? "Create your account" : recovering && mode !== "migration" ? "Recover your account" : copy.title;
   const otherTitle = otherRecovery ? "Recover another account" : "Sign in to another account";
-  let description = "Sign in with your gamertag and password. Your accounts stay encrypted while signed out.";
-  if (recovering) description = "Choose a way back in. Your saved accounts stay on this device.";
-  if (signingUp) description = "Start a new Drip account with a gamertag and password.";
-  if (mode === "migration") description = "Enter your saved recovery code to encrypt the accounts already on this device. Your existing copy stays intact until encryption is verified.";
-  return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : title}
-    description={description}>
-    {!recovering && !signingUp && screen !== "other" && !otherRecovery && <>
-    <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />
-    </>}
-    {passkey && (recovering || (!signingUp && screen !== "other" && !otherRecovery)) && mode !== "migration" && <section className="panel" aria-label="Unlock with your passkey">
+  return <AuthLayout title={screen === "other" || otherRecovery ? otherTitle : copy.title}
+    description={copy.description}>
+    {signingIn && <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />}
+    {passkey && (recovering || signingIn) && mode !== "migration" && <section className="panel" aria-label="Unlock with your passkey">
       {recovering && <><h2>Use your saved unlock passkey</h2><p className="muted">No password or code needed. You can set a new password in Settings after unlocking.</p></>}
       <button className="btn" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
@@ -84,7 +90,7 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
       }}>{busy ? "Unlocking…" : "Unlock with passkey"}</button>
       <p className="muted">Use Face ID, Touch ID or your device lock.</p>
     </section>}
-    {!recovering && !signingUp && screen !== "other" && !otherRecovery && <>
+    {signingIn && <>
     <div className="auth-links"><button className="text-link" disabled={busy} onClick={() => navigate("recover")}>Forgot password?</button></div>
     <div className="auth-footer"><p>New to Drip?</p><button className="btn ghost" disabled={busy} onClick={() => navigate("signup")}>Sign up</button>
       <button className="text-link" disabled={busy} onClick={() => navigate("other")}>Use another account</button></div>

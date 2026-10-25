@@ -19,7 +19,9 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
       if (password !== again) { setMessage("Passwords do not match."); return; }
       setBusy(true);
       try {
-        const root = method === "passkey" ? await passkeyRecoveryRoot() : method === "password" ? await passwordRecoveryRoot(code) : code;
+        let root = code;
+        if (method === "passkey") root = await passkeyRecoveryRoot();
+        else if (method === "password") root = await passwordRecoveryRoot(code);
         const name = await setLoginPassword(root, username, password, data); setUsername(name); setCode(""); setPassword(""); setAgain(""); setMessage(`Password saved. Sign in as ${name} next time. Keep your recovery codes for a forgotten password.`);
       }
       catch (error) { setMessage((error as Error).name === "NotAllowedError" ? "Passkey confirmation was cancelled. Your password has not changed." : (error as Error).message); }

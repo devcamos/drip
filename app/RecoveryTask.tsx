@@ -13,7 +13,8 @@ export function RecoveryTask({ onSetup }: Readonly<{ onSetup: () => void }>) {
         const state = await recoveryReadiness();
         if (!active || id !== sequence) return;
         const complete = state.passkey || state.codesSaved;
-        const next = complete ? phaseRef.current === "needed" ? "complete" : "hidden" : "needed";
+        let next: typeof phaseRef.current = "needed";
+        if (complete) next = phaseRef.current === "needed" ? "complete" : "hidden";
         phaseRef.current = next; setPhase(next);
       } catch {
         // Unknown storage cannot establish that a fallback was saved.
@@ -30,7 +31,7 @@ export function RecoveryTask({ onSetup }: Readonly<{ onSetup: () => void }>) {
   }, [phase]);
   if (phase === "checking" || phase === "hidden") return null;
   return <section className={`panel install-task${phase === "complete" ? " is-complete" : ""}`} aria-label="Account recovery setup">
-    {phase === "complete" ? <p role="status">Recovery is ready. You have another way back in.</p> : <>
+    {phase === "complete" ? <output className="recovery-task-complete">Recovery is ready. You have another way back in.</output> : <>
       <h2>Keep a way back in</h2>
       <p className="muted">Set up an unlock passkey or save your recovery codes, so losing your password doesn’t lock you out.</p>
       <button className="btn ghost" onClick={onSetup}>Set up recovery</button>

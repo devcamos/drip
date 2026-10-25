@@ -157,8 +157,9 @@ Sources: [Next.js 16.4.3](https://github.com/vercel/next.js/releases/tag/v16.4.3
 
 ## Local verification
 
-- 394 unit/component tests pass across 50 files. Global coverage is 94.20%
-  statements, 91.80% branches, 93.54% functions and 97.71% lines.
+- 394 unit/component tests pass across 50 files. After the
+  [check cleanup](pr36-checks-review.md), global coverage is 94.24%
+  statements, 91.78% branches, 93.57% functions and 97.73% lines.
 - `RecoveryCodeInput`, `RecoveryTask`, `recovery-file` and `recovery-readiness`
   each have 100% statement, branch and function coverage. This supplements their
   behavior assertions; coverage alone is not a guarantee of correctness.

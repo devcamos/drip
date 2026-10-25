@@ -8,6 +8,20 @@ import type { AppData } from "@/lib/types";
 import { hasPasskeyUnlock, passkeyRecoveryRoot } from "@/lib/passkey-unlock";
 import { confirmRecoveryCodesSaved } from "@/lib/recovery-readiness";
 import { passwordUnlockContext } from "@/lib/db";
+
+async function confirmedRecoveryRoot(usePasskey: boolean, usePassword: boolean, code: string) {
+  if (usePasskey) return passkeyRecoveryRoot();
+  if (usePassword) return passwordRecoveryRoot(code);
+  return resolveRecoveryCode(code);
+}
+
+function RecoveryCodeField({ usePassword, code, onChange, disabled }: Readonly<{ usePassword: boolean; code: string; onChange: (value: string) => void; disabled: boolean }>) {
+  return <>
+    <label htmlFor="create-recovery-code">{usePassword ? "Confirm your password" : "Your current recovery code"}</label>
+    <input id="create-recovery-code" type="password" autoComplete={usePassword ? "current-password" : "off"} value={code} onChange={event => onChange(event.target.value)} disabled={disabled} />
+  </>;
+}
+
 export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; verifier: { salt: string; hash: string } }>) {
   const [code, setCode] = useState(""); const [codes, setCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -35,7 +49,7 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
       const { binding } = await passwordUnlockContext();
       const state = await readCloudState();
       if (!state || state.version === 0) throw new Error("Enable cloud recovery and sync your accounts first.");
-      const root = usePasskey ? await passkeyRecoveryRoot() : usePassword ? await passwordRecoveryRoot(code) : await resolveRecoveryCode(code);
+      const root = await confirmedRecoveryRoot(usePasskey, usePassword, code);
       if (!(await C.checkCode(root, verifier))) throw new Error("That isn't your recovery code.");
       if (!confirm("Create a new set of six recovery codes? This removes cloud lookup for the previous set. Devices that already recovered with old codes keep access; this does not revoke a compromised code. Keep the new file safe.")) return;
       const session = await authClient.getSession();
@@ -62,10 +76,8 @@ export function RecoveryCodes({ data, verifier }: Readonly<{ data: AppData; veri
       }}>I’ve saved my recovery codes</button>}
       <p className="muted">Download the file before leaving. Codes stay hidden unless you choose to show them, and hide again after 30 seconds or when you leave the window. Your original recovery code still works.</p>
     </> : <>
-      {usePasskey ? <p className="muted">Confirm with your saved unlock passkey to create codes without your password or an old code.</p> : <>
-        <label htmlFor="create-recovery-code">{usePassword ? "Confirm your password" : "Your current recovery code"}</label>
-        <input id="create-recovery-code" type="password" autoComplete={usePassword ? "current-password" : "off"} value={code} onChange={e => setCode(e.target.value)} disabled={busy} />
-      </>}
+      {usePasskey ? <p className="muted">Confirm with your saved unlock passkey to create codes without your password or an old code.</p> :
+        <RecoveryCodeField usePassword={usePassword} code={code} onChange={setCode} disabled={busy} />}
       <div className="row-gap"><button className="btn" disabled={busy || (!usePasskey && (usePassword ? !code : !C.isValidCode(code)))} onClick={generate}>{busy ? "Creating codes…" : "Create six recovery codes"}</button></div>
       {hasPasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePasskey(!usePasskey); setCode(""); setMessage(""); }}>{usePasskey ? "Use password or recovery code instead" : "Confirm with saved passkey"}</button>}
       {hasPassword && !usePasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePassword(!usePassword); setCode(""); setMessage(""); }}>{usePassword ? "Use a recovery code instead" : "Confirm with password instead"}</button>}
