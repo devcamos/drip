@@ -18,9 +18,11 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
     })().catch(() => { if (active) setError("Your account is created. Could not open the recovery step; try again. Your saved account is kept."); });
     return () => { active = false; };
   }, [attempt]);
+  let content = <output>Opening recovery setup…</output>;
+  if (error) content = <section className="panel"><p role="alert" className="err">{error}</p><button className="btn" onClick={() => setAttempt(value => value + 1)}>Try again</button></section>;
+  else if (account) content = <RecoveryCodes data={account.data} verifier={account.verifier} onSaved={onSaved} signup />;
   return <AuthLayout title="Save your recovery codes" description="Your account is created. Download and confirm your original recovery file to finish signup and open Accounts.">
-    {error ? <section className="panel"><p role="alert" className="err">{error}</p><button className="btn" onClick={() => setAttempt(value => value + 1)}>Try again</button></section> : account ?
-      <RecoveryCodes data={account.data} verifier={account.verifier} onSaved={onSaved} signup /> : <p role="status">Opening recovery setup…</p>}
+    {content}
     <SignOutButton />
   </AuthLayout>;
 }
