@@ -1,5 +1,17 @@
 import { expect, type Page, type Locator } from "@playwright/test";
 
+export async function finishSignupRecovery(page: Page, password: string) {
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible({ timeout: 30_000 });
+  const panel = page.getByRole("region", { name: "Recovery codes", exact: true });
+  await panel.getByLabel("Confirm your password", { exact: true }).fill(password);
+  await withAuthRetry(page, () => panel.getByRole("button", { name: "Open original recovery codes" }).click(), panel.getByRole("button", { name: "Download recovery codes" }));
+  const download = page.waitForEvent("download");
+  await panel.getByRole("button", { name: "Download recovery codes" }).click();
+  expect((await download).suggestedFilename()).toBe("drip-recovery-codes.txt");
+  await panel.getByRole("button", { name: "I’ve saved my recovery codes" }).click();
+  await expect(page.getByTestId("header-tag")).toBeVisible();
+}
+
 export async function enableCloudRecovery(page: Page) {
   const panel = page.getByRole("region", { name: "Cloud recovery", exact: true });
   const enable = panel.getByRole("button", { name: "Enable encrypted cloud recovery" });

@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import { legacyAccount } from "./legacy-account-helpers";
-import { withAuthRetry } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery } from "./auth-helpers";
 
 async function authenticator(page: Page, context: BrowserContext) {
   const cdp = await context.newCDPSession(page);
@@ -75,7 +75,8 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await page.getByLabel(/^Gamertag/).fill(handle);
   await page.getByLabel("Create password", { exact: true }).fill(oldPassword);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(oldPassword);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
+  await finishSignupRecovery(page, oldPassword);
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   await page.getByLabel("Balance", { exact: true }).fill("3200"); await page.getByLabel("Rate", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -96,7 +97,7 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await withAuthRetry(page, () => form.getByRole("button", { name: "Save password" }).click(), form.getByText(/Password saved/));
   const codes = page.getByRole("region", { name: "Recovery codes", exact: true });
   await codes.getByRole("button", { name: "Confirm with saved passkey" }).click();
-  await withAuthRetry(page, () => codes.getByRole("button", { name: "Create six recovery codes" }).click(), codes.getByRole("button", { name: "Download recovery codes" }));
+  await withAuthRetry(page, () => codes.getByRole("button", { name: "Open original recovery codes" }).click(), codes.getByRole("button", { name: "Download recovery codes" }));
   await expect(codes.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
   await capture(page, "recovery-codes-ready");
   const downloadEvent = page.waitForEvent("download"); await codes.getByRole("button", { name: "Download recovery codes" }).click();

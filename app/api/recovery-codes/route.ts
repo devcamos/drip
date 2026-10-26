@@ -38,6 +38,13 @@ export async function POST(request: Request) {
     WHERE records @> $1::jsonb AND item->>'locator' = $2 LIMIT 1`, [JSON.stringify([{ locator: body.locator }]), body.locator]);
   return rows.length ? reply(rows[0]) : reply({ error: "Code not found." }, 404);
 }
+export async function GET(request: Request) {
+  if (!cloudConfigured()) return reply({ error: "Recovery unavailable." }, 503);
+  const userId = (await getAuth().api.getSession({ headers: request.headers }))?.user.id;
+  if (!userId || request.headers.get("x-drip-owner") !== userId) return reply({ error: "Sign in again." }, 401);
+  const { rows } = await database().query("SELECT records FROM drip_recovery_codes WHERE user_id = $1", [userId]);
+  return reply({ locators: rows.length ? rows[0].records.map((record: { locator: string }) => record.locator) : null });
+}
 export async function PUT(request: Request) {
   if (!sameOrigin(request)) return reply({ error: "Invalid origin." }, 403);
   if (!cloudConfigured()) return reply({ error: "Recovery unavailable." }, 503);
@@ -51,10 +58,18 @@ export async function PUT(request: Request) {
       typeof e.salt === "string" && /^[A-Za-z0-9+/]{22}==$/.test(e.salt) && typeof e.iv === "string" && /^[A-Za-z0-9+/]{16}$/.test(e.iv) &&
       typeof e.ct === "string" && e.ct.length >= 32 && e.ct.length <= 1024 && /^[A-Za-z0-9+/]+={0,2}$/.test(e.ct);
   })) return reply({ error: "Invalid recovery codes." }, 400);
-  // A single row replacement atomically rotates the entire set, scoped to the session owner.
+  // The first set is permanent. The unique owner key also protects concurrent
+  // tabs/devices and older clients: no request may replace an existing set.
   // Do not accept unbounded extra properties from clients.
   const safe = records.map(({ locator, envelope }) => ({ locator, envelope: { app: envelope.app, v: envelope.v, kdf: envelope.kdf, iter: envelope.iter, salt: envelope.salt, iv: envelope.iv, ct: envelope.ct } }));
   const { rows } = await database().query(`INSERT INTO drip_recovery_codes (user_id, records) SELECT $1, $2::jsonb WHERE EXISTS (SELECT 1 FROM drip_vault WHERE user_id = $1)
-    ON CONFLICT (user_id) DO UPDATE SET records = EXCLUDED.records RETURNING user_id`, [userId, JSON.stringify(safe)]);
-  return rows.length ? reply({ saved: true }) : reply({ error: "Save your cloud copy first." }, 409);
+    ON CONFLICT (user_id) DO NOTHING RETURNING user_id`, [userId, JSON.stringify(safe)]);
+  if (rows.length) return reply({ saved: true });
+  const existing = await database().query("SELECT records FROM drip_recovery_codes WHERE user_id = $1", [userId]);
+  if (!existing.rows.length) return reply({ error: "Save your cloud copy first." }, 409);
+  const original = new Set(existing.rows[0].records.map((record: { locator: string }) => record.locator));
+  // A lost response can safely be retried with the same original codes. Random
+  // encryption IVs need not match; the immutable stored wrappers are retained.
+  if (original.size === 6 && safe.every(record => original.has(record.locator))) return reply({ saved: true });
+  return reply({ error: "Your original recovery codes are already set up. Use your saved recovery file; another set cannot be created.", code: "RECOVERY_CODES_EXIST" }, 409);
 }

@@ -5,6 +5,7 @@ import { AccountSwitchRequired } from "./account-switch";
 import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, signOutDevice, unlockDevice, type DeviceSession } from "./device-session";
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
+import { originalRecoveryCodes } from "./original-recovery-codes";
 import { safeFetch } from "./worker-safety";
 import type { AppData } from "./types";
 
@@ -34,8 +35,10 @@ export async function signUpPassword(username: string, password: string, data: A
     before = await readDeviceSession();
   } else if (before?.signedOut || existing) throw new Error("This browser already has an account. Sign in instead.");
   const root = generateRecoveryCode();
+  let signupOwner = "";
   try {
   const { user, key } = await connect(root, data, true, replacement?.generation, undefined, replacement?.nonce);
+  signupOwner = user.id;
   const remote = await vault("GET", undefined, user.id, replacement?.generation, replacement?.nonce);
   if (remote.version !== 0 || remote.envelope) throw new Error("Account setup changed. Try again.");
   const saved = await vault("PUT", { version: 0, envelope: await seal(data, key) }, user.id, replacement?.generation, replacement?.nonce);
@@ -56,6 +59,11 @@ export async function signUpPassword(username: string, password: string, data: A
     }
     throw error;
   }
+  // Account creation is complete. The required recovery step can retry if
+  // storage or the connection fails; it must not turn a created account into a
+  // misleading signup failure. The first file is encrypted before registration.
+  try { await originalRecoveryCodes(root, signupOwner, AbortSignal.timeout(3000)); }
+  catch { /* The required download step remains visible until completed. */ }
   notifyDeviceSession();
 }
 

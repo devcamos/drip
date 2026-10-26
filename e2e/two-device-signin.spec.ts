@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import { withAuthRetry } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery } from "./auth-helpers";
 
 const password = "Synthetic meadow 42!";
 const tag = () => "dv_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
@@ -9,7 +9,8 @@ async function signup(page: Page, name: string) {
   await page.getByLabel(/Gamertag/).fill(name);
   await page.getByLabel("Create password", { exact: true }).fill(password);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
+  await finishSignupRecovery(page, password);
 }
 async function login(page: Page, name: string, success: Locator) {
   const form = page.getByRole("form", { name: "Password sign-in", exact: true });

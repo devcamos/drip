@@ -120,7 +120,7 @@ test("downloaded set of six codes independently restores the same cloud account"
   await enableCloudRecovery(page);
   page.on("dialog", dialog => dialog.accept());
   await page.getByLabel("Your current recovery code").fill(original);
-  await page.getByRole("button", { name: "Create six recovery codes" }).click();
+  await page.getByRole("button", { name: "Open original recovery codes" }).click();
   const list = page.getByRole("region", { name: "Recovery codes" }).getByRole("listitem");
   await expect(list).toHaveCount(6, { timeout: 30_000 });
   const codes = await list.allTextContents();
