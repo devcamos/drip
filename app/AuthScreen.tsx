@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-export type AuthScreen = "login" | "signup" | "recover" | "backup" | "other" | "other-recover";
-const screens = new Set<AuthScreen>(["login", "signup", "recover", "backup", "other", "other-recover"]);
+export type AuthScreen = "login" | "signup" | "recover" | "backup";
+const screens = new Set<AuthScreen>(["login", "signup", "recover", "backup"]);
 function currentScreen(): AuthScreen {
   const value = window.location.hash.slice(1) as AuthScreen;
+  // Keep old bookmarks usable through the same login and recovery screens.
+  if (window.location.hash === "#other") return "login";
+  if (window.location.hash === "#other-recover") return "recover";
   return screens.has(value) ? value : "login";
 }
 

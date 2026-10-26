@@ -67,9 +67,9 @@ test("signup requires the original file, resumes after refresh, and downloads th
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await page.reload();
   const login = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await login.getByLabel("Sign-in gamertag").fill("original_demo");
+  await login.getByLabel("Gamertag").fill("original_demo");
   await login.getByLabel("Password", { exact: true }).fill(password);
-  await login.getByRole("button", { name: "Sign in with password" }).click();
+  await login.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
   expect(await openAndDownload()).toBe(original);
   await page.getByRole("button", { name: "I’ve saved my recovery codes" }).click();

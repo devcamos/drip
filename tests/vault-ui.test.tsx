@@ -19,10 +19,10 @@ describe("local vault gate", () => {
   });
   it("does not render decrypted accounts on a fresh page until unlocked", async () => {
     await seedVault(data); lockLocalVault(); render(<Drip />);
-    await screen.findByRole("heading", { name: "Unlock Drip" });
+    await screen.findByRole("heading", { name: "Sign in to Drip" });
     expect(screen.queryByText("private_user")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
-    fill(fixtureCode); fireEvent.click(screen.getByRole("button", { name: "Unlock Drip" }));
+    fill(fixtureCode); fireEvent.click(screen.getByRole("button", { name: "Recover account" }));
     await screen.findByTestId("header-tag"); expect(await loadData()).toEqual(data);
   });
   it("keeps encryption failures visible on the migration gate and preserves original data", async () => {

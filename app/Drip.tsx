@@ -233,12 +233,11 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     return () => { active = false; };
   }, [draftAttempt]);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const { screen: route, navigate } = useAuthScreen();
-  const screen = route === "other" || route === "other-recover" ? "login" : route;
+  const { screen, navigate } = useAuthScreen();
   useEffect(() => { setError(""); }, [screen]);
   if (!draft) return <main>{error ? <><p role="alert">{error}</p><button className="btn" onClick={() => { setError(""); setDraftAttempt(n => n + 1); }}>Try again</button></> : <p className="muted">Loading…</p>}</main>;
   const screenCopy = {
-    login: { title: "Welcome back", description: "Sign in to your Drip account." },
+    login: { title: "Sign in to Drip", description: "Use your gamertag and password to open your accounts." },
     signup: { title: "Create your account", description: "Track your money and the income it earns. No real name, email or phone needed." },
     recover: { title: "Recover your account", description: "Find your saved credentials or use a recovery code to get back in." },
     backup: { title: "Restore a backup", description: "Get back to your accounts using a saved recovery code." },

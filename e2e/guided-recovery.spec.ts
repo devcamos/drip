@@ -38,7 +38,7 @@ test("forgotten credentials guidance and local file import recover actual encryp
   await capture(page, "missing-credentials");
   await page.getByLabel("Recovery codes file").setInputFiles({ name: "drip-recovery-codes.txt", mimeType: "text/plain", buffer: Buffer.from(`Drip recovery codes\n1. ${code}`) });
   await expect(page.getByText("1 recovery code loaded. Your file stays on this device.")).toBeVisible();
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Recover account", exact: true }).click();
   await expect(page.getByRole("region", { name: "Account cards" })).toContainText("£3,200.00");
 });
 
@@ -106,16 +106,16 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await expect(codes.getByText(/Recovery setup complete/)).toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   const login = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await login.getByLabel("Sign-in gamertag").fill(handle); await login.getByLabel("Password", { exact: true }).fill(oldPassword);
-  await withAuthRetry(page, () => login.getByRole("button", { name: "Sign in with password" }).click(), login.getByText("Gamertag or password is incorrect."));
+  await login.getByLabel("Gamertag").fill(handle); await login.getByLabel("Password", { exact: true }).fill(oldPassword);
+  await withAuthRetry(page, () => login.getByRole("button", { name: "Sign in" }).click(), login.getByText("Gamertag or password is incorrect."));
   await login.getByLabel("Password", { exact: true }).fill(newPassword);
-  await withAuthRetry(page, () => login.getByRole("button", { name: "Sign in with password" }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => login.getByRole("button", { name: "Sign in" }).click(), page.getByTestId("header-tag"));
   await expect(page.getByRole("region", { name: "Account cards" })).toContainText("£3,200.00");
   const fresh = await browser.newContext(); const other = await fresh.newPage();
   try {
     await other.goto(baseURL!);
-    await other.getByLabel("Sign-in gamertag").fill(handle); await other.getByLabel("Password", { exact: true }).fill(newPassword);
-    await withAuthRetry(other, () => other.getByRole("button", { name: "Sign in with password" }).click(), other.getByTestId("header-tag"));
+    await other.getByLabel("Gamertag").fill(handle); await other.getByLabel("Password", { exact: true }).fill(newPassword);
+    await withAuthRetry(other, () => other.getByRole("button", { name: "Sign in" }).click(), other.getByTestId("header-tag"));
     await expect(other.getByRole("region", { name: "Account cards" })).toContainText("£3,200.00");
     other.on("dialog", dialog => dialog.accept()); await other.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect.poll(async () => (await other.request.get(`${baseURL}/api/auth/get-session`)).json()).toBeNull();

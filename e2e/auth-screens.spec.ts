@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("login, signup and recovery stay separate and support browser history", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Create password", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("code")).toHaveCount(0);
@@ -29,5 +29,5 @@ test("login, signup and recovery stay separate and support browser history", asy
   await page.reload();
   await expect(page.getByLabel("Backup file", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
 });
