@@ -175,6 +175,32 @@ export async function savePasswordUnlock(envelope: PasswordWrap, expected: Vault
   await guardedWrite(before, stamp, s => { s.put({ vaultId: expected.vaultId, envelope }, "passwordUnlock"); }, { password: true });
 }
 
+/** Keep the first encrypted code file across retries and competing tabs. */
+export async function rememberOriginalRecoveryCodes(ownerId: string, envelope: import("./crypto").BackupFile, expected: VaultBinding) {
+  const before = await stored(); const stamp = epoch; checkBinding(before, expected); current(before);
+  if (before.cloud?.userId !== ownerId) throw new Error("Cloud account changed. Sign in again.");
+  let original: import("./crypto").BackupFile;
+  await guardedWrite(before, stamp, (store, cloud) => {
+    if (cloud?.userId !== ownerId) throw new Error("Cloud account changed. Sign in again.");
+    const key = `originalRecoveryCodes:${ownerId}`; const read = store.get(key);
+    read.onsuccess = () => {
+      original = read.result ?? envelope;
+      if (!read.result) store.put(envelope, key);
+    };
+  });
+  return original!;
+}
+
+/** Confirmation and the signup checkpoint complete in one guarded transaction. */
+export async function saveRecoveryCodesConfirmation(expectedVaultId: string | undefined) {
+  const before = await stored(); const stamp = epoch; current(before);
+  if (!expectedVaultId || before.vault?.id !== expectedVaultId) throw new Error("Your account changed. Open recovery codes for the current account.");
+  await guardedWrite(before, stamp, store => {
+    store.put({ vaultId: expectedVaultId, savedAt: new Date().toISOString() }, "recoveryCodesSaved");
+    store.delete("signupRecoveryRequired");
+  });
+}
+
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
 async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean; signup?: SignupReplacement; retained?: RetainedAccount } = {}): Promise<void> {
   const db = await open();
@@ -288,7 +314,10 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");
     if (keys.header.id !== before.vault?.id) s.delete("passkeyUnlock");
     if (keys.header.id !== before.vault?.id) s.delete("passwordUnlock");
-    if (signupPassword) s.put({ vaultId: keys.header.id, envelope: signupPassword }, "passwordUnlock");
+    if (signupPassword) {
+      s.put({ vaultId: keys.header.id, envelope: signupPassword }, "passwordUnlock");
+      s.put({ vaultId: keys.header.id }, "signupRecoveryRequired");
+    }
     if (resumeGeneration) s.put({ signedOut: false, remotePending: false, generation }, "deviceSession");
   }, { allowSignedOut: !!resumeGeneration, records: true, signup: replacement, retained });
   if (stamp !== epoch) throw new VaultLockedError();

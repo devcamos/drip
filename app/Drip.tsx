@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
-import { commitCloudRestore, getItem, isAppData, loadData, saveData, localVaultStatus } from "@/lib/db";
+import { commitCloudRestore, getItem, isAppData, loadData, saveData, localVaultStatus, passwordUnlockContext } from "@/lib/db";
 import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
@@ -13,6 +13,7 @@ import { InstallTask, useInstallTask } from "./InstallTask";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
 import { RecoveryCodes } from "./RecoveryCodes";
+import { SignupRecovery } from "./SignupRecovery";
 import { PasskeyUnlock } from "./PasskeyUnlock";
 import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
@@ -35,16 +36,18 @@ const today = () => M.ymd(new Date());
 
 export default function Drip() {
   const installTask = useInstallTask();
-  const [gate, setGate] = useState<{ status: Awaited<ReturnType<typeof localVaultStatus>>; signedOut: boolean }>();
+  const [gate, setGate] = useState<{ status: Awaited<ReturnType<typeof localVaultStatus>>; signedOut: boolean; signupRecovery: boolean }>();
   const [error, setError] = useState("");
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const id = ++sequence.current;
     try {
       const status = await localVaultStatus(); const session = await readDeviceSession();
+      const checkpoint = await getItem<{ vaultId: string }>("signupRecoveryRequired");
+      const { binding } = await passwordUnlockContext();
       if (id !== sequence.current) return;
       if (status === "unlocked" && !session?.signedOut && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      setGate({ status, signedOut: !!session?.signedOut }); setError("");
+      setGate({ status, signedOut: !!session?.signedOut, signupRecovery: !!checkpoint && checkpoint.vaultId === binding?.vaultId }); setError("");
     } catch { if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
   }, []);
   useEffect(() => {
@@ -58,6 +61,7 @@ export default function Drip() {
   if (!gate) return <main><p className="muted">Loading…</p></main>;
   if (gate.signedOut) return <SignedOut mode="signedOut" onSignedIn={refresh} />;
   if (gate.status === "locked" || gate.status === "migration") return <SignedOut mode={gate.status} onSignedIn={refresh} />;
+  if (gate.signupRecovery) return <SignupRecovery onSaved={refresh} />;
   return <UnlockedDrip installTask={installTask} />;
 }
 

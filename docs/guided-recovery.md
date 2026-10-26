@@ -14,11 +14,14 @@ cannot decrypt data on a fresh browser without a code.
   password, a freshly verified encrypted unlock passkey, or a recovery code.
   The existing recovery-verified server endpoint saves the new password and
   revokes other server sessions. The vault root and financial data are retained.
-- Recovery codes can be created using a freshly verified unlock passkey, even
-  if the old password and code are unavailable. Existing confirmation and
-  registration safeguards remain in place. Generated codes are masked by default;
-  explicit reveal lasts up to 30 seconds, and download, saved-file confirmation, window blur
-  and hiding the tab conceal them again.
+- New signup prepares one original set of six recovery codes. A required
+  download-and-confirm step opens before Accounts. Its checkpoint survives
+  refresh/sign-in; existing accounts keep their currently registered set.
+- Settings opens the same original file on the issuing browser after password,
+  verified unlock-passkey or recovery-code confirmation. Codes are masked by
+  default, reveal for up to 30 seconds, and hide on blur/download/confirmation.
+  The API atomically refuses any different set, including older clients and
+  competing tabs/devices. A retry of the same set preserves stored wrappers.
 - Code-file import runs entirely in the browser, accepts up to six distinct
   supported codes, caps input at 32 KB, masks codes in the selector, and never
   submits the original text file. A later manual edit cancels a pending read.
@@ -26,6 +29,10 @@ cannot decrypt data on a fresh browser without a code.
   encrypted unlock passkey or an explicitly confirmed saved-code download.
   A download click alone does not count as confirmation. The receipt contains
   only a vault identifier and timestamp, and cannot complete another vault's task.
+  No routine code replacement exists. The first file is retained encrypted
+  before registration so a lost response can retry the same set. Original-file
+  retention and signup completion use guarded local transactions. Registration
+  failure does not invalidate an existing saved-file confirmation.
 - Signed-out screens reset private form state as part of route navigation. They
   do not run a delayed reset after the new form becomes interactive, which could
   erase a password-manager autofill. Leaving and returning still clears secrets.
@@ -55,3 +62,17 @@ fallback; service failures, denied requests and rate limits stop the operation.
 HTTP 429 is handled at both stages, and server/transport internals are not shown
 to the user. [Signup failure tests and screenshots](screenshots/signup-errors/README.md)
 document the separate, still-unidentified hosted signup report.
+
+## Original-file limits
+
+The server stores only hashed locators and encrypted root wrappers, not the raw
+six codes. The issuing browser retains an additional root-encrypted original
+file for retry/download. A fresh device without that encrypted file cannot
+re-download the six codes; use the downloaded original. Routine settings cannot
+replace a lost file. Existing previously rotated sets cannot be reconstructed;
+the currently registered set becomes permanent. No compromise-revocation or
+vault rekeying feature is added. Recovery provisioning has a shared eight-second
+request deadline, shortened to three seconds during signup; failure opens the
+retryable recovery step for the already-created account, not a signup error.
+
+Verification: [original recovery evidence](screenshots/original-recovery/README.md).
