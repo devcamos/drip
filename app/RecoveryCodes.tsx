@@ -23,10 +23,10 @@ function RecoveryCodeField({ usePassword, code, onChange, disabled }: Readonly<{
   </>;
 }
 
-export function RecoveryCodes({ data, verifier, onSaved, signup = false }: Readonly<{ data: AppData; verifier: { salt: string; hash: string }; onSaved?: () => void | Promise<void>; signup?: boolean }>) {
+export function RecoveryCodes({ data, verifier, onSaved }: Readonly<{ data: AppData; verifier: { salt: string; hash: string }; onSaved?: () => void | Promise<void> }>) {
   const [code, setCode] = useState(""); const [codes, setCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
-  const [hasPassword, setHasPassword] = useState(signup); const [usePassword, setUsePassword] = useState(signup);
+  const [hasPassword, setHasPassword] = useState(false); const [usePassword, setUsePassword] = useState(false);
   const [hasPasskey, setHasPasskey] = useState(false); const [usePasskey, setUsePasskey] = useState(false);
   const [downloaded, setDownloaded] = useState(false); const [saved, setSaved] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
@@ -78,8 +78,8 @@ export function RecoveryCodes({ data, verifier, onSaved, signup = false }: Reado
       {usePasskey ? <p className="muted">Confirm with your saved unlock passkey to open your original recovery file.</p> :
         <RecoveryCodeField usePassword={usePassword} code={code} onChange={setCode} disabled={busy} />}
       <div className="row-gap"><button className="btn" disabled={busy || (!usePasskey && (usePassword ? !code : !C.isValidCode(code)))} onClick={generate}>{busy ? "Opening codes…" : "Open original recovery codes"}</button></div>
-      {!signup && hasPasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePasskey(!usePasskey); setCode(""); setMessage(""); }}>{usePasskey ? "Use password or recovery code instead" : "Confirm with saved passkey"}</button>}
-      {!signup && hasPassword && !usePasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePassword(!usePassword); setCode(""); setMessage(""); }}>{usePassword ? "Use a recovery code instead" : "Confirm with password instead"}</button>}
+      {hasPasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePasskey(!usePasskey); setCode(""); setMessage(""); }}>{usePasskey ? "Use password or recovery code instead" : "Confirm with saved passkey"}</button>}
+      {hasPassword && !usePasskey && <button className="text-link" disabled={busy} onClick={() => { setUsePassword(!usePassword); setCode(""); setMessage(""); }}>{usePassword ? "Use a recovery code instead" : "Confirm with password instead"}</button>}
     </>}
     {message && <output className="muted">{message}</output>}
   </section>;

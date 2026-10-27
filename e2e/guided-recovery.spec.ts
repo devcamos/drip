@@ -76,7 +76,7 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await page.getByLabel("Create password", { exact: true }).fill(oldPassword);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(oldPassword);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
-  await finishSignupRecovery(page, oldPassword);
+  await finishSignupRecovery(page);
   await page.getByRole("button", { name: "Add account", exact: true }).click();
   await page.getByLabel("Balance", { exact: true }).fill("3200"); await page.getByLabel("Rate", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Save", exact: true }).click();

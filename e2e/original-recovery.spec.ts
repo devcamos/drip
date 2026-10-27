@@ -1,24 +1,30 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
+test.use({ trace: "off" }); // Recovery material must not be saved in traces.
+
 async function capture(page: Page, state: string) {
   if (!process.env.DRIP_ORIGINAL_CAPTURE) return;
-  const dir = "docs/screenshots/original-recovery"; await mkdir(dir, { recursive: true });
+  const dir = "docs/screenshots/signup-recovery-save"; await mkdir(dir, { recursive: true });
   for (const [device, width, height] of [["mobile", 390, 844], ["desktop", 1280, 900]] as const) {
     await page.setViewportSize({ width, height });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${dir}/${state}-${device}.png`, fullPage: true, scale: "css",
-      style: 'input[type="password"], .recovery-list[data-revealed="true"] { color:transparent !important; text-shadow:none !important; caret-color:transparent !important; }' });
+      mask: [page.locator('.recovery-list code'), page.locator('input[type="password"]')], maskColor: "#d9c8ae" });
   }
   await page.setViewportSize({ width: 390, height: 844 });
 }
 
-test("signup requires the original file, resumes after refresh, and downloads the same set again", async ({ page }) => {
+for (const method of ["download", "screenshot", "retry"] as const) {
+test(`signup saves original codes by ${method} without another password and resumes the same set`, async ({ page }) => {
   // Real app, encryption, IndexedDB, password unwrap and file downloads. Only
   // the network backend is synthetic; this is not a hosted database/auth test.
   const owner = "synthetic-original-owner"; const password = "Synthetic river meadow 42!";
   let user: any; let passwordEnvelope: any; let vault: any = { version: 0, envelope: null };
   let records: any[] | undefined;
+  let recoveryUnavailable = method === "retry";
+  let passwordSignIns = 0; let downloads = 0;
+  page.on("download", () => downloads++);
   await page.route("**/api/**", async route => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     const body = request.postDataJSON(); let value: any = {};
@@ -28,11 +34,12 @@ test("signup requires the original file, resumes after refresh, and downloads th
     else if (path === "/api/auth/get-session") value = { user, session: { id: "synthetic", userId: owner, expiresAt: "2099-01-01T00:00:00Z" } };
     else if (path === "/api/auth/sign-in/email") value = { user, token: "synthetic" };
     else if (path === "/api/auth/gamertag-password") { passwordEnvelope = body.envelope; value = { saved: true }; }
-    else if (path.startsWith("/api/auth/sign-in/gamertag")) value = { owner, envelope: passwordEnvelope };
+    else if (path.startsWith("/api/auth/sign-in/gamertag")) { passwordSignIns++; value = { owner, envelope: passwordEnvelope }; }
     else if (path === "/api/cloud") {
       if (request.method() === "PUT") vault = { version: vault.version + 1, envelope: body.envelope, updated_at: new Date().toISOString() };
       value = vault;
     } else if (path === "/api/recovery-codes") {
+      if (recoveryUnavailable) return route.fulfill({ status: 503, json: { error: "Synthetic recovery outage" } });
       if (request.method() === "GET") value = { locators: records?.map(record => record.locator) ?? null };
       else if (request.method() === "PUT") {
         if (records && !body.records.every((candidate: any) => records!.some(original => original.locator === candidate.locator))) return route.fulfill({ status: 409, json: { code: "RECOVERY_CODES_EXIST" } });
@@ -47,23 +54,36 @@ test("signup requires the original file, resumes after refresh, and downloads th
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
-  await capture(page, "required-download");
+  if (method === "retry") {
+    await expect(page.locator("main .panel").getByRole("alert")).toContainText("Could not open your recovery codes");
+    await capture(page, "recovery-retry");
+    await expect(page.getByTestId("header-tag")).toHaveCount(0);
+    recoveryUnavailable = false;
+    await page.getByRole("button", { name: "Try again" }).click();
+  }
+  await expect(page.getByRole("button", { name: "Download recovery codes" })).toBeVisible();
+  await expect(page.getByLabel("Confirm your password", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue to Accounts" })).toBeDisabled();
+  const originalCodes = await page.locator("#signup-recovery-codes code").allTextContents();
+  expect(originalCodes).toHaveLength(6);
+  expect(new Set(originalCodes).size).toBe(6);
+  expect(passwordSignIns).toBe(0);
+  if (method === "download") await capture(page, "save-original-codes");
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
-  async function openAndDownload(state?: string) {
+  async function openAndDownload(settings = false) {
     const panel = page.getByRole("region", { name: "Recovery codes", exact: true });
-    await panel.getByLabel("Confirm your password", { exact: true }).fill(password);
-    await panel.getByRole("button", { name: "Open original recovery codes" }).click();
-    await expect(panel.getByRole("button", { name: "Show recovery codes" })).toHaveAttribute("aria-expanded", "false");
-    if (state) await capture(page, state);
+    if (settings) {
+      await panel.getByLabel("Confirm your password", { exact: true }).fill(password);
+      await panel.getByRole("button", { name: "Open original recovery codes" }).click();
+    } else await expect(panel.getByLabel("Confirm your password", { exact: true })).toHaveCount(0);
     const downloadEvent = page.waitForEvent("download");
     await panel.getByRole("button", { name: "Download recovery codes" }).click();
     const download = await downloadEvent;
     expect(download.suggestedFilename()).toBe("drip-recovery-codes.txt");
     return readFile((await download.path())!, "utf8");
   }
-  const original = await openAndDownload("signup-original-ready");
-  await capture(page, "confirm-original");
-  expect(original.split("\n").filter(line => /^\d\. /.test(line))).toHaveLength(6);
+  const original = method === "download" ? await openAndDownload() : undefined;
+  if (original) expect(original.split("\n").filter(line => /^\d\. /.test(line))).toHaveLength(6);
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await page.reload();
   const login = page.getByRole("form", { name: "Password sign-in", exact: true });
@@ -71,12 +91,29 @@ test("signup requires the original file, resumes after refresh, and downloads th
   await login.getByLabel("Password", { exact: true }).fill(password);
   await login.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
-  expect(await openAndDownload()).toBe(original);
-  await page.getByRole("button", { name: "I’ve saved my recovery codes" }).click();
+  await expect(page.getByRole("button", { name: "Download recovery codes" })).toBeVisible();
+  expect(await page.locator("#signup-recovery-codes code").allTextContents()).toEqual(originalCodes);
+  expect(passwordSignIns).toBe(2);
+  if (original) expect(await openAndDownload()).toBe(original);
+  else expect(downloads).toBe(0);
+  await page.getByRole("checkbox", { name: /I’ve saved a screenshot/ }).check();
+  if (method === "download") await capture(page, "saved-copy-confirmed");
+  await page.getByRole("button", { name: "Continue to Accounts" }).click();
   await expect(page.getByText("No accounts yet")).toBeVisible();
   await expect(page.getByTestId("header-tag")).toContainText("original_demo");
-  await capture(page, "accounts-after-confirmation");
+  if (method === "download") await capture(page, "accounts-after-save");
+  if (!original) expect(downloads).toBe(0);
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
-  expect(await openAndDownload("settings-original")).toBe(original);
+  const sameFile = await openAndDownload(true);
+  if (original) expect(sameFile).toBe(original);
+  originalCodes.forEach(code => expect(sameFile).toContain(code));
   expect(records).toHaveLength(6);
+  await page.reload();
+  const returning = page.getByRole("form", { name: "Password sign-in", exact: true });
+  await returning.getByLabel("Gamertag").fill("original_demo");
+  await returning.getByLabel("Password", { exact: true }).fill(password);
+  await returning.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByTestId("header-tag")).toContainText("original_demo");
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toHaveCount(0);
 });
+}

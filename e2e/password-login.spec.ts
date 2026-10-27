@@ -25,7 +25,7 @@ async function onboard(page: Page, handle: string, withPassword = false) {
   await page.getByLabel("Create password", { exact: true }).fill(password);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
-  await finishSignupRecovery(page, password);
+  await finishSignupRecovery(page);
   await expect(page.getByText("No accounts yet")).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true })).toHaveClass("on");
   return "";
@@ -81,7 +81,7 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
   } finally { await second.close(); }
 });
-test("signup requires the original recovery file and offers the same set later with password confirmation", async ({ page }) => {
+test("signup saves the original recovery codes and offers the same set later with password confirmation", async ({ page }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(90_000);
   const payloads: string[] = [];
   page.on("request", request => { if (["/api/auth/sign-in/gamertag", "/api/auth/gamertag-password"].some(path => request.url().endsWith(path))) payloads.push(request.postData() ?? ""); });
@@ -164,7 +164,7 @@ test("signed-out signup preserves a recoverable old account through cancellation
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await page.getByLabel(/Gamertag/).fill(replacement);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
-  await finishSignupRecovery(page, password);
+  await finishSignupRecovery(page);
   await expect(page.getByTestId("header-tag")).toContainText(replacement); await expect(page.getByText("No accounts yet")).toBeVisible();
   // Multiple real synthetic users share this test host's auth limiter. Allow
   // the normal automatic retry without weakening or bypassing that limiter.

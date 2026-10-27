@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Drip from "../app/Drip";
 import * as db from "../lib/db";
-import { generateRecoveryCode } from "../lib/crypto";
+import { deriveCloudEncryptionKey, generateRecoveryCode } from "../lib/crypto";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 
 const originals = vi.hoisted(() => vi.fn());
@@ -15,38 +15,78 @@ let vaultId: string;
 const codes = Array.from({ length: 6 }, () => `DRIP2-${generateRecoveryCode()}`);
 beforeEach(async () => {
   vi.clearAllMocks();
-  await seedVault({ ...db.emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "demo", createdAt: "now" } });
+  const identity = { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "demo", createdAt: "now" };
+  await seedVault({ ...db.emptyData(), identity }, fixtureCode, { userId: "owner", identityId: identity.id, key: await deriveCloudEncryptionKey(fixtureCode), version: 1, dirty: false, lastSyncAt: "now", generation: "cloud", revision: 0 });
   vaultId = (await db.passwordUnlockContext()).binding!.vaultId;
   await db.setItem("signupRecoveryRequired", { vaultId });
+  await db.unlockLocalVault(fixtureCode);
   cloud.readCloudState.mockResolvedValue({ userId: "owner", version: 1 });
   cloud.authClient.getSession.mockResolvedValue({ data: { user: { id: "owner" } } });
-  originals.mockResolvedValue({ codes, cached: true, vaultId });
+  originals.mockReset().mockResolvedValue({ codes, cached: true, vaultId });
   vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:synthetic", revokeObjectURL: vi.fn() }));
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
 
 async function openFile() {
   await screen.findByRole("heading", { name: "Save your recovery codes" });
-  fireEvent.change(await screen.findByLabelText("Confirm your password"), { target: { value: "synthetic password" } });
-  fireEvent.click(screen.getByRole("button", { name: "Open original recovery codes" }));
   await screen.findByRole("button", { name: "Download recovery codes" });
+  expect(screen.queryByLabelText("Confirm your password")).toBeNull();
 }
 
-it("requires download and successful confirmation before showing Accounts and clears the checkpoint atomically", async () => {
+it("accepts a saved screenshot without another password or download and clears the checkpoint only after successful confirmation", async () => {
   render(<Drip />); await openFile();
   expect(screen.queryByRole("button", { name: "Use a recovery code instead" })).toBeNull();
   expect(screen.queryByText(/No accounts yet/)).toBeNull();
-  expect(screen.queryByRole("button", { name: "I’ve saved my recovery codes" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Download recovery codes" }));
+  const next = screen.getByRole("button", { name: "Continue to Accounts" });
+  expect(next).toBeDisabled();
+  expect(screen.getAllByRole("listitem")).toHaveLength(6);
+  fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
   expect(await db.getItem("signupRecoveryRequired")).toBeDefined();
   vi.spyOn(db, "saveRecoveryCodesConfirmation").mockRejectedValueOnce(new Error("Synthetic storage failure"));
-  fireEvent.click(screen.getByRole("button", { name: "I’ve saved my recovery codes" }));
+  fireEvent.click(next);
   await screen.findByText(/Could not save your confirmation/);
   expect(await db.getItem("signupRecoveryRequired")).toBeDefined();
-  fireEvent.click(screen.getByRole("button", { name: "I’ve saved my recovery codes" }));
+  fireEvent.click(next);
   await screen.findByText(/No accounts yet/);
   expect(await db.getItem("signupRecoveryRequired")).toBeUndefined();
   expect((await rawStore()).recoveryCodesSaved.vaultId).toBe(vaultId);
+  expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  await expect(db.signupRecoveryContext()).rejects.toThrow(/Sign in again/);
+});
+
+it("offers a download and requires the same explicit saved-copy acknowledgement", async () => {
+  render(<Drip />); await openFile();
+  fireEvent.click(screen.getByRole("button", { name: "Download recovery codes" }));
+  expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Continue to Accounts" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
+  await screen.findByText(/No accounts yet/);
+  expect(originals).toHaveBeenCalledOnce();
+});
+
+it("hides codes on blur and lets a failed download fall back to a saved screenshot", async () => {
+  render(<Drip />); await openFile();
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "true");
+  fireEvent.blur(window);
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "false");
+  fireEvent.click(screen.getByRole("button", { name: "Show recovery codes" }));
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "true");
+  vi.mocked(HTMLAnchorElement.prototype.click).mockImplementationOnce(() => { throw new Error("Synthetic download failure"); });
+  fireEvent.click(screen.getByRole("button", { name: "Download recovery codes" }));
+  await screen.findByText(/Could not download the file/);
+  fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
+  await screen.findByText(/No accounts yet/);
+});
+
+it("does not show codes or accept confirmation for another vault", async () => {
+  originals.mockResolvedValueOnce({ codes, cached: true, vaultId: "another-vault" });
+  render(<Drip />);
+  await screen.findByText(/Could not open your recovery codes/);
+  expect(screen.queryByRole("list")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Continue to Accounts" })).toBeNull();
+  expect(await db.getItem("signupRecoveryRequired")).toEqual({ vaultId });
 });
 
 it("resumes the required step after remount and keeps it visible on recovery-service failure", async () => {
@@ -54,11 +94,12 @@ it("resumes the required step after remount and keeps it visible on recovery-ser
   originals.mockRejectedValueOnce(new Error("Recovery service unavailable. Retry shortly."));
   render(<Drip />);
   await screen.findByRole("heading", { name: "Save your recovery codes" });
-  fireEvent.change(await screen.findByLabelText("Confirm your password"), { target: { value: "synthetic password" } });
-  fireEvent.click(screen.getByRole("button", { name: "Open original recovery codes" }));
-  await screen.findByText(/Recovery service unavailable/);
+  await screen.findByText(/Could not open your recovery codes/);
   expect(await db.getItem("signupRecoveryRequired")).toEqual({ vaultId });
   expect(screen.queryByText(/No accounts yet/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await openFile();
+  expect(screen.getAllByRole("listitem")).toHaveLength(6);
 });
 
 it("does not impose another signup download on an unrelated restored vault", async () => {

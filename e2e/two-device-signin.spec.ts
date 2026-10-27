@@ -10,7 +10,7 @@ async function signup(page: Page, name: string) {
   await page.getByLabel("Create password", { exact: true }).fill(password);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
-  await finishSignupRecovery(page, password);
+  await finishSignupRecovery(page);
 }
 async function login(page: Page, name: string, success: Locator) {
   const form = page.getByRole("form", { name: "Password sign-in", exact: true });

@@ -69,7 +69,7 @@ export async function signUpPassword(username: string, password: string, data: A
   // storage or the connection fails; it must not turn a created account into a
   // misleading signup failure. The first file is encrypted before registration.
   try { await originalRecoveryCodes(root, signupOwner, AbortSignal.timeout(3000)); }
-  catch { /* The required download step remains visible until completed. */ }
+  catch { /* The required save step remains visible until completed. */ }
   notifyDeviceSession();
 }
 

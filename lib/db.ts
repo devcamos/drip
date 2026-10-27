@@ -11,7 +11,7 @@ const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
 type Device = { signedOut: boolean; generation: string; remotePending?: boolean; signupNonce?: string };
 type Metadata = Omit<CloudState, "key">;
-type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap } };
+type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap }; signupRecovery?: { vaultId: string } };
 export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null; passwordCiphertext?: string | null }
 export interface RetainedAccount { vaultId: string; generation?: string; records: string }
 function checkBinding(value: Stored, expected: VaultBinding) {
@@ -19,7 +19,7 @@ function checkBinding(value: Stored, expected: VaultBinding) {
     (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext) ||
     (expected.passwordCiphertext !== undefined && (value.password?.envelope.ct ?? null) !== expected.passwordCiphertext)) throw new Error("Device session changed. Unlock Drip again before continuing.");
 }
-let unlocked: { keys: LocalKeys; generation?: string } | undefined;
+let unlocked: { keys: LocalKeys; generation?: string; signupRoot?: string } | undefined;
 let epoch = 0;
 let writes: Promise<unknown> = Promise.resolve();
 let lastWrite: Promise<void> = Promise.resolve();
@@ -51,8 +51,8 @@ async function stored(): Promise<Stored> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const t = db.transaction(STORE, "readonly"); const s = t.objectStore(STORE);
-    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock");
-    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result, password: password.result }); };
+    const data = s.get(KEY), cloud = s.get("cloudState"), vault = s.get("localVault"), gate = s.get("deviceSession"), verifier = s.get("verifier"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock"), signupRecovery = s.get("signupRecoveryRequired");
+    t.oncomplete = () => { db.close(); resolve({ data: data.result, cloud: cloud.result, vault: vault.result, gate: gate.result, verifier: verifier.result, passkey: passkey.result, password: password.result, signupRecovery: signupRecovery.result }); };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not read local storage.", { cause: t.error })); };
   });
 }
@@ -138,7 +138,7 @@ export async function unlockLocalVault(root: string, expected?: VaultBinding): P
     s.delete("onboardingDraft");
   }, { allowSignedOut: true, passkey: expected?.passkeyCiphertext !== undefined, password: expected?.passwordCiphertext !== undefined });
   if (stamp !== epoch) throw new VaultLockedError();
-  unlocked = { keys, generation: before.gate?.generation };
+  unlocked = { keys, generation: before.gate?.generation, signupRoot: before.signupRecovery?.vaultId === keys.header.id ? root : undefined };
   closing = false;
   lastWrite = Promise.resolve();
   const latest = await stored(); current(latest, true);
@@ -191,14 +191,22 @@ export async function rememberOriginalRecoveryCodes(ownerId: string, envelope: i
   return original!;
 }
 
+/** Reuse only the authenticated, unfinished signup's in-memory key. Never persist it. */
+export async function signupRecoveryContext() {
+  const value = await stored(); const local = current(value);
+  if (value.signupRecovery?.vaultId !== local.keys.header.id || !local.signupRoot || !value.cloud?.userId || value.cloud.version < 1) throw new Error("Sign in again to finish saving your recovery codes.");
+  return { root: local.signupRoot, ownerId: value.cloud.userId, vaultId: local.keys.header.id };
+}
+
 /** Confirmation and the signup checkpoint complete in one guarded transaction. */
 export async function saveRecoveryCodesConfirmation(expectedVaultId: string | undefined) {
-  const before = await stored(); const stamp = epoch; current(before);
+  const before = await stored(); const stamp = epoch; const local = current(before);
   if (!expectedVaultId || before.vault?.id !== expectedVaultId) throw new Error("Your account changed. Open recovery codes for the current account.");
   await guardedWrite(before, stamp, store => {
     store.put({ vaultId: expectedVaultId, savedAt: new Date().toISOString() }, "recoveryCodesSaved");
     store.delete("signupRecoveryRequired");
   });
+  delete local.signupRoot;
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
@@ -322,7 +330,7 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   }, { allowSignedOut: !!resumeGeneration, records: true, signup: replacement, retained });
   if (stamp !== epoch) throw new VaultLockedError();
   epoch++; // Pending writes belong to the copy the user just replaced.
-  unlocked = { keys, generation };
+  unlocked = { keys, generation, signupRoot: signupPassword ? root : undefined };
   closing = false;
   lastWrite = Promise.resolve();
 }
