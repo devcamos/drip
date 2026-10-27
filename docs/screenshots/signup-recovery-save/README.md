@@ -1,8 +1,8 @@
 # One-time signup recovery save
 
-Application source: [`bddd7a8`](https://github.com/devcamos/drip/commit/bddd7a8ed9c4c0d8c5af8e97a41b3bbbf9ef90fc).
+Application source: [`0934c2d`](https://github.com/devcamos/drip/commit/0934c2d450bb88d8058b4b2fb077dfb457758dc2).
 Captured and visually inspected on27October2026 from the optimized local app,
-build `local-bf5bbd67-3e49-448f-b3d8-a41d865b4d45`. The following evidence commit
+build `local-89b20a94-f0fd-4273-ad13-89f481fcff80`. The following evidence commit
 adds screenshots/documentation only.
 
 The account/backend responses are synthetic. Encryption, local storage, password
@@ -32,14 +32,18 @@ within their panels. Codes hide when the app loses focus.
   the app. It resumes the same original set without a second password prompt.
 - A failed initial recovery request can retry in the authenticated signup session.
   Storage-confirmation failures keep the checkpoint until confirmation succeeds.
+- After sign-out revokes the cloud session, offline password sign-in can resume
+  local setup. Reconnecting and retrying renews the existing account's session
+  without another password or signup request, then opens the same six codes.
 - Completed signup does not show this step again. Settings can open the same set
   using its existing confirmation. No replacement set is generated.
 - The temporary signup key is memory-only and unavailable after lock, sign-out,
   completion or a different vault. Raw storage contains neither it nor a password.
 
-Validation:436 unit/component tests pass; coverage94.18% statements,91.75% branches,
-93.80% functions,97.91% lines. Typecheck, optimized build and audit pass;34 browser
+Validation:438 unit/component tests pass; coverage94.19% statements,91.76% branches,
+93.80% functions,97.91% lines. Typecheck, optimized build and audit pass;35 browser
 journeys pass,16 existing cloud/update opt-ins skipped. The old UI failed the new
-no-second-password regression. The retry journey initially needed its alert
+no-second-password regression. The expired-session regression also failed before
+guarded renewal was restored. The retry journey initially needed its alert
 locator scoped to the panel to exclude Next's route announcer; the corrected
 journey and complete browser suite pass. No assertions or required gates weakened.
