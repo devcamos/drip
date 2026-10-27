@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Drip from "../app/Drip";
 import * as db from "../lib/db";
 import { deriveCloudEncryptionKey, generateRecoveryCode } from "../lib/crypto";
@@ -15,6 +15,7 @@ let vaultId: string;
 const codes = Array.from({ length: 6 }, () => `DRIP2-${generateRecoveryCode()}`);
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
   const identity = { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "demo", createdAt: "now" };
   await seedVault({ ...db.emptyData(), identity }, fixtureCode, { userId: "owner", identityId: identity.id, key: await deriveCloudEncryptionKey(fixtureCode), version: 1, dirty: false, lastSyncAt: "now", generation: "cloud", revision: 0 });
   vaultId = (await db.passwordUnlockContext()).binding!.vaultId;
@@ -79,6 +80,31 @@ it("hides codes on blur and lets a failed download fall back to a saved screensh
   fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
   fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
   await screen.findByText(/No accounts yet/);
+});
+
+it.each(["blur", "background-return"] as const)("keeps a delayed code response hidden after %s until explicitly shown", async event => {
+  let resolve!: (value: { codes: string[]; vaultId: string; cached: boolean }) => void;
+  originals.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  render(<Drip />);
+  await waitFor(() => expect(resolve).toBeDefined());
+  if (event === "blur") {
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    fireEvent.blur(window);
+  } else {
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    visibility.mockReturnValue("hidden"); fireEvent(document, new Event("visibilitychange"));
+    visibility.mockReturnValue("visible"); fireEvent(document, new Event("visibilitychange"));
+    fireEvent.focus(window);
+  }
+  await act(async () => resolve({ codes, vaultId, cached: true }));
+  await screen.findByRole("button", { name: "Download recovery codes" });
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "false");
+  expect(screen.queryByText(codes[0])).toBeNull();
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  fireEvent.focus(window);
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "false");
+  fireEvent.click(screen.getByRole("button", { name: "Show recovery codes" }));
+  expect(screen.getByRole("list")).toHaveAttribute("data-revealed", "true");
 });
 
 it("does not show codes or accept confirmation for another vault", async () => {

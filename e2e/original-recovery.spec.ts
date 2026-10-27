@@ -15,7 +15,7 @@ async function capture(page: Page, state: string) {
   await page.setViewportSize({ width: 390, height: 844 });
 }
 
-for (const method of ["download", "screenshot", "retry", "offline-return"] as const) {
+for (const method of ["download", "screenshot", "retry", "offline-return", "initial-offline-return"] as const) {
 test(`signup saves original codes by ${method} without another password and resumes the same set`, async ({ page }) => {
   // Real app, encryption, IndexedDB, password unwrap and file downloads. Only
   // the network backend is synthetic; this is not a hosted database/auth test.
@@ -73,13 +73,22 @@ test(`signup saves original codes by ${method} without another password and resu
   expect(originalCodes).toHaveLength(6);
   expect(new Set(originalCodes).size).toBe(6);
   expect(passwordSignIns).toBe(0);
-  if (method === "offline-return") {
-    page.on("dialog", dialog => dialog.accept());
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
-    await expect.poll(() => cloudSignedIn).toBe(false);
+  if (method === "offline-return" || method === "initial-offline-return") {
+    if (method === "offline-return") {
+      page.on("dialog", dialog => dialog.accept());
+      await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+      await expect.poll(() => cloudSignedIn).toBe(false);
+    } else {
+      // Legacy unfinished first signup has no local generation. Expire only the
+      // synthetic server session; do not seed a generation through sign-out.
+      await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+      await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+      cloudSignedIn = false;
+    }
     offlineNetwork = true;
     await page.context().setOffline(true);
+    if (method === "initial-offline-return") await page.reload();
     const offline = page.getByRole("form", { name: "Password sign-in", exact: true });
     await offline.getByLabel("Gamertag").fill("original_demo");
     await offline.getByLabel("Password", { exact: true }).fill(password);

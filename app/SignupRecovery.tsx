@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadData, signupRecoveryContext } from "@/lib/db";
 import { originalRecoveryCodes } from "@/lib/original-recovery-codes";
 import { downloadRecoveryCodes } from "@/lib/recovery-codes";
@@ -16,11 +16,13 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
   const [attempt, setAttempt] = useState(0); const [showCodes, setShowCodes] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false); const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const autoReveal = useRef(true);
 
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
+    autoReveal.current = document.visibilityState !== "hidden" && document.hasFocus();
     setOpening(true); setError("");
     void (async () => {
       const context = await signupRecoveryContext();
@@ -30,14 +32,14 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
       if (session.data?.user.id !== context.ownerId) {
         // Offline unlock can resume this local signup without a cloud cookie.
         // Renew only the existing identity, guarded against a later sign-out.
-        const account = await connect(context.root, data, false, undefined, context.generation);
+        const account = await connect(context.root, data, false, undefined, context.generation ?? "initial");
         if (account.user.id !== context.ownerId) throw new Error("Cloud account changed.");
       }
       const file = await originalRecoveryCodes(context.root, context.ownerId, controller.signal);
       if (file.vaultId !== context.vaultId) throw new Error("Account changed.");
       if (active) {
         setOriginal({ codes: file.codes, vaultId: file.vaultId, handle: data.identity?.handle });
-        setShowCodes(document.visibilityState !== "hidden");
+        setShowCodes(autoReveal.current && document.visibilityState !== "hidden" && document.hasFocus());
       }
     })().catch(() => {
       if (active) setError("Your account is saved. Could not open your recovery codes. Try again when connected.");
@@ -46,7 +48,7 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
   }, [attempt]);
 
   useEffect(() => {
-    const hide = () => setShowCodes(false);
+    const hide = () => { autoReveal.current = false; setShowCodes(false); };
     const visibility = () => { if (document.visibilityState === "hidden") hide(); };
     window.addEventListener("blur", hide); document.addEventListener("visibilitychange", visibility);
     return () => { window.removeEventListener("blur", hide); document.removeEventListener("visibilitychange", visibility); };
