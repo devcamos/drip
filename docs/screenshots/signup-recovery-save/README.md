@@ -1,8 +1,8 @@
 # One-time signup recovery save
 
-Application source: [`0934c2d`](https://github.com/devcamos/drip/commit/0934c2d450bb88d8058b4b2fb077dfb457758dc2).
+Application source: [`ea5d83d`](https://github.com/devcamos/drip/commit/ea5d83d839bccabe6437bd470fb6d13156b21635).
 Captured and visually inspected on27October2026 from the optimized local app,
-build `local-89b20a94-f0fd-4273-ad13-89f481fcff80`. The following evidence commit
+build `local-1c7c38b0-de69-49b7-ad51-b8d7091a0645`. The following evidence commit
 adds screenshots/documentation only.
 
 The account/backend responses are synthetic. Encryption, local storage, password
@@ -18,7 +18,8 @@ actual six codes. No password, code, token or customer information is published.
 | Accounts after completion | [View](accounts-after-save-mobile.png) | [View](accounts-after-save-desktop.png) |
 | Recovery-service failure keeps the account and offers retry | [View](recovery-retry-mobile.png) | [View](recovery-retry-desktop.png) |
 
-All eight images were opened and inspected. Layout checks found no horizontal
+All eight images were opened and inspected; unchanged captures retain identical
+image bytes. Layout checks found no horizontal
 overflow; the six code rows, download, acknowledgement and Continue controls fit
 within their panels. Codes hide when the app loses focus.
 
@@ -39,11 +40,22 @@ within their panels. Codes hide when the app loses focus.
   using its existing confirmation. No replacement set is generated.
 - The temporary signup key is memory-only and unavailable after lock, sign-out,
   completion or a different vault. Raw storage contains neither it nor a password.
+- An initial signup with no device generation still binds its renewal before
+  dispatch. Switching accounts while it waits blocks the request with the screen
+  either open or unmounted. A delayed file response after blur or background/return
+  keeps codes hidden until the user explicitly selects Show.
 
-Validation:438 unit/component tests pass; coverage94.19% statements,91.76% branches,
-93.80% functions,97.91% lines. Typecheck, optimized build and audit pass;35 browser
+Validation:443 unit/component tests pass; coverage94.29% statements,92.03% branches,
+93.93% functions,97.91% lines. The whole-app gate is85%, with the stricter library
+thresholds retained. Typecheck, optimized build and audit pass;36 browser
 journeys pass,16 existing cloud/update opt-ins skipped. The old UI failed the new
 no-second-password regression. The expired-session regression also failed before
 guarded renewal was restored. The retry journey initially needed its alert
 locator scoped to the panel to exclude Next's route announcer; the corrected
 journey and complete browser suite pass. No assertions or required gates weakened.
+
+The dedicated old-main-to-candidate PWA test also passed separately: distinct
+real build fingerprints, a waiting-worker reload, retained encrypted records,
+wrong-password rejection and successful offline return with the same balance.
+This uses local unconfigured builds and synthetic data, not hosted cloud identity
+or customer records. It closes one of the ordinary suite's16 skipped opt-ins.
