@@ -7,7 +7,7 @@ import { deriveCloudEncryptionKey, generateRecoveryCode } from "../lib/crypto";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 
 const originals = vi.hoisted(() => vi.fn());
-const cloud = vi.hoisted(() => ({ readCloudState: vi.fn(), authClient: { getSession: vi.fn() } }));
+const cloud = vi.hoisted(() => ({ readCloudState: vi.fn(), connect: vi.fn(), authClient: { getSession: vi.fn() } }));
 vi.mock("../lib/original-recovery-codes", () => ({ originalRecoveryCodes: originals }));
 vi.mock("../lib/cloud", async original => ({ ...await original<typeof import("../lib/cloud")>(), ...cloud }));
 vi.mock("../lib/password-login", async original => ({ ...await original<typeof import("../lib/password-login")>(), passwordUsername: async () => "demo", passwordRecoveryRoot: async () => fixtureCode }));
@@ -22,6 +22,7 @@ beforeEach(async () => {
   await db.unlockLocalVault(fixtureCode);
   cloud.readCloudState.mockResolvedValue({ userId: "owner", version: 1 });
   cloud.authClient.getSession.mockResolvedValue({ data: { user: { id: "owner" } } });
+  cloud.connect.mockReset().mockResolvedValue({ user: { id: "owner" } });
   originals.mockReset().mockResolvedValue({ codes, cached: true, vaultId });
   vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:synthetic", revokeObjectURL: vi.fn() }));
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -87,6 +88,32 @@ it("does not show codes or accept confirmation for another vault", async () => {
   expect(screen.queryByRole("list")).toBeNull();
   expect(screen.queryByRole("button", { name: "Continue to Accounts" })).toBeNull();
   expect(await db.getItem("signupRecoveryRequired")).toEqual({ vaultId });
+});
+
+it("renews an expired cloud session after offline unlock before retrying the original codes", async () => {
+  await db.setItem("deviceSession", { signedOut: false, generation: "offline-resume" });
+  await db.unlockLocalVault(fixtureCode);
+  let authenticated = false;
+  cloud.authClient.getSession.mockResolvedValue({ data: null });
+  cloud.connect.mockImplementation(async () => { authenticated = true; return { user: { id: "owner" } }; });
+  originals.mockImplementation(async () => {
+    if (!authenticated) throw new Error("Unauthenticated recovery request");
+    return { codes, cached: true, vaultId };
+  });
+  render(<Drip />); await openFile();
+  expect(cloud.connect).toHaveBeenCalledWith(fixtureCode, expect.objectContaining({ identity: expect.objectContaining({ handle: "demo" }) }), false, undefined, "offline-resume");
+  fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
+  await screen.findByText(/No accounts yet/);
+});
+
+it("rejects a renewal for another owner before opening the recovery codes", async () => {
+  cloud.authClient.getSession.mockResolvedValue({ data: null });
+  cloud.connect.mockResolvedValue({ user: { id: "another-owner" } });
+  render(<Drip />);
+  await screen.findByText(/Could not open your recovery codes/);
+  expect(originals).not.toHaveBeenCalled();
+  expect(screen.queryByRole("list")).toBeNull();
 });
 
 it("resumes the required step after remount and keeps it visible on recovery-service failure", async () => {

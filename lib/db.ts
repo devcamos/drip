@@ -195,7 +195,7 @@ export async function rememberOriginalRecoveryCodes(ownerId: string, envelope: i
 export async function signupRecoveryContext() {
   const value = await stored(); const local = current(value);
   if (value.signupRecovery?.vaultId !== local.keys.header.id || !local.signupRoot || !value.cloud?.userId || value.cloud.version < 1) throw new Error("Sign in again to finish saving your recovery codes.");
-  return { root: local.signupRoot, ownerId: value.cloud.userId, vaultId: local.keys.header.id };
+  return { root: local.signupRoot, ownerId: value.cloud.userId, vaultId: local.keys.header.id, generation: value.gate?.generation };
 }
 
 /** Confirmation and the signup checkpoint complete in one guarded transaction. */

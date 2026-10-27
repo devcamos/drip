@@ -4,6 +4,7 @@ import { loadData, signupRecoveryContext } from "@/lib/db";
 import { originalRecoveryCodes } from "@/lib/original-recovery-codes";
 import { downloadRecoveryCodes } from "@/lib/recovery-codes";
 import { confirmRecoveryCodesSaved } from "@/lib/recovery-readiness";
+import { authClient, connect } from "@/lib/cloud";
 import { AuthLayout } from "./AuthScreen";
 import { SignOutButton } from "./DeviceSession";
 
@@ -24,6 +25,14 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
     void (async () => {
       const context = await signupRecoveryContext();
       const data = await loadData();
+      const session = await authClient.getSession({ fetchOptions: { signal: controller.signal, timeout: 8000, retry: 0 } });
+      controller.signal.throwIfAborted();
+      if (session.data?.user.id !== context.ownerId) {
+        // Offline unlock can resume this local signup without a cloud cookie.
+        // Renew only the existing identity, guarded against a later sign-out.
+        const account = await connect(context.root, data, false, undefined, context.generation);
+        if (account.user.id !== context.ownerId) throw new Error("Cloud account changed.");
+      }
       const file = await originalRecoveryCodes(context.root, context.ownerId, controller.signal);
       if (file.vaultId !== context.vaultId) throw new Error("Account changed.");
       if (active) {

@@ -15,30 +15,35 @@ async function capture(page: Page, state: string) {
   await page.setViewportSize({ width: 390, height: 844 });
 }
 
-for (const method of ["download", "screenshot", "retry"] as const) {
+for (const method of ["download", "screenshot", "retry", "offline-return"] as const) {
 test(`signup saves original codes by ${method} without another password and resumes the same set`, async ({ page }) => {
   // Real app, encryption, IndexedDB, password unwrap and file downloads. Only
   // the network backend is synthetic; this is not a hosted database/auth test.
   const owner = "synthetic-original-owner"; const password = "Synthetic river meadow 42!";
   let user: any; let passwordEnvelope: any; let vault: any = { version: 0, envelope: null };
   let records: any[] | undefined;
+  let cloudSignedIn = false;
+  let offlineNetwork = false;
   let recoveryUnavailable = method === "retry";
   let passwordSignIns = 0; let downloads = 0;
   page.on("download", () => downloads++);
   await page.route("**/api/**", async route => {
+    if (offlineNetwork) return route.abort("internetdisconnected");
     const request = route.request(); const path = new URL(request.url()).pathname;
     const body = request.postDataJSON(); let value: any = {};
     if (path === "/api/cloud/status") value = { available: true };
     else if (path === "/api/auth/sign-in/email" && !user) return route.fulfill({ status: 401, json: { code: "INVALID_EMAIL_OR_PASSWORD" } });
-    else if (path === "/api/auth/sign-up/email") { user = { id: owner, email: body.email, name: "original_demo" }; value = { user, token: "synthetic" }; }
-    else if (path === "/api/auth/get-session") value = { user, session: { id: "synthetic", userId: owner, expiresAt: "2099-01-01T00:00:00Z" } };
-    else if (path === "/api/auth/sign-in/email") value = { user, token: "synthetic" };
+    else if (path === "/api/auth/sign-up/email") { user = { id: owner, email: body.email, name: "original_demo" }; cloudSignedIn = true; value = { user, token: "synthetic" }; }
+    else if (path === "/api/auth/get-session") value = cloudSignedIn ? { user, session: { id: "synthetic", userId: owner, expiresAt: "2099-01-01T00:00:00Z" } } : null;
+    else if (path === "/api/auth/sign-in/email") { cloudSignedIn = true; value = { user, token: "synthetic" }; }
+    else if (path === "/api/auth/sign-out") cloudSignedIn = false;
     else if (path === "/api/auth/gamertag-password") { passwordEnvelope = body.envelope; value = { saved: true }; }
-    else if (path.startsWith("/api/auth/sign-in/gamertag")) { passwordSignIns++; value = { owner, envelope: passwordEnvelope }; }
+    else if (path.startsWith("/api/auth/sign-in/gamertag")) { passwordSignIns++; if (path.endsWith("/gamertag")) cloudSignedIn = true; value = { owner, envelope: passwordEnvelope }; }
     else if (path === "/api/cloud") {
       if (request.method() === "PUT") vault = { version: vault.version + 1, envelope: body.envelope, updated_at: new Date().toISOString() };
       value = vault;
     } else if (path === "/api/recovery-codes") {
+      if (!cloudSignedIn) return route.fulfill({ status: 401, json: { error: "Session expired" } });
       if (recoveryUnavailable) return route.fulfill({ status: 503, json: { error: "Synthetic recovery outage" } });
       if (request.method() === "GET") value = { locators: records?.map(record => record.locator) ?? null };
       else if (request.method() === "PUT") {
@@ -68,6 +73,28 @@ test(`signup saves original codes by ${method} without another password and resu
   expect(originalCodes).toHaveLength(6);
   expect(new Set(originalCodes).size).toBe(6);
   expect(passwordSignIns).toBe(0);
+  if (method === "offline-return") {
+    page.on("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+    await expect.poll(() => cloudSignedIn).toBe(false);
+    offlineNetwork = true;
+    await page.context().setOffline(true);
+    const offline = page.getByRole("form", { name: "Password sign-in", exact: true });
+    await offline.getByLabel("Gamertag").fill("original_demo");
+    await offline.getByLabel("Password", { exact: true }).fill(password);
+    await offline.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.locator("main .panel").getByRole("alert")).toContainText("Could not open your recovery codes");
+    expect(cloudSignedIn).toBe(false);
+    await page.context().setOffline(false);
+    offlineNetwork = false;
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByRole("button", { name: "Download recovery codes" })).toBeVisible();
+    expect(cloudSignedIn).toBe(true);
+    expect(await page.locator("#signup-recovery-codes code").allTextContents()).toEqual(originalCodes);
+    expect(passwordSignIns).toBe(0);
+    await expect(page.getByLabel("Confirm your password", { exact: true })).toHaveCount(0);
+  }
   if (method === "download") await capture(page, "save-original-codes");
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   async function openAndDownload(settings = false) {
