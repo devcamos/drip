@@ -117,6 +117,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .chart-table th,.chart-table td { padding:8px 4px; text-align:left; border-bottom:1px solid var(--border); }
 .recovery-list { padding-left:24px; }
 .recovery-list li { padding:10px 0; font-size:13px; overflow-wrap:anywhere; }
+.signup-recovery h2 { margin-top:0; }
+.signup-recovery .row-gap .btn { width:100%; }
+.signup-recovery .check-label { align-items:flex-start; line-height:1.5; }
 
 .tagline > .btn { margin-left:auto; min-height:36px; }
 

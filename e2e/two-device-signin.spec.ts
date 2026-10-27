@@ -10,13 +10,13 @@ async function signup(page: Page, name: string) {
   await page.getByLabel("Create password", { exact: true }).fill(password);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
-  await finishSignupRecovery(page, password);
+  await finishSignupRecovery(page);
 }
 async function login(page: Page, name: string, success: Locator) {
   const form = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await form.getByLabel("Sign-in gamertag").fill(name);
+  await form.getByLabel("Gamertag").fill(name);
   await form.getByLabel("Password", { exact: true }).fill(password);
-  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in with password", exact: true }).click(), success);
+  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in", exact: true }).click(), success);
 }
 async function capture(page: Page, name: string) {
   if (!process.env.DRIP_SIGNIN_CAPTURE) return;
@@ -66,7 +66,7 @@ test("two browsers restore the same account; a third is blocked; account switchi
     expect(await (await page.request.get("http://localhost:4321/api/auth/get-session")).json()).not.toBeNull();
     page.on("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
     await login(c, name, c.getByTestId("header-tag"));
     await expect(c.getByRole("region", { name: "Account cards", exact: true })).toContainText("£3,000.00");
 

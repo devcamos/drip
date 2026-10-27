@@ -11,7 +11,7 @@ jobs:
       - name: Security audit (fails on high or critical)
         run: npm audit --audit-level=high
       - run: npm run typecheck
-      - name: Unit + component tests with coverage (global ≥80%, lib ≥90/85)
+      - name: Unit + component tests with coverage (global ≥85%, lib ≥90/85)
         run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium

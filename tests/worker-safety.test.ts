@@ -123,6 +123,16 @@ it("binds queued cloud renewal to the locally unlocked device generation", async
   expect(fetcher).toHaveBeenCalledOnce();
 });
 
+it("permits a captured initial renewal only while the device still has no generation", async () => {
+  const { setItem } = await import("../lib/db");
+  const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  const request = { method: "POST", headers: { "X-Drip-Reconnect": "initial" } };
+  await safeFetch("/api/auth/sign-in/email", request);
+  await setItem("deviceSession", { signedOut: false, generation: "another-account" });
+  await expect(safeFetch("/api/auth/sign-in/email", request)).rejects.toThrow(/session changed/);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
 it("rechecks a cloud renewal after waiting for the shared request lock", async () => {
   const { setItem } = await import("../lib/db");
   await setItem("deviceSession", { signedOut: false, generation: "unlocked" });
