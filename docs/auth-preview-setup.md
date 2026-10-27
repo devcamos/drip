@@ -7,8 +7,9 @@ sign-in is available.
 
 On26October the current Vercel environment metadata showed these settings scoped
 to older Preview branches, with separate Production settings. The
-`fix/post-deployment-signin` branch inherited none of them. Its stable auth URL
-has now been installed, but its database and secret still need configuration.
+`fix/post-deployment-signin` branch inherited none of them. All three settings
+were subsequently installed for this branch's Preview using the user's explicit
+CLI grant, and a rebuild of the exact Git source passed the configuration guard.
 
 Configure the following only for Preview, branch `fix/post-deployment-signin`,
 team `devonte-amos-projects`, project `drip`:
@@ -31,6 +32,13 @@ probe should return401 rather than503; it does not prove valid-account sign-in.
 Creating a synthetic cloud account remains subject to the outstanding explicit
 approval request. Existing Production accounts are not copied into Preview.
 
+For narrow protected checks, `vercel project token <project-id> --json` obtains
+only a short-lived Development OIDC token. Keep it in memory and send it in the
+`x-vercel-trusted-oidc-idp-token` header only to this project's Preview origin.
+Avoid a full environment pull for a check needing only that token. Some CLI
+versions automatically create a persistent project bypass for `vercel curl`;
+do not use that path without explicit authorization for the access change.
+
 ## Prevention
 
 The Vercel build now runs `npm run validate:deployment` before compilation. This
@@ -39,11 +47,12 @@ validate their formats and check the stable auth origin matches the target.
 It logs setting names/errors only and performs no database query or migration.
 Local UI builds remain possible through `npm run build` without cloud credentials.
 
-Sixteen preflight regressions cover missing/malformed/mismatched settings, safe
-error output and the Vercel build wiring. The wiring test failed before this fix
-and passed after it. The full local suite now passes430 tests; typecheck, optimized
-build and audit pass. The earlier414-test/32-browser CI result applies to the
-previous head; the new current-head checks must complete before readiness.
+The preflight regressions cover missing/malformed/mismatched settings, safe error
+output and the Vercel build wiring. The wiring test failed before the fix and
+passed after it. Check required CI on the current PR head before marking ready;
+the PR description records current verification rather than an earlier commit's
+results. The one-time signup save flow and its local evidence are indexed in
+[signup recovery screenshots](screenshots/signup-recovery-save/README.md).
 
 This confirms a Preview configuration defect. It does not establish the cause of
 the separately reported Production failure: Production's invalid-credential probes
