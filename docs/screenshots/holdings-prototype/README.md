@@ -2,6 +2,8 @@
 
 Interactive route: `/prototype` on the feature-branch Preview.
 
+The sample-data route returns 404 on Production deployments. Design review and experiments stay available on Preview and local development; this PR does not connect the design to real accounts.
+
 [Open the prototype](https://drip-git-prototype-holdings-card-deck-devonte-amos-projects.vercel.app/prototype). Vercel sign-in may be required by the existing Preview protection. The owner-approved branch configuration is now provisioned; the current build and hosted acceptance results are tracked in [PR #43](https://github.com/devcamos/drip/pull/43). The screenshots below remain accurately labelled local captures.
 
 Source tested: `ced53f305e9887bc7326294b0530abd7dcc31950`, based on released main `d9be8d1fabf141761a961dfcee011a60abb62c5a`. Captured 27 October 2026 from the running local production build, not mockups. All eight images were opened and visually inspected. CSS-pixel screenshots; synthetic GBP fixtures only, with no customer data or secrets to mask.
@@ -31,3 +33,7 @@ Stack images and desktop expansion are full-page captures; other images show the
 - Three new real-browser checks passed: mobile, desktop, and 320 × 740 with reduced motion. They exercise expand/collapse, filters, edit/save, gradient preview/cancel/apply, Escape/focus restoration, keyboard traversal, custom colours, reset-on-reload, absence of horizontal overflow, no application API calls and no service-worker registration. No browser page errors occurred.
 - Browser testing caught missing focus restoration after dismissing a dialog and corrected it before handoff. Early test-only failures (jsdom dialog shim, fixture arithmetic and a locator tied to an edited balance) were corrected without weakening checks.
 - Existing ordinary browser suite was not repeated locally for this isolated route; the PR's full current-head CI is the required gate. Hosted Preview verification is recorded separately in the PR/handoff.
+
+## Production guard follow-up
+
+Before merge, the architecture review's Production-exposure follow-up was closed with a server-page `notFound()` guard for `VERCEL_ENV=production`. Four route regression tests cover Production rejection and continued Preview/local access (one failed before the guard; all four passed afterward). The full local suite now has 454 passing tests across 58 files; coverage is 94.19% statements, 91.80% branches, 94.19% functions and 97.70% lines. Typecheck, Preview/local and Production-mode builds, and audit passed. An actual local Production-mode server returned `/` 200, `/prototype` HTML 404 and React Server Components 404, with no sample holding data rendered. The approved visual design is unchanged.
