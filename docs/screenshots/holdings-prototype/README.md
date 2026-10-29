@@ -2,6 +2,8 @@
 
 Interactive route: `/prototype` on the feature-branch Preview.
 
+[Open the prototype](https://drip-git-prototype-holdings-card-deck-devonte-amos-projects.vercel.app/prototype). Vercel sign-in may be required by the existing Preview protection. The owner-approved branch configuration is now provisioned; the current build and hosted acceptance results are tracked in [PR #43](https://github.com/devcamos/drip/pull/43). The screenshots below remain accurately labelled local captures.
+
 Source tested: `ced53f305e9887bc7326294b0530abd7dcc31950`, based on released main `d9be8d1fabf141761a961dfcee011a60abb62c5a`. Captured 27 October 2026 from the running local production build, not mockups. All eight images were opened and visually inspected. CSS-pixel screenshots; synthetic GBP fixtures only, with no customer data or secrets to mask.
 
 | State | Mobile · 390 × 844 | Desktop · 1280 × 900 |
