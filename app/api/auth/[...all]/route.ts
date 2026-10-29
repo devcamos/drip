@@ -1,9 +1,10 @@
 import { getAuth, cloudConfigured } from "@/server/auth";
 import { guardDeviceAuthResponse } from "@/server/device-sessions";
+import { authBaseURL } from "@/scripts/deployment-config.mjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function boundedPasswordRequest(request: Request): Promise<Request | Response> {
-  if (request.headers.get("origin") !== new URL(process.env.BETTER_AUTH_URL ?? request.url).origin) return Response.json({ error: "Invalid origin." }, { status: 403 });
+  if (request.headers.get("origin") !== new URL(authBaseURL(process.env) ?? request.url).origin) return Response.json({ error: "Invalid origin." }, { status: 403 });
   const reader = request.body?.getReader(); if (!reader) return Response.json({ error: "Missing body." }, { status: 400 });
   let length = 0; const chunks: Uint8Array[] = [];
   while (true) {
@@ -17,7 +18,7 @@ async function boundedPasswordRequest(request: Request): Promise<Request | Respo
 async function handler(request: Request) {
   if (!cloudConfigured()) return Response.json({ error: "Cloud recovery is not configured." }, { status: 503 });
   const path = new URL(request.url).pathname;
-  if (request.method === "POST" && ["/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/gamertag-password"].includes(path)) {
+  if (request.method === "POST" && ["/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/gamertag-password", "/api/auth/sign-in/gamertag-devices", "/api/auth/sign-in/gamertag-revoke-device"].includes(path)) {
     const bounded = await boundedPasswordRequest(request);
     if (bounded instanceof Response) return bounded;
     request = bounded;

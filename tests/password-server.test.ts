@@ -19,7 +19,24 @@ function context(body: unknown) { return {
   },
 }; }
 const endpoints = passwordLogin(db as any).endpoints as any;
+const browser = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => { vi.clearAllMocks(); client.query.mockImplementation((...args) => db.query(...args)); db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.includes("WITH saved") ? [{ user_id: "owner" }] : [] })); });
+it.each(["gamertagDevices", "revokeGamertagDevice"])("rechecks the current credential under the owner lock for %s without creating a cookie", async endpoint => {
+  const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.startsWith("SELECT user_id, password_hash") ? [{ user_id: "owner", password_hash: "before-reset", envelope }] : [] }));
+  const ctx = context({ username: "tester", proof, sessionId: "another-session" }); ctx.headers.set("x-drip-device", browser);
+  await expect(endpoints[endpoint](ctx)).rejects.toThrow(/incorrect/);
+  expect(client.query).toHaveBeenCalledWith(expect.stringContaining("AND password_hash = $3"), ["owner", "tester", "before-reset"]);
+  expect(client.query.mock.calls.some(([sql]) => sql.startsWith('DELETE FROM "session"'))).toBe(false);
+  expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled(); expect(cookie).not.toHaveBeenCalled();
+});
+it.each(["gamertagDevices", "revokeGamertagDevice"])("rejects invalid devices and wrong passwords before listing/revoking (%s)", async endpoint => {
+  const ctx = context({ username: "tester", proof, sessionId: "private-session" });
+  await expect(endpoints[endpoint](ctx)).rejects.toMatchObject({ statusCode: 400 });
+  ctx.headers.set("x-drip-device", browser);
+  await expect(endpoints[endpoint](ctx)).rejects.toMatchObject({ statusCode: 401 });
+  expect(client.query).not.toHaveBeenCalled(); expect(cookie).not.toHaveBeenCalled();
+});
 it("uses Better Auth password verification and cookie sessions before returning an encrypted wrapper", async () => {
   const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
   db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : [{ id: "new-session", user_id: "owner", password_hash: "hashed", envelope }] }));

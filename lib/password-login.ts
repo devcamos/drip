@@ -2,6 +2,7 @@ import { checkCode, codeVerifier, generateRecoveryCode } from "./crypto";
 import { authClient, cloudKey, connect, readCloudState, recoveryCredentials, seal, syncNow, vault, writeCloudState } from "./cloud";
 import { claimEmptyPasswordDevice, commitCloudRestore, completeDeviceSession, getItem, isAppData, passwordUnlockContext, reserveSignupReplacement, savePasswordUnlock, type RetainedAccount, type SignupReplacement, type VaultBinding } from "./db";
 import { AccountSwitchRequired } from "./account-switch";
+import { DeviceLimitReached } from "./device-management";
 import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOtherAccount, signOutDevice, unlockDevice, type DeviceSession } from "./device-session";
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -12,6 +13,7 @@ import type { AppData } from "./types";
 async function call(path: string, body: unknown, headers?: Record<string, string>) {
   const response = await safeFetch(`/api/auth/${path}`, { method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
   const value = await response.json();
+  if (response.status === 409 && value.code === "DEVICE_LIMIT_REACHED") throw new DeviceLimitReached(value.message);
   if (response.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
   if (!response.ok) throw new Error(value.message ?? "Could not sign in. Try again online.");
   return value;

@@ -23,6 +23,7 @@ import { SignupForm } from "./SignupForm";
 import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
 import { AccountForm } from "./AccountForm";
+import { DeviceSettings } from "./DeviceManagement";
 import { AccountDetail } from "./AccountDetail";
 import { IncomeSummary } from "./IncomeSummary";
 import { displayProvider, productLabel } from "@/lib/products";
@@ -393,6 +394,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
       <section className="panel"><h2>Payment notifications</h2><p className="muted">Expected payment dates and optional phone reminders for your income accounts.</p><button className="btn ghost" onClick={onNotifications}>Manage payment notifications</button></section>
       <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
       <PasswordSetup data={data} />
+      <DeviceSettings key={data.identity?.id} />
       <PasskeyUnlock name={data.identity ? I.formatTag(data.identity) : "Drip"} />
       <RecoveryCodes data={data} verifier={verifier} />
       <CloudPanel data={data} verifier={verifier} onRestored={onCloudRestored} />

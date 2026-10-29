@@ -2,14 +2,17 @@ import { createHmac } from "node:crypto";
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import type { AuthContext } from "@better-auth/core";
 import { setSessionCookie } from "better-auth/cookies";
-import type { Pool } from "@neondatabase/serverless";
+import type { Pool, PoolClient } from "@neondatabase/serverless";
 import * as z from "zod";
 import { validPasswordWrap } from "../lib/password-crypto";
 import { withPasswordOwner } from "./password-transaction";
 import { admitDeviceSession, assertDeviceAdmission, type Admission } from "./device-sessions";
+import { revokeDevice, signedInDevices } from "./manage-devices";
 
 const username = z.string().regex(/^[a-z0-9_]{3,16}$/);
 const proof = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+const deviceId = z.string().uuid();
+type LoginContext = { body: { username: string; proof: string }; headers: Headers; context: AuthContext };
 const badLogin = () => new APIError("UNAUTHORIZED", { message: "Gamertag or password is incorrect." });
 async function allowed(db: Pool, name: string, headers: Headers, secret: string) {
   const ip = process.env.VERCEL === "1" ? headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ?? "unknown" : "local";
@@ -26,7 +29,7 @@ async function allowed(db: Pool, name: string, headers: Headers, secret: string)
  * Keep the high-entropy recovery credential intact for recovery and old devices.
  */
 export function passwordLogin(db: Pool) {
-  async function verifiedLogin(ctx: { body: { username: string; proof: string }; headers: Headers; context: AuthContext }) {
+  async function verifiedLogin(ctx: LoginContext) {
     await allowed(db, ctx.body.username, ctx.headers, ctx.context.secret);
     const { rows } = await db.query("SELECT user_id, password_hash, envelope FROM drip_password_login WHERE username = $1", [ctx.body.username]);
     const entry = rows[0];
@@ -36,9 +39,36 @@ export function passwordLogin(db: Pool) {
     if (!user || !validPasswordWrap(entry.envelope) || entry.envelope.owner !== user.id || entry.envelope.username !== ctx.body.username) throw badLogin();
     return { entry, user };
   }
+  async function manage<T>(ctx: LoginContext, work: (client: PoolClient, owner: string, device: string) => Promise<T>) {
+    const device = deviceId.safeParse(ctx.headers.get("x-drip-device"));
+    if (!device.success) throw new APIError("BAD_REQUEST", { message: "Reload Drip to identify this browser." });
+    const { entry, user } = await verifiedLogin(ctx);
+    const result = await withPasswordOwner(db, user.id, async client => {
+      // Reset/recovery and management share this lock: a proof checked before
+      // a concurrent reset cannot revoke sessions after the reset commits.
+      const fresh = await client.query("SELECT user_id FROM drip_password_login WHERE user_id = $1 AND username = $2 AND password_hash = $3", [user.id, ctx.body.username, entry.password_hash]);
+      if (!fresh.rows.length) throw badLogin();
+      return work(client, user.id, device.data.toLowerCase());
+    });
+    return result;
+  }
   return {
     id: "drip-gamertag-password",
     endpoints: {
+      gamertagDevices: createAuthEndpoint("/sign-in/gamertag-devices", {
+        method: "POST", requireHeaders: true, body: z.strictObject({ username, proof }),
+      }, async ctx => {
+        const devices = await manage(ctx, signedInDevices);
+        ctx.setHeader("Cache-Control", "no-store");
+        return ctx.json({ devices });
+      }),
+      revokeGamertagDevice: createAuthEndpoint("/sign-in/gamertag-revoke-device", {
+        method: "POST", requireHeaders: true, body: z.strictObject({ username, proof, sessionId: z.string().min(1).max(128) }),
+      }, async ctx => {
+        const result = await manage(ctx, (client, owner, device) => revokeDevice(client, owner, ctx.body.sessionId, device));
+        ctx.setHeader("Cache-Control", "no-store");
+        return ctx.json(result);
+      }),
       gamertagKey: createAuthEndpoint("/sign-in/gamertag-key", {
         method: "POST", requireHeaders: true, body: z.object({ username, proof }),
       }, async ctx => {
