@@ -12,7 +12,8 @@
     "e2e": "playwright test",
     "audit": "npm audit --audit-level=high",
     "postinstall": "node tools/depcruise/link-bin.mjs",
-    "depcruise": "depcruise app lib server --output-type err"
+    "depcruise": "depcruise app lib server --output-type err",
+    "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.13",
@@ -23,6 +24,7 @@
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "web-push": "3.6.7",
     "ws": "8.22.0",
     "zod": "4.6.7"
   },
@@ -36,6 +38,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/web-push": "3.6.4",
     "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "^5.0.5",
     "drip-depcruise": "file:tools/depcruise",

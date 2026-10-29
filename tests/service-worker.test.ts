@@ -16,7 +16,7 @@ it("accepts app update/version messages only from its own origin", () => {
   expect(skipWaiting).not.toHaveBeenCalled(); expect(postMessage).not.toHaveBeenCalled();
   message({ origin, data: { type: "SKIP_WAITING" } });
   message({ origin, data: { type: "DRIP_WORKER_VERSION" }, ports: [{ postMessage }] });
-  expect(skipWaiting).toHaveBeenCalledOnce(); expect(postMessage).toHaveBeenCalledWith({ version: 3 });
+  expect(skipWaiting).toHaveBeenCalledOnce(); expect(postMessage).toHaveBeenCalledWith({ version: 4 });
 });
 
 function shellWorker(release: string, windows: number, storage = new Map<string, Map<string, Response>>()) {
@@ -68,4 +68,30 @@ it("keeps the previous public shell when a new build cannot install", async () =
   await expect(current.event("install")).rejects.toThrow("offline");
   expect(current.storage.get("drip-shell-working")?.has("/")).toBe(true);
   expect(current.clients.claim).not.toHaveBeenCalled();
+});
+
+it("displays only generic push content and uses a same-day tag to coalesce retries", async () => {
+  const listeners = new Map<string, (event: any) => void>(), showNotification = vi.fn().mockResolvedValue(undefined);
+  const self = { registration: { showNotification }, location: { origin: "https://drip.example" }, addEventListener: (name: string, fn: any) => listeners.set(name, fn) };
+  runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), { self, importScripts() {} });
+  const push = listeners.get("push")!;
+  for (const value of [null, {}, { type: "unknown", date: "2026-10-29" }, { type: "payment-reminder", date: "bad" }]) push({ data: { json: () => value } });
+  push({ data: { json() { throw new Error("malformed"); } } }); expect(showNotification).not.toHaveBeenCalled();
+  let work: Promise<unknown> | undefined;
+  push({ data: { json: () => ({ type: "payment-reminder", date: "2026-10-29", title: "Private account", body: "£999", url: "https://evil.test" }) }, waitUntil: (p: Promise<unknown>) => { work = p; } }); await work;
+  expect(showNotification).toHaveBeenCalledWith("Drip payment reminder", expect.objectContaining({ tag: "drip-payment-2026-10-29" }));
+  expect(JSON.stringify(showNotification.mock.calls)).not.toMatch(/Private|999|evil/);
+  push({ data: { json: () => ({ type: "notification-test", date: "2026-10-29" }) }, waitUntil: (p: Promise<unknown>) => { work = p; } }); await work;
+  expect(showNotification).toHaveBeenLastCalledWith("Drip notification test", expect.objectContaining({ tag: "drip-payment-test" }));
+});
+it("focuses an existing app without reloading edits, or opens only the fixed same-origin reminders path", async () => {
+  const listeners = new Map<string, (event: any) => void>(), focus = vi.fn(), postMessage = vi.fn(), openWindow = vi.fn();
+  const clients = { matchAll: vi.fn().mockResolvedValue([{ url: "https://drip.example/", focus, postMessage }]), openWindow };
+  const self = { clients, location: { origin: "https://drip.example" }, addEventListener: (name: string, fn: any) => listeners.set(name, fn) };
+  runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), { self, URL, importScripts() {} });
+  const click = listeners.get("notificationclick")!; let work: Promise<unknown> | undefined; const close = vi.fn();
+  const event = { notification: { tag: "drip-payment-2026-10-29", close, data: { url: "https://evil.test" } }, waitUntil: (p: Promise<unknown>) => { work = p; } };
+  click(event); await work; expect(focus).toHaveBeenCalledOnce(); expect(postMessage).toHaveBeenCalledWith({ type: "DRIP_OPEN_PAYMENTS" }); expect(openWindow).not.toHaveBeenCalled();
+  clients.matchAll.mockResolvedValueOnce([]); click(event); await work; expect(openWindow).toHaveBeenCalledWith("https://drip.example/?tab=payments");
+  click({ ...event, notification: { tag: "other", close } }); expect(close).toHaveBeenCalledTimes(2);
 });

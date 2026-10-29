@@ -1,0 +1,2 @@
+import { defineConfig, devices } from "@playwright/test";
+export default defineConfig({ testDir: "e2e", testMatch: ["income-notifications.spec.ts", "income-update.spec.ts"], timeout: 60000, use: { baseURL: "http://localhost:4329", ...devices["Pixel 7"], launchOptions: { executablePath: process.env.PW_CHROME || "/usr/bin/chromium" } }, webServer: { command: "npm run start -- --port 4329", url: "http://localhost:4329", reuseExistingServer: !process.env.CI } });

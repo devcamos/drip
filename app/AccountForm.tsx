@@ -21,25 +21,27 @@ function validForm(input: FormInputs) {
   return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.round2(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
 }
 
-export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void | Promise<boolean>; onCancel: () => void }>) {
+export function AccountForm({ existing, onSave, onCancel, initialCategory }: Readonly<{ existing?: Account; initialCategory?: ProductCategory; onSave: (a: Account) => void | Promise<boolean>; onCancel: () => void }>) {
+  const initialProduct = existing?.productCategory ?? initialCategory ?? (existing ? "other" : "easy-access");
+  const initialProvider = existing?.provider ?? (initialProduct === "stocks-funds" ? "Trading212" : "Zopa");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
-  const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
+  const [provider, setProvider] = useState(initialProvider);
   const [custom, setCustom] = useState(customProviderName(existing?.provider));
-  const [category, setCategory] = useState<ProductCategory>(existing?.productCategory ?? (existing ? "other" : "easy-access"));
-  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[existing?.productCategory ?? "other"].taxWrapper);
+  const [category, setCategory] = useState<ProductCategory>(initialProduct);
+  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[initialProduct].taxWrapper);
   const [label, setLabel] = useState(existing?.label ?? "");
   const [holding, setHolding] = useState(existing?.holdingName ?? "");
   const [customHolding, setCustomHolding] = useState(!!existing?.holdingName && !(TRADING_212_HOLDINGS as readonly string[]).includes(existing.holdingName));
-  const [colour, setColour] = useState(normaliseColour(existing ? existing.colour : PROVIDERS.Zopa));
+  const [colour, setColour] = useState(normaliseColour(existing ? existing.colour : PROVIDERS[initialProvider]));
   const [colourChosen, setColourChosen] = useState(!!existing);
   const [balance, setBalance] = useState(existing ? String(existing.balance) : "");
   const [rate, setRate] = useState(existing ? String(existing.ratePct) : "");
-  const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? "interest");
-  const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? "monthly");
-  const [reinvest, setReinvest] = useState(existing?.reinvestIncome ?? existing?.rateType !== "dividend");
-  const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), 1));
+  const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? PRODUCTS[initialProduct].rateType);
+  const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? PRODUCTS[initialProduct].frequency);
+  const [reinvest, setReinvest] = useState(existing?.reinvestIncome ?? (existing ? existing.rateType !== "dividend" : PRODUCTS[initialProduct].reinvestIncome));
+  const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), payoutMonths[PRODUCTS[initialProduct].frequency]));
   const [rateFrom, setRateFrom] = useState(today());
   const [hasBonus, setHasBonus] = useState(!!existing?.bonus);
   const [bonusAmount, setBonusAmount] = useState(existing?.bonus ? String(existing.bonus.amount) : "");

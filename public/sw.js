@@ -17,7 +17,32 @@ self.addEventListener('install', event => {
 self.addEventListener('message', event => {
   if (event.origin !== self.location.origin) return;
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-  if (event.data?.type === 'DRIP_WORKER_VERSION') event.ports[0]?.postMessage({ version: 3 });
+  if (event.data?.type === 'DRIP_WORKER_VERSION') event.ports[0]?.postMessage({ version: 4 });
+});
+
+// Web Push is user-visible and deliberately excludes account names and figures.
+self.addEventListener('push', event => {
+  let payload;
+  try { payload = event.data?.json(); } catch { return; }
+  if (!payload || !['payment-reminder', 'notification-test'].includes(payload.type) || !/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) return;
+  const test = payload.type === 'notification-test';
+  event.waitUntil(self.registration.showNotification(test ? 'Drip notification test' : 'Drip payment reminder', {
+    body: test ? 'Phone notifications are working on this device.' : 'A payment is expected today. Open Drip to check and log what arrived.',
+    tag: test ? 'drip-payment-test' : `drip-payment-${payload.date}`, icon: '/icon-192.png', badge: '/icon-192.png',
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  if (!event.notification.tag?.startsWith('drip-payment-')) return;
+  event.notification.close();
+  event.waitUntil((async () => {
+    const target = new URL('/?tab=payments', self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = windows.find(client => { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname === '/'; });
+    if (existing) {
+      await existing.focus();
+      existing.postMessage({ type: 'DRIP_OPEN_PAYMENTS' });
+    } else await self.clients.openWindow(target);
+  })());
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {

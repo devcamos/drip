@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AppData } from "@/lib/types";
+import type { AppData, ProductCategory } from "@/lib/types";
 import * as M from "@/lib/maths";
 import * as C from "@/lib/crypto";
 import { commitCloudRestore, getItem, isAppData, loadData, saveData, localVaultStatus, passwordUnlockContext } from "@/lib/db";
@@ -28,8 +28,13 @@ import { IncomeSummary } from "./IncomeSummary";
 import { displayProvider, productLabel } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
+import { DividendPortfolio } from "./DividendPortfolio";
+import { PaymentNotifications } from "./PaymentNotifications";
+import { PhoneReminderSync } from "./PhoneReminders";
+import { useCalendarDay } from "./useCalendarDay";
+import { paymentReminders } from "@/lib/payment-reminders";
 
-type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string } | { name: "trends" } | { name: "settings" };
+type View = { name: "home" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" };
 type Verifier = { salt: string; hash: string };
 
 const today = () => M.ymd(new Date());
@@ -49,6 +54,16 @@ export default function Drip() {
       if (status === "unlocked" && !session?.signedOut && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
       setGate({ status, signedOut: !!session?.signedOut, signupRecovery: !!checkpoint && checkpoint.vaultId === binding?.vaultId }); setError("");
     } catch { if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
+  }, []);
+  useEffect(() => {
+    const open = (event: MessageEvent) => {
+      if (event.origin !== location.origin || event.source !== navigator.serviceWorker?.controller || event.data?.type !== "DRIP_OPEN_PAYMENTS") return;
+      const url = new URL(location.href); url.searchParams.set("tab", "payments");
+      history.replaceState(null, "", url.href);
+      window.dispatchEvent(new Event("drip-open-payments"));
+    };
+    navigator.serviceWorker?.addEventListener("message", open);
+    return () => navigator.serviceWorker?.removeEventListener("message", open);
   }, []);
   useEffect(() => {
     refresh();
@@ -74,11 +89,27 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
+  const calendarDay = useCalendarDay();
+  const [paymentPrompt, setPaymentPrompt] = useState(false);
+  const initialNavigation = useRef(false);
   const loadSequence = useRef(0);
   const [locked, setLocked] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [loadError, setLoadError] = useState("");
   const lockOn = !!data?.lock?.credentialId;
+  useEffect(() => {
+    if (!data || initialNavigation.current) return;
+    initialNavigation.current = true;
+    if (data.accounts.length && new URLSearchParams(location.search).get("tab") === "payments") setView({ name: "payments" });
+  }, [data]);
+  useEffect(() => {
+    const open = () => {
+      if (["add", "detail", "settings"].includes(view.name) || pendingSaves) { setPaymentPrompt(true); return; }
+      setView({ name: "payments" }); setPaymentPrompt(false);
+    };
+    window.addEventListener("drip-open-payments", open);
+    return () => window.removeEventListener("drip-open-payments", open);
+  }, [view.name, pendingSaves]);
   useEffect(() => {
     if (!data) return;
     let hiddenAt: number | null = null;
@@ -159,6 +190,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
+  const pendingPayments = paymentReminders(data.accounts, calendarDay).filter(item => item.date === calendarDay && !item.logged).length;
   let body: React.ReactNode;
   switch (view.name) {
   case "detail": {
@@ -170,7 +202,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   }
   case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
-    body = <AccountForm key={view.id ?? "new"} existing={existing} onCancel={() => setView({ name: "home" })} onSave={async (a) => {
+    body = <AccountForm key={view.id ?? view.category ?? "new"} existing={existing} initialCategory={view.category} onCancel={() => setView({ name: "home" })} onSave={async (a) => {
       const saved = await update((d) => ({ ...d, accounts: d.accounts.some(x => x.id === a.id) ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] }));
       if (saved) setView({ name: "detail", id: a.id });
       return saved;
@@ -180,24 +212,31 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   case "trends":
     body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
     break;
+  case "portfolio":
+    body = <DividendPortfolio accounts={data.accounts} onOpen={id => setView({ name: "detail", id })} onAdd={() => setView({ name: "add", category: "stocks-funds" })} />;
+    break;
+  case "payments":
+    body = <PaymentNotifications accounts={data.accounts} identityId={data.identity.id} onOpen={id => setView({ name: "detail", id })} />;
+    break;
   case "settings":
     body = <Settings data={data} verifier={verifier}
+    onNotifications={() => setView({ name: "payments" })}
     onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); replaceData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
     onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); replaceData(n); }} />;
     break;
   default:
-    body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} />;
+    body = <Home data={data} open={(id) => setView({ name: "detail", id })} add={() => setView({ name: "add" })} portfolio={() => setView({ name: "portfolio" })} />;
   }
 
   return (
     <>
-      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><SignOutButton /></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} />{saveError && <p role="alert" className="err">{saveError}</p>}<InstallTask state={installTask} />{view.name === "home" && <RecoveryTask onSetup={() => setView({ name: "settings" })} />}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
+      <main><div className="tagline"><span data-testid="header-tag">💧 Drip · <b>{I.formatTag(data.identity)}</b></span><div className="header-actions"><button className="btn ghost small payment-bell" aria-label={`Payment notifications, ${pendingPayments} to check`} onClick={() => setView({ name: "payments" })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span aria-hidden="true">{pendingPayments}</span></button><SignOutButton /></div></div><output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output><PwaStatus /><CloudSync hasData={data.accounts.length > 0} /><PhoneReminderSync identityId={data.identity.id} accounts={data.accounts} onManage={() => setView({ name: "payments" })} />{saveError && <p role="alert" className="err">{saveError}</p>}{paymentPrompt && <div className="banner info"><span>Payment reminder selected. Finish your current edit before opening reminders.</span><button className="btn ghost small" disabled={!!pendingSaves} onClick={() => { setPaymentPrompt(false); setView({ name: "payments" }); }}>Open reminders</button></div>}<InstallTask state={installTask} />{view.name === "home" && <RecoveryTask onSetup={() => setView({ name: "settings" })} />}{body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p></main>
       <nav className="tabs">
-        {(["home", "trends", "add", "settings"] as const).map((n) => (
+        {(["home", "portfolio", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") ? "on" : ""} onClick={() => setView({ name: n } as View)}>
-            {{ home: "Accounts", trends: "Trends", add: "Add", settings: "Settings" }[n]}
+            {{ home: "Accounts", portfolio: "Portfolio", trends: "Trends", add: "Add", settings: "Settings" }[n]}
           </button>
         ))}
       </nav>
@@ -273,7 +312,7 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
   );
 }
 
-function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) => void; add: () => void }>) {
+function Home({ data, open, add, portfolio }: Readonly<{ data: AppData; open: (id: string) => void; add: () => void; portfolio: () => void }>) {
   const t = today();
   const up = M.upcoming(data.accounts, t);
   return (
@@ -302,6 +341,7 @@ function Home({ data, open, add }: Readonly<{ data: AppData; open: (id: string) 
         </section>
       )}
       {data.accounts.length > 0 && <IncomeSummary accounts={data.accounts} />}
+      {data.accounts.some(account => account.rateType === "dividend") && <button className="portfolio-link" onClick={portfolio}><span><b>Dividend portfolio</b><small>See your total dividend income</small></span><span aria-hidden="true">↗</span></button>}
       {up.length > 0 && (
         <div className="panel"><h2 style={{ marginTop: 0 }}>Upcoming estimated payments</h2>
           <ul className="list">{up.map((p) => <li key={p.account.id}><span>{p.account.holdingName ?? displayProvider(p.account.provider)}<br /><span className="muted">{fmtDate(p.date)}</span></span><b>{M.gbp(p.amount)}</b></li>)}</ul>
@@ -328,7 +368,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: Readonly<{ credentialI
   );
 }
 
-function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored }: Readonly<{ data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void> }>) {
+function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestored, onNotifications }: Readonly<{ data: AppData; verifier: Verifier; onBackedUp: () => void; onRestore: (d: AppData, code: string, expectedGeneration?: string) => void | Promise<void>; onLock: (l: AppData["lock"]) => void; onCloudRestored: (d: AppData, code: string) => void | Promise<void>; onNotifications: () => void }>) {
   const [supported, setSupported] = useState<boolean | null>(null); const [lockMsg, setLockMsg] = useState("");
   useEffect(() => { L.passkeySupported().then(setSupported); }, []);
   const lockPanel = (
@@ -350,6 +390,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   return (
     <>
       <h1>Settings</h1>
+      <section className="panel"><h2>Payment notifications</h2><p className="muted">Expected payment dates and optional phone reminders for your income accounts.</p><button className="btn ghost" onClick={onNotifications}>Manage payment notifications</button></section>
       <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
       <PasswordSetup data={data} />
       <PasskeyUnlock name={data.identity ? I.formatTag(data.identity) : "Drip"} />
