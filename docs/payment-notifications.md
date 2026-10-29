@@ -16,8 +16,8 @@ syncs and opens Drip. Delivery depends on the browser, network and push provider
 ## Deployment setup (requires approval, Preview first)
 
 Apply `scripts/payment-notifications.sql` to the isolated Preview database using
-the existing approved migration workflow. It creates one additive table with a
-user FK; it does not modify password, recovery, vault or session schemas.
+the existing approved migration workflow. It creates two additive notification
+tables with user FKs; it does not modify password, recovery, vault or session schemas.
 
 In the existing Drip Vercel project, configure only the approved environment:
 
@@ -26,15 +26,20 @@ In the existing Drip Vercel project, configure only the approved environment:
 - `CRON_SECRET`: random bearer secret, at least32characters.
 
 Do not regenerate the storage key during routine builds: existing subscriptions
-need the same key. Keep private values server-only and out of logs/source. Base
-`DATABASE_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` remain required per the
-existing branch deployment preflight. No paid plan change is needed.
+need the same key. Keep private values server-only and out of logs/source.
+`DATABASE_URL` and `BETTER_AUTH_SECRET` remain required. Preview can derive a
+missing `BETTER_AUTH_URL` from its stable `VERCEL_BRANCH_URL`; Production and
+local runs require an explicit auth origin. No paid plan change is needed.
 
 Vercel Cron calls `/api/notifications/dispatch` once a day at09UTC, with Hobby
 precision within that hour. It runs automatically on Production only. A Preview
 test must invoke that endpoint manually with its scoped bearer secret, after
 explicit setup approval. Use an opted-in synthetic device; do not notify users
-as a test. `Send test notification` is authenticated and limited to once/minute.
+as a test. `Send test notification` is authenticated and limited to one per60seconds
+across that Drip user's devices. Schedule updates share a60-update,60-second
+window per user, alongside the existing device limit. These owner/action budgets
+survive enrollment deletion, expiry and device/address changes. Limiter storage
+is bounded to two small rows per user and is removed with that user.
 Successful provider acceptance alone does not prove a phone displayed it.
 
 ## Verification

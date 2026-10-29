@@ -1,6 +1,15 @@
 -- Additive, opt-in phone reminders. Review/apply explicitly, on Preview first.
 -- No financial vault, password, recovery-code or auth-session schema changes.
 BEGIN;
+-- These two owner/action rows survive subscription deletion, transport rotation
+-- and expired endpoints. They contain no notification address or financial data.
+CREATE TABLE IF NOT EXISTS drip_push_rate_limits (
+  user_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  action text NOT NULL CHECK (action IN ('update', 'test')),
+  window_started_at timestamptz NOT NULL,
+  hits integer NOT NULL CHECK (hits > 0),
+  PRIMARY KEY (user_id, action)
+);
 CREATE TABLE IF NOT EXISTS drip_push_subscriptions (
   id uuid PRIMARY KEY,
   user_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,

@@ -13,12 +13,23 @@ export type PushRow = { id: string; user_id: string; device_id: string; envelope
 
 export class ReminderStore {
   constructor(readonly db: ReminderDatabase, private readonly key: Buffer) {}
+  /** Autocommit before enrollment work: a rejected/rolled-back save still spends
+   * its budget, and deleting the enrollment cannot reset an owner's cooldown. */
+  private async consume(owner: string, action: "update" | "test", maximum: number, now: Date) {
+    return !!(await this.db.query(`INSERT INTO drip_push_rate_limits(user_id,action,window_started_at,hits)
+      VALUES($1,$2,$3,1) ON CONFLICT(user_id,action) DO UPDATE SET
+      window_started_at=CASE WHEN drip_push_rate_limits.window_started_at<=$3::timestamptz-interval '1 minute' THEN $3 ELSE drip_push_rate_limits.window_started_at END,
+      hits=CASE WHEN drip_push_rate_limits.window_started_at<=$3::timestamptz-interval '1 minute' THEN 1 ELSE drip_push_rate_limits.hits+1 END
+      WHERE drip_push_rate_limits.window_started_at<=$3::timestamptz-interval '1 minute' OR drip_push_rate_limits.hits<$4
+      RETURNING user_id`, [owner, action, now, maximum])).rows.length;
+  }
   async current(owner: string, device: string): Promise<PushRow | undefined> {
     return (await this.db.query("SELECT id,user_id,device_id,envelope,schedule,revision FROM drip_push_subscriptions WHERE user_id=$1 AND device_id=$2", [owner, device])).rows[0];
   }
   async remove(owner: string, device: string) { await this.db.query("DELETE FROM drip_push_subscriptions WHERE user_id=$1 AND device_id=$2", [owner, device]); }
   async expired(row: PushRow) { await this.db.query("DELETE FROM drip_push_subscriptions WHERE id=$1 AND revision=$2", [row.id, row.revision]); }
   async save(owner: string, device: string, subscription: PushSubscription, schedule: ReminderSchedule, now = new Date()) {
+    if (!await this.consume(owner, "update", 60, now)) throw new ReminderError("Too many reminder updates. Try again in a minute.", 429);
     const hash = createHash("sha256").update(subscription.endpoint).digest("hex");
     const connection = await this.db.connect();
     try {
@@ -70,6 +81,7 @@ export class ReminderStore {
   }
   subscription(row: PushRow) { return openSubscription(row.envelope, this.key, row.user_id, row.device_id); }
   async allowTest(row: PushRow, now: Date) {
-    return !!(await this.db.query("UPDATE drip_push_subscriptions SET last_test_at=$1 WHERE id=$2 AND (last_test_at IS NULL OR last_test_at<$1::timestamptz-interval '1 minute') RETURNING id", [now, row.id])).rows.length;
+    if (!await this.consume(row.user_id, "test", 1, now)) return false;
+    return !!(await this.db.query("UPDATE drip_push_subscriptions SET last_test_at=$1 WHERE id=$2 AND user_id=$3 AND device_id=$4 AND revision=$5 AND (last_test_at IS NULL OR last_test_at<=$1::timestamptz-interval '1 minute') RETURNING id", [now, row.id, row.user_id, row.device_id, row.revision])).rows.length;
   }
 }
