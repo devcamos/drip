@@ -34,6 +34,7 @@ function initialValues(existing?: Account, category?: ProductCategory) {
   const defaults = PRODUCTS[product];
   return { product, provider, colour: normaliseColour(existing ? existing.colour : PROVIDERS[provider]),
     balance: existing ? String(existing.balance) : "", rate: existing ? String(existing.ratePct) : "",
+    bonusAmount: existing?.bonus ? String(existing.bonus.amount) : "",
     reinvest: existing?.reinvestIncome ?? (existing ? existing.rateType !== "dividend" : defaults.reinvestIncome) };
 }
 function validHoldingName(category: ProductCategory, provider: string, custom: boolean, holding: string) {
@@ -66,7 +67,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), payoutMonths[PRODUCTS[initialProduct].frequency]));
   const [rateFrom, setRateFrom] = useState(today());
   const [hasBonus, setHasBonus] = useState(!!existing?.bonus);
-  const [bonusAmount, setBonusAmount] = useState(existing?.bonus ? String(existing.bonus.amount) : "");
+  const [bonusAmount, setBonusAmount] = useState(initial.bonusAmount);
   const [bonusDate, setBonusDate] = useState(existing?.bonus?.expectedDate ?? "");
   const isOther = isOtherProvider(provider, existing);
   const b = Number(balance), r = Number(rate);
