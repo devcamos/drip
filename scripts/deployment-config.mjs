@@ -1,9 +1,10 @@
-// Preview derives its stable branch origin; Production/local require an explicit URL.
+// Preview always uses Vercel's stable branch origin, so one project-wide Preview
+// BETTER_AUTH_URL (which can only match one branch) cannot break other branches.
+// Production and local runs still require an explicit, validated URL.
 export function authBaseURL(env) {
-  const configured = env.BETTER_AUTH_URL?.trim();
-  if (configured) return configured;
   const branch = env.VERCEL_ENV === "preview" ? env.VERCEL_BRANCH_URL?.trim() : "";
-  return branch ? `https://${branch}` : undefined;
+  if (branch) return `https://${branch}`;
+  return env.BETTER_AUTH_URL?.trim() || undefined;
 }
 const local = host => ["localhost", "127.0.0.1", "[::1]"].includes(host);
 function validDatabase(value) {

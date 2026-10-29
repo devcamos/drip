@@ -28,9 +28,10 @@ it.each([
   { DATABASE_URL: "https://database.invalid" },
   { DATABASE_URL: "postgresql://localhost/drip" },
   { BETTER_AUTH_SECRET: "short" },
-  { VERCEL_BRANCH_URL: "another-branch.invalid" },
+  { VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "another-host.invalid" },
 ])("rejects malformed or mismatched deployment settings without printing values (%#)", values => {
-  const result = check(values);
+  // Production validates the configured auth URL; Preview derives it from Vercel.
+  const result = check({ VERCEL_ENV: "production", ...values });
   expect(result.length).toBeGreaterThan(0);
   for (const value of Object.values(values)) expect(result.join("\n")).not.toContain(value);
 });
@@ -45,7 +46,10 @@ it("requires the Vercel build to run the preflight before building", () => {
 it("derives a missing Preview auth origin from the branch URL only", () => {
   expect(check({ BETTER_AUTH_URL: undefined })).toEqual([]);
   expect(authBaseURL({ VERCEL_ENV: "preview", VERCEL_BRANCH_URL: configured.VERCEL_BRANCH_URL })).toBe(configured.BETTER_AUTH_URL);
-  expect(authBaseURL({ ...configured, BETTER_AUTH_URL: " https://drip.invalid " })).toBe("https://drip.invalid");
+  expect(authBaseURL({ ...configured, VERCEL_ENV: "production", BETTER_AUTH_URL: " https://drip.invalid " })).toBe("https://drip.invalid");
+  // A project-wide Preview value set for another branch never overrides this branch's origin.
+  expect(authBaseURL({ ...configured, BETTER_AUTH_URL: "https://drip-git-other-devonte-amos-projects.vercel.app" })).toBe(configured.BETTER_AUTH_URL);
+  expect(check({ BETTER_AUTH_URL: "https://drip-git-other-devonte-amos-projects.vercel.app" })).toEqual([]);
   expect(check({ BETTER_AUTH_URL: undefined, VERCEL_ENV: "production", VERCEL_BRANCH_URL: "drip.invalid" }).join("\n")).toContain("BETTER_AUTH_URL is missing");
   expect(check({ BETTER_AUTH_URL: undefined, VERCEL_BRANCH_URL: undefined }).join("\n")).toContain("BETTER_AUTH_URL is missing");
   expect(authBaseURL({ VERCEL_BRANCH_URL: "drip.invalid" })).toBeUndefined();
