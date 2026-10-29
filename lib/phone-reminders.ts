@@ -41,7 +41,7 @@ export async function reminderWorker(): Promise<ServiceWorkerRegistration> {
 async function request(identityId: string, method: "GET" | "PUT" | "DELETE" | "POST", body?: unknown, endpoint = "subscription") {
   const state = await readCloudState();
   const gate = await getItem<{ generation: string; signedOut: boolean }>("deviceSession");
-  if (!state || state.identityId !== identityId || gate?.signedOut) throw new Error("Sign in and connect cloud recovery to manage phone reminders.");
+  if (state?.identityId !== identityId || gate?.signedOut) throw new Error("Sign in and connect cloud recovery to manage phone reminders.");
   const generation = gate?.generation ?? "initial";
   const response = await safeFetch(`/api/notifications/${endpoint}`, {
     method, cache: "no-store", credentials: "same-origin",
@@ -49,7 +49,10 @@ async function request(identityId: string, method: "GET" | "PUT" | "DELETE" | "P
     body: body ? JSON.stringify(body) : undefined,
   });
   const result = await response.json();
-  if (!response.ok) throw new PhoneReminderError(`${result.error ?? "Could not update phone reminders."}${result.reference ? ` Reference: ${result.reference}` : ""}`, result.code);
+  if (!response.ok) {
+    const reference = result.reference ? " Reference: " + result.reference : "";
+    throw new PhoneReminderError((result.error ?? "Could not update phone reminders.") + reference, result.code);
+  }
   return result;
 }
 async function currentData(identityId: string) {
@@ -59,9 +62,9 @@ async function currentData(identityId: string) {
 }
 function encode(bytes: ArrayBuffer | null) {
   if (!bytes) throw new Error("Could not read this device's notification address.");
-  return btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  return btoa(String.fromCodePoint(...new Uint8Array(bytes))).replaceAll("+", "-").replaceAll("/", "_").split("=")[0];
 }
-function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - value.length % 4) % 4)), char => char.charCodeAt(0)); }
+function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - value.length % 4) % 4)), char => char.codePointAt(0)!); }
 async function saveSchedule(identityId: string, subscription: PushSubscription) {
   const data = await currentData(identityId);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;

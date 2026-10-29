@@ -117,3 +117,20 @@ it("waits for other in-flight deliveries when a database operation fails", async
   await vi.waitFor(() => expect(finish).toBeDefined()); expect(done).toBe(false); finish();
   expect(await pending).toBeInstanceOf(Error); expect(f.store.advance).toHaveBeenCalledOnce();
 });
+
+it("rejects invalid external registrations at the API boundary before any database write", async () => {
+  const f = apiFixture();
+  const valid = { subscription: f.subscription, schedule: f.schedule };
+  const invalid = [
+    { ...valid, balance: 123 },
+    { ...valid, subscription: { ...f.subscription, endpoint: "https://127.0.0.1/internal" } },
+    { ...valid, subscription: { ...f.subscription, keys: { ...f.subscription.keys, auth: "bad" } } },
+    { ...valid, schedule: { ...f.schedule, timeZone: "Unknown/Zone" } },
+    { ...valid, schedule: { ...f.schedule, plans: [{ anchor: "2026-02-30", frequency: "monthly" }] } },
+    { ...valid, schedule: { ...f.schedule, plans: [{ ...f.schedule.plans[0], privateAccount: "not allowed" }] } },
+  ];
+  for (const body of invalid) {
+    expect((await f.api.PUT(f.request("PUT", {}, JSON.stringify(body)))).status).toBe(400);
+  }
+  expect(f.store.save).not.toHaveBeenCalled();
+});

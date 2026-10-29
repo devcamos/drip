@@ -7,7 +7,13 @@ export type ReminderSchedule = { timeZone: string; plans: PaymentPlan[] };
 const months: Record<Exclude<Frequency, "daily">, number> = { monthly: 1, quarterly: 3, annually: 12 };
 function accountPlan(account: Account, day: string): PaymentPlan {
   const created = account.createdAt.slice(0, 10);
-  return { anchor: account.frequency === "daily" ? (validDate(created) ? created : validDate(account.nextPayoutDate) ? account.nextPayoutDate : day) : account.nextPayoutDate, frequency: account.frequency };
+  let anchor = account.nextPayoutDate;
+  if (account.frequency === "daily") {
+    anchor = day;
+    if (validDate(account.nextPayoutDate)) anchor = account.nextPayoutDate;
+    if (validDate(created)) anchor = created;
+  }
+  return { anchor, frequency: account.frequency };
 }
 
 export function dateInZone(now = new Date(), timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone) {
@@ -30,7 +36,7 @@ export function followingDay(day: string) { return ymd(new Date(Date.parse(`${da
 export function paymentDue(plan: PaymentPlan, day: string) { return plan.skipDate !== day && nextPayment(plan, day) === day; }
 export function nextReminder(schedule: ReminderSchedule, today: string): string | null {
   const dates = schedule.plans.map(plan => nextPayment(plan, plan.skipDate === today ? followingDay(today) : today));
-  return dates.length ? dates.toSorted()[0] : null;
+  return dates.length ? dates.toSorted((a, b) => a.localeCompare(b))[0] : null;
 }
 export function loggedToday(account: Account, day: string) {
   return account.payouts.some(payment => payment.kind === "actual" && payment.date === day && payment.amount > 0 && Number.isFinite(payment.amount) && (payment.incomeType ?? account.rateType) === account.rateType);

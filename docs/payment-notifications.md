@@ -51,3 +51,28 @@ refuses non-loopback or differently named databases. CI supplies its own service
 account credentials, browser permission or push-provider delivery are mocked as
 proof of real-device delivery. Old-to-new worker4 offline update evidence is
 required before marking this PR ready.
+
+## API validation evidence
+
+Notification handlers share an authenticated context and strict schemas. The
+architecture review's ARCH-003 warning should be checked against this full path:
+
+| Incoming input | Validation before persistence/delivery | Regression coverage |
+| --- | --- | --- |
+| Subscription PUT body | JSON content type; advertised and streamed64KB bounds; strict `registrationSchema.safeParse` before `store.save` | malformed/oversized JSON; invalid schemas; no save on rejection |
+| Endpoint and transport keys | HTTPS push-provider allowlist; no credentials/port/fragment; canonical base64url and P-256 point validation | SSRF/private hosts; wrong key sizes; invalid point/padding |
+| Schedule | strict date/frequency/time-zone schema, max500plans; unknown fields rejected | impossible dates/zones, oversized plan lists, financial-field rejection |
+| Owner/device headers | session user must match owner; UUIDv4 device; same-origin writes | unauthenticated, other-owner, bad-device and cross-origin rejection |
+| Cron Authorization | configured bearer with length check and constant-time comparison | absent/incorrect/extended bearer rejected |
+| Test notification | own enrolled device; per-minute rate limit; fixed generic payload | missing/expired enrollment, rate limiting, no raw secret/error logs |
+
+Sources: [API](../server/notifications/api.ts),
+[schemas](../server/notifications/model.ts),
+[security tests](../tests/notifications-security.test.ts),
+[real database tests](../integration/notifications-postgres.test.ts).
+GET/DELETE/test routes consume no client body or financial query parameters.
+The dispatch loop intentionally waits for each bounded batch: leases and the
+runtime budget must be checked before requesting the next page. Body reads are
+sequential to enforce limits with backpressure. The old-to-new deployment test
+is opt-in because it needs two actual builds on a coordinated stable origin;
+it has been executed locally, not replaced with a skipped-test success claim.

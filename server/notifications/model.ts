@@ -5,7 +5,7 @@ import { validDate } from "@/lib/products";
 const base64 = (size: number) => z.string().max(120).refine(value => {
   if (!/^[A-Za-z0-9_-]+={0,2}$/.test(value)) return false;
   const bytes = Buffer.from(value, "base64url");
-  return bytes.length === size && bytes.toString("base64url") === value.replace(/=+$/, "");
+  return bytes.length === size && bytes.toString("base64url") === value.split("=")[0];
 });
 export function allowedPushEndpoint(value: string) {
   try {

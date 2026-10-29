@@ -8,7 +8,7 @@ import { ReminderStore } from "./store";
 export const notifications = reminderApi({
   config: pushConfig,
   origin: () => new URL(authBaseURL(process.env)!).origin,
-  session: async headers => cloudConfigured() ? getAuth().api.getSession({ headers }) : null,
+  session: headers => cloudConfigured() ? getAuth().api.getSession({ headers }) : Promise.resolve(null),
   store: config => new ReminderStore(database(), config.storageKey),
   sender: config => (subscription, payload) => webPush.sendNotification(subscription, JSON.stringify(payload), {
     vapidDetails: { subject: config.subject, publicKey: config.publicKey, privateKey: config.privateKey },

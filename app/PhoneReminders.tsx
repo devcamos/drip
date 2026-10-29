@@ -3,46 +3,80 @@ import { useEffect, useRef, useState } from "react";
 import type { Account } from "@/lib/types";
 import * as Phone from "@/lib/phone-reminders";
 
-export function PhoneReminders({ identityId }: Readonly<{ accounts: Account[]; identityId?: string }>) {
+function unavailableMessage(capability: ReturnType<typeof Phone.phoneCapability> | undefined, identityId: string | undefined, available: boolean | undefined) {
+  if (capability === "install") return "On iPhone or iPad, tap Share → Add to Home Screen. Open the installed Drip app, then turn on reminders here.";
+  if (capability === "unsupported") return "Phone notifications are not supported in this browser. Your in-app reminders still work.";
+  if (!identityId) return "Sign in and connect cloud recovery to turn on phone reminders.";
+  if (available === false) return "Phone notifications are not available on this deployment yet. Your in-app reminders are ready.";
+  return "";
+}
+function expired(error: unknown) { return error instanceof Phone.PhoneReminderError && error.code === "PUSH_SUBSCRIPTION_EXPIRED"; }
+function usePhoneSettings(identityId?: string) {
   const [capability, setCapability] = useState<ReturnType<typeof Phone.phoneCapability>>();
   const [configuration, setConfiguration] = useState<Awaited<ReturnType<typeof Phone.phoneConfiguration>>>();
   const [enabled, setEnabled] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
-  const [failure, setFailure] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const [failure, setFailure] = useState(false), [attempt, setAttempt] = useState(0);
   const sequence = useRef(0);
   useEffect(() => {
     const current = ++sequence.current;
-    const support = Phone.phoneCapability(); setCapability(support); setConfiguration(undefined); setEnabled(false); setBusy(false); setMessage(""); setFailure(false);
+    const support = Phone.phoneCapability();
+    setCapability(support); setConfiguration(undefined); setEnabled(false); setBusy(false); setMessage(""); setFailure(false);
     if (support !== "supported" || !identityId) return;
     void (async () => {
       const config = await Phone.phoneConfiguration();
       const on = config.available ? await Phone.phoneReminderStatus(identityId) : false;
       if (current === sequence.current) { setConfiguration(config); setEnabled(on); }
-    })().catch(() => { if (current === sequence.current) { setFailure(true); setMessage("Could not load phone reminder settings. Try again."); } });
+    })().catch(() => {
+      if (current !== sequence.current) return;
+      setFailure(true); setMessage("Could not load phone reminder settings. Try again.");
+    });
     return () => { sequence.current++; };
   }, [identityId, attempt]);
   async function perform(work: () => Promise<void>, success: string) {
     const current = sequence.current;
     setBusy(true); setMessage(""); setFailure(false);
-    try { await work(); const on = await Phone.phoneReminderStatus(identityId!); if (current === sequence.current) { setEnabled(on); setMessage(success); } }
-    catch (error) { if (current === sequence.current) { if (error instanceof Phone.PhoneReminderError && error.code === "PUSH_SUBSCRIPTION_EXPIRED") setEnabled(false); setFailure(true); setMessage((error as Error).message); } }
-    finally { if (current === sequence.current) setBusy(false); }
+    try {
+      await work();
+      const on = await Phone.phoneReminderStatus(identityId!);
+      if (current === sequence.current) { setEnabled(on); setMessage(success); }
+    } catch (error) {
+      if (current !== sequence.current) return;
+      if (expired(error)) { setEnabled(false); }
+      setFailure(true); setMessage((error as Error).message);
+    } finally { if (current === sequence.current) setBusy(false); }
   }
+  async function enable() {
+    try {
+      // Native permission is requested synchronously in this click handler.
+      const permission = Notification.requestPermission();
+      await perform(() => Phone.enablePhoneReminders(identityId!, configuration!.publicKey!, permission), "Phone reminders are on for this device.");
+    } catch { setFailure(true); setMessage("Could not ask for notification permission. Check this device's settings."); }
+  }
+  const off = () => perform(() => Phone.disablePhoneReminders(identityId!), "Phone reminders turned off for this device.");
+  const test = () => perform(() => Phone.testPhoneReminder(identityId!), "Test accepted by the notification service. Check your device.");
+  const retry = () => { setMessage(""); setFailure(false); setAttempt(value => value + 1); };
+  return { capability, configuration, enabled, busy, message, failure, enable, off, test, retry };
+}
+type Settings = ReturnType<typeof usePhoneSettings>;
+function PhoneActions({ settings }: Readonly<{ settings: Settings }>) {
+  const { enabled, busy, configuration, enable, off, test } = settings;
+  if (enabled) return <><button className="btn ghost" disabled={busy} onClick={() => void off()}>Turn off</button><button className="btn" disabled={busy} onClick={() => void test()}>Send test notification</button></>;
+  return <button className="btn" disabled={busy || !configuration?.publicKey} onClick={() => void enable()}>{busy ? "Updating…" : "Turn on phone reminders"}</button>;
+}
+export function PhoneReminders({ identityId }: Readonly<{ accounts: Account[]; identityId?: string }>) {
+  const settings = usePhoneSettings(identityId);
+  const { capability, configuration, enabled, busy, message, failure, retry } = settings;
+  const unavailable = unavailableMessage(capability, identityId, configuration?.available);
   return <section className="panel phone-reminders" aria-labelledby="phone-reminders-title"><div className="wallet-heading"><h2 id="phone-reminders-title">Phone notifications</h2><span className={`phone-status ${enabled ? "is-on" : ""}`}>{enabled ? "On" : "Off"}</span></div>
     <p className="muted">Get a reminder on expected payment dates, even while Drip is closed. Only generic messages appear on your lock screen.</p>
-    {capability === "install" ? <p className="muted">On iPhone or iPad, tap Share → Add to Home Screen. Open the installed Drip app, then turn on reminders here.</p> : capability === "unsupported" ? <p className="muted">Phone notifications are not supported in this browser. Your in-app reminders still work.</p> : !identityId ? <p className="muted">Sign in and connect cloud recovery to turn on phone reminders.</p> : configuration?.available === false ? <p className="muted">Phone notifications are not available on this deployment yet. Your in-app reminders are ready.</p> : <>
+    {unavailable ? <p className="muted">{unavailable}</p> : <>
       <p className="muted">Checked daily around 09:00–10:00 UTC, using this device&apos;s saved payment dates and time zone. Delivery depends on your device and connection. Reminders can continue while signed out; turn them off here or in device settings.</p>
       <p className="muted">Turning this on saves payment dates and an encrypted notification address on Drip&apos;s server. Account names, balances and income amounts are not included.</p>
-      <div className="row-gap">{enabled ? <><button className="btn ghost" disabled={busy} onClick={() => void perform(() => Phone.disablePhoneReminders(identityId), "Phone reminders turned off for this device.")}>Turn off</button><button className="btn" disabled={busy} onClick={() => void perform(() => Phone.testPhoneReminder(identityId), "Test accepted by the notification service. Check your device.")}>Send test notification</button></> : <button className="btn" disabled={busy || !configuration?.publicKey} onClick={() => {
-        try {
-          const permission = Notification.requestPermission();
-          void perform(() => Phone.enablePhoneReminders(identityId, configuration!.publicKey!, permission), "Phone reminders are on for this device.");
-        } catch { setFailure(true); setMessage("Could not ask for notification permission. Check this device's settings."); }
-      }}>{busy ? "Updating…" : "Turn on phone reminders"}</button>}</div>
+      <div className="row-gap"><PhoneActions settings={settings} /></div>
       {typeof Notification !== "undefined" && Notification.permission === "denied" && <p className="muted">Notifications are blocked in your device or browser settings. Allow them there, then try again.</p>}
     </>}
     {message && <p role={failure ? "alert" : "status"} className={failure ? "err" : "ok"}>{message}</p>}
-    {failure && <button className="btn ghost small" disabled={busy} onClick={() => { setMessage(""); setFailure(false); setAttempt(value => value + 1); }}>Retry settings</button>}
+    {failure && <button className="btn ghost small" disabled={busy} onClick={retry}>Retry settings</button>}
   </section>;
 }
 

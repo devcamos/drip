@@ -6,13 +6,17 @@ import { displayProvider } from "@/lib/products";
 import { useCalendarDay } from "./useCalendarDay";
 import { PhoneReminders } from "./PhoneReminders";
 
+function paymentType(account: Account) {
+  if (account.frequency === "daily") return "Daily";
+  return account.rateType === "dividend" ? "Dividend" : "Interest";
+}
 const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 export function PaymentNotifications({ accounts, identityId, onOpen }: Readonly<{ accounts: Account[]; identityId?: string; onOpen: (id: string) => void }>) {
   const day = useCalendarDay();
   const reminders = paymentReminders(accounts, day);
   const due = reminders.filter(reminder => reminder.date === day);
   const future = reminders.filter(reminder => reminder.date > day);
-  const list = (items: typeof reminders) => <ul className="payment-reminders">{items.map(reminder => <li key={reminder.account.id} className={reminder.logged && reminder.date === day ? "payment-logged" : ""}><div className="payment-date"><span>{dateLabel(reminder.date)}</span><small>{reminder.account.frequency === "daily" ? "Daily" : reminder.account.rateType === "dividend" ? "Dividend" : "Interest"}</small></div><div><b>{reminder.account.holdingName ?? displayProvider(reminder.account.provider)}</b><span className="muted">Estimated {gbp(reminder.amount)}</span><small>{reminder.logged && reminder.date === day ? "Payment logged today" : "Expected payment — check your provider"}</small></div><button className="btn ghost small" onClick={() => onOpen(reminder.account.id)}>Open</button></li>)}</ul>;
+  const list = (items: typeof reminders) => <ul className="payment-reminders">{items.map(reminder => <li key={reminder.account.id} className={reminder.logged && reminder.date === day ? "payment-logged" : ""}><div className="payment-date"><span>{dateLabel(reminder.date)}</span><small>{paymentType(reminder.account)}</small></div><div><b>{reminder.account.holdingName ?? displayProvider(reminder.account.provider)}</b><span className="muted">Estimated {gbp(reminder.amount)}</span><small>{reminder.logged && reminder.date === day ? "Payment logged today" : "Expected payment — check your provider"}</small></div><button className="btn ghost small" onClick={() => onOpen(reminder.account.id)}>Open</button></li>)}</ul>;
   return <>
     <div className="section-heading"><p className="section-eyebrow">KEEP AN EYE ON PAYDAY</p><h1>Payment notifications</h1><p className="muted">Expected payment dates across all your income accounts.</p></div>
     <section className="panel" aria-labelledby="payments-today"><div className="wallet-heading"><h2 id="payments-today">Today</h2><span className="payment-count">{due.filter(reminder => !reminder.logged).length} to check</span></div>

@@ -14,6 +14,10 @@ export type ReminderDependencies = {
   sender: (config: PushConfig) => PushSender;
   now?: () => Date;
 };
+async function rejectOversize(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<never> {
+  await reader.cancel();
+  throw new ReminderError("Reminder information is too large.", 413);
+}
 async function readBody(request: Request) {
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") throw new ReminderError("Use a JSON request.", 415);
   const limit = 64_000;
@@ -24,23 +28,24 @@ async function readBody(request: Request) {
   while (true) {
     const next = await reader.read(); if (next.done) break;
     size += next.value.byteLength;
-    if (size > limit) { await reader.cancel(); throw new ReminderError("Reminder information is too large.", 413); }
+    if (size > limit) return rejectOversize(reader);
     chunks.push(next.value);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { throw new ReminderError("Invalid reminder information.", 400); }
 }
+async function run(operation: string, work: () => Response | Promise<Response>) {
+  try { return await work(); }
+  catch (error) {
+    if (error instanceof ReminderError) return reply({ error: error.message }, error.status);
+    const reference = randomUUID();
+    // Never log request payloads, URLs, subscription keys, SQL or raw provider errors.
+    console.error(JSON.stringify({ event: "drip.reminders.error", operation, reference }));
+    return reply({ error: "Phone reminders are unavailable. Try again later.", reference }, 503);
+  }
+}
+
 export function reminderApi(deps: ReminderDependencies) {
   const now = () => deps.now?.() ?? new Date();
-  async function run(operation: string, work: () => Promise<Response>) {
-    try { return await work(); }
-    catch (error) {
-      if (error instanceof ReminderError) return reply({ error: error.message }, error.status);
-      const reference = randomUUID();
-      // Never log request payloads, URLs, subscription keys, SQL or raw provider errors.
-      console.error(JSON.stringify({ event: "drip.reminders.error", operation, reference }));
-      return reply({ error: "Phone reminders are unavailable. Try again later.", reference }, 503);
-    }
-  }
   async function context(request: Request, write: boolean) {
     if (write && request.headers.get("origin") !== deps.origin()) throw new ReminderError("Invalid origin.", 403);
     const session = await deps.session(request.headers);
@@ -52,10 +57,11 @@ export function reminderApi(deps: ReminderDependencies) {
     return { owner: session.user.id, device: device.toLowerCase(), config, store: deps.store(config) };
   }
   return {
-    config: () => run("configuration", async () => { const config = deps.config(); return reply(config ? { available: true, publicKey: config.publicKey, workerVersion: 4, dailyWindow: "09:00–10:00 UTC" } : { available: false }); }),
+    config: () => run("configuration", () => { const config = deps.config(); return reply(config ? { available: true, publicKey: config.publicKey, workerVersion: 4, dailyWindow: "09:00–10:00 UTC" } : { available: false }); }),
     GET: (request: Request) => run("status", async () => { const c = await context(request, false); return reply({ enabled: !!await c.store.current(c.owner, c.device) }); }),
     PUT: (request: Request) => run("subscribe", async () => {
       const c = await context(request, true);
+      // model.ts defines the strict transport/key/date schemas; reject before persistence.
       const parsed = registrationSchema.safeParse(await readBody(request));
       if (!parsed.success) throw new ReminderError("Invalid notification address or payment schedule.", 400);
       await c.store.save(c.owner, c.device, parsed.data.subscription, parsed.data.schedule, now());
