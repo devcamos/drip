@@ -15,7 +15,7 @@ function validDatabase(value) {
 function originProblems(value, expected) {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || local(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error();
+    if (url.protocol !== "https:" || local(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Authentication URL must be a secure origin.");
     if (expected && url.origin !== new URL(`https://${expected}`).origin) return ["BETTER_AUTH_URL does not match the stable Vercel origin for this target."];
     return [];
   } catch { return ["BETTER_AUTH_URL must be an HTTPS origin without credentials, paths, queries or fragments."]; }

@@ -21,6 +21,12 @@ function validForm(input: FormInputs) {
   return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.round2(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
 }
 
+function isCustomHolding(holding?: string) {
+  return !!holding && !(TRADING_212_HOLDINGS as readonly string[]).includes(holding);
+}
+function isOtherProvider(provider: string, existing?: Account) {
+  return provider === "Other" || (!!existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
+}
 function initialValues(existing?: Account, category?: ProductCategory) {
   const fallbackProduct = existing ? "other" : "easy-access";
   const product = existing?.productCategory ?? category ?? fallbackProduct;
@@ -49,7 +55,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[initialProduct].taxWrapper);
   const [label, setLabel] = useState(existing?.label ?? "");
   const [holding, setHolding] = useState(existing?.holdingName ?? "");
-  const [customHolding, setCustomHolding] = useState(!!existing?.holdingName && !(TRADING_212_HOLDINGS as readonly string[]).includes(existing.holdingName));
+  const [customHolding, setCustomHolding] = useState(isCustomHolding(existing?.holdingName));
   const [colour, setColour] = useState(initial.colour);
   const [colourChosen, setColourChosen] = useState(!!existing);
   const [balance, setBalance] = useState(initial.balance);
@@ -62,7 +68,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [hasBonus, setHasBonus] = useState(!!existing?.bonus);
   const [bonusAmount, setBonusAmount] = useState(existing?.bonus ? String(existing.bonus.amount) : "");
   const [bonusDate, setBonusDate] = useState(existing?.bonus?.expectedDate ?? "");
-  const isOther = provider === "Other" || (!!existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
+  const isOther = isOtherProvider(provider, existing);
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
