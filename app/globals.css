@@ -125,3 +125,47 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 
 .check-label { display: flex; gap: 10px; align-items: center; margin-top: 18px; color: var(--text); }
 .check-label input { width: auto; flex-shrink: 0; }
+
+.header-actions { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.payment-bell { display:flex; align-items:center; gap:5px; min-height:36px; }
+.payment-bell span { min-width:16px; font-variant-numeric:tabular-nums; }
+.section-heading { margin:24px 0 18px; }
+.section-eyebrow { color:var(--accent-text); font-size:11px; font-weight:700; letter-spacing:1.4px; }
+.section-heading h1 { letter-spacing:-.8px; }
+.section-heading .muted { line-height:1.6; }
+.dividend-hero { border:1px solid #dfc4a8; padding:22px; }
+.dividend-hero > .muted:first-child { margin-top:0; }
+.dividend-hero .big { font-size:40px; letter-spacing:-1px; }
+.income-periods { display:flex; border:0; gap:6px; margin:20px 0 12px; padding:0; }
+.income-periods button { flex:1; border:1px solid var(--border); border-radius:24px; background:var(--bg); color:var(--muted); font:inherit; font-size:12px; font-weight:600; padding:10px 3px; min-height:44px; cursor:pointer; }
+.income-periods [aria-pressed="true"] { background:var(--text); color:var(--bg); border-color:var(--text); }
+.dividend-hero p:last-child { margin-bottom:0; line-height:1.6; font-size:12px; }
+.dividend-history { list-style:none; margin:18px 0 0; padding:0; }
+.dividend-history li { display:grid; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; gap:12px; margin:15px 0; font-size:12px; }
+.dividend-history b { font-weight:600; min-width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+.dividend-bar { height:9px; background:var(--bg); border-radius:20px; overflow:hidden; }
+.dividend-bar i { display:block; height:100%; background:linear-gradient(90deg,var(--accent),#673b26); border-radius:20px; }
+.portfolio-holdings { list-style:none; margin:16px 0; padding:0; }
+.portfolio-holdings li + li { margin-top:12px; }
+.portfolio-holdings button { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px 10px; width:100%; padding:18px; border:1px solid var(--border); border-radius:16px; background:var(--panel); color:var(--text); text-align:left; font:inherit; cursor:pointer; }
+.portfolio-holdings b { overflow-wrap:anywhere; }
+.portfolio-holdings strong { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.portfolio-holdings small { display:block; margin-top:4px; font-size:12px; color:var(--muted); }
+.holding-income { display:flex; flex-direction:column; gap:4px; color:var(--muted); font-size:11px; }
+.holding-income b { color:var(--text); font-size:14px; font-weight:600; }
+.portfolio-link { display:flex; align-items:center; justify-content:space-between; width:100%; border:1px solid var(--border); border-radius:14px; background:var(--panel); color:var(--text); text-align:left; padding:16px; margin:16px 0; font:inherit; cursor:pointer; }
+.portfolio-link small { display:block; color:var(--muted); font-size:12px; margin-top:5px; }
+.portfolio-link > span:last-child { font-size:24px; color:var(--accent); }
+.payment-count,.phone-status { font-size:12px; color:var(--muted); border:1px solid var(--border); border-radius:20px; padding:5px 9px; white-space:nowrap; }
+.phone-status.is-on { color:#175e3e; border-color:#75a58e; background:#e6f0e7; }
+.payment-reminders { margin:12px 0; padding:0; list-style:none; }
+.payment-reminders li { display:grid; grid-template-columns:58px minmax(0,1fr) auto; gap:10px; align-items:center; padding:16px 0; border-bottom:1px solid var(--border); }
+.payment-reminders b { font-size:14px; overflow-wrap:anywhere; }
+.payment-reminders .muted { display:block; font-size:12px; margin-top:5px; }
+.payment-reminders small { display:block; font-size:11px; color:var(--muted); margin-top:5px; line-height:1.5; }
+.payment-date { text-align:center; align-self:stretch; display:flex; flex-direction:column; justify-content:center; border-radius:10px; padding:8px 4px; background:var(--bg); font-size:12px; font-weight:600; }
+.payment-date small { font-size:10px; font-weight:400; }
+.payment-logged .payment-date { background:#e5eddf; }
+.phone-reminders .muted { line-height:1.6; }
+.phone-reminders .row-gap button { flex:1; }
+@media(max-width:359px) { .header-actions { gap:5px; } .header-actions .btn { padding:6px 8px; font-size:12px; } .payment-reminders li { grid-template-columns:48px minmax(0,1fr) auto; gap:7px; } .payment-reminders .btn { padding:7px; } .portfolio-holdings button { padding:14px; } }

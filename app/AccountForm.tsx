@@ -21,34 +21,59 @@ function validForm(input: FormInputs) {
   return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.round2(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
 }
 
-export function AccountForm({ existing, onSave, onCancel }: Readonly<{ existing?: Account; onSave: (a: Account) => void | Promise<boolean>; onCancel: () => void }>) {
+function isCustomHolding(holding?: string) {
+  return !!holding && !(TRADING_212_HOLDINGS as readonly string[]).includes(holding);
+}
+function isOtherProvider(provider: string, existing?: Account) {
+  return provider === "Other" || (!!existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
+}
+function initialValues(existing?: Account, category?: ProductCategory) {
+  const fallbackProduct = existing ? "other" : "easy-access";
+  const product = existing?.productCategory ?? category ?? fallbackProduct;
+  const provider = existing?.provider ?? (product === "stocks-funds" ? "Trading212" : "Zopa");
+  const defaults = PRODUCTS[product];
+  return { product, provider, colour: normaliseColour(existing ? existing.colour : PROVIDERS[provider]),
+    balance: existing ? String(existing.balance) : "", rate: existing ? String(existing.ratePct) : "",
+    bonusAmount: existing?.bonus ? String(existing.bonus.amount) : "",
+    reinvest: existing?.reinvestIncome ?? (existing ? existing.rateType !== "dividend" : defaults.reinvestIncome) };
+}
+function validHoldingName(category: ProductCategory, provider: string, custom: boolean, holding: string) {
+  if (category !== "stocks-funds") return true;
+  if (holding.length > 100) return false;
+  return provider !== "Trading212" || !custom || !!holding.trim();
+}
+
+export function AccountForm({ existing, onSave, onCancel, initialCategory }: Readonly<{ existing?: Account; initialCategory?: ProductCategory; onSave: (a: Account) => void | Promise<boolean>; onCancel: () => void }>) {
+  const initial = initialValues(existing, initialCategory);
+  const initialProduct = initial.product;
+  const initialProvider = initial.provider;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
-  const [provider, setProvider] = useState(existing?.provider ?? "Zopa");
+  const [provider, setProvider] = useState(initialProvider);
   const [custom, setCustom] = useState(customProviderName(existing?.provider));
-  const [category, setCategory] = useState<ProductCategory>(existing?.productCategory ?? (existing ? "other" : "easy-access"));
-  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[existing?.productCategory ?? "other"].taxWrapper);
+  const [category, setCategory] = useState<ProductCategory>(initialProduct);
+  const [wrapper, setWrapper] = useState<TaxWrapper>(existing?.taxWrapper ?? PRODUCTS[initialProduct].taxWrapper);
   const [label, setLabel] = useState(existing?.label ?? "");
   const [holding, setHolding] = useState(existing?.holdingName ?? "");
-  const [customHolding, setCustomHolding] = useState(!!existing?.holdingName && !(TRADING_212_HOLDINGS as readonly string[]).includes(existing.holdingName));
-  const [colour, setColour] = useState(normaliseColour(existing ? existing.colour : PROVIDERS.Zopa));
+  const [customHolding, setCustomHolding] = useState(isCustomHolding(existing?.holdingName));
+  const [colour, setColour] = useState(initial.colour);
   const [colourChosen, setColourChosen] = useState(!!existing);
-  const [balance, setBalance] = useState(existing ? String(existing.balance) : "");
-  const [rate, setRate] = useState(existing ? String(existing.ratePct) : "");
-  const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? "interest");
-  const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? "monthly");
-  const [reinvest, setReinvest] = useState(existing?.reinvestIncome ?? existing?.rateType !== "dividend");
-  const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), 1));
+  const [balance, setBalance] = useState(initial.balance);
+  const [rate, setRate] = useState(initial.rate);
+  const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? PRODUCTS[initialProduct].rateType);
+  const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? PRODUCTS[initialProduct].frequency);
+  const [reinvest, setReinvest] = useState(initial.reinvest);
+  const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), payoutMonths[PRODUCTS[initialProduct].frequency]));
   const [rateFrom, setRateFrom] = useState(today());
   const [hasBonus, setHasBonus] = useState(!!existing?.bonus);
-  const [bonusAmount, setBonusAmount] = useState(existing?.bonus ? String(existing.bonus.amount) : "");
+  const [bonusAmount, setBonusAmount] = useState(initial.bonusAmount);
   const [bonusDate, setBonusDate] = useState(existing?.bonus?.expectedDate ?? "");
-  const isOther = provider === "Other" || (!!existing && !(existing.provider in PROVIDERS) && provider === existing.provider);
+  const isOther = isOtherProvider(provider, existing);
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
-  const validHolding = category !== "stocks-funds" || ((provider !== "Trading212" || !customHolding || !!holding.trim()) && holding.length <= 100);
+  const validHolding = validHoldingName(category, provider, customHolding, holding);
   const valid = validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);

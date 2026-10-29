@@ -26,7 +26,7 @@ export const safeFetch: typeof fetch = async (input, init) => {
   // Parsing base only: fetch still receives the caller's original input.
   const url = new URL(address, "https://drip.invalid");
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || (url.pathname === "/api/recovery-codes" && method !== "POST");
+  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || (url.pathname === "/api/recovery-codes" && method !== "POST") || ["/api/notifications/subscription", "/api/notifications/test"].includes(url.pathname);
   if (!privateRequest) return fetch(input, init);
   const run = async () => {
     const deviceId = await browserDeviceId();
