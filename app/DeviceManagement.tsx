@@ -77,7 +77,7 @@ export function DeviceManager({ username, password, onClose, onContinue }: Reado
       {selected.current && !onContinue && <p>You will be signed out here too. Sync any changes before continuing.</p>}
       <div className="row-gap"><button type="button" className="btn danger" disabled={busy} onClick={remove}>{busy ? "Signing out…" : "Confirm sign out"}</button><button type="button" className="btn ghost" disabled={busy} onClick={() => setSelected(undefined)}>Keep device</button></div>
     </section>}
-    {message && <output role="status" className="ok">{message}</output>}
+    {message && <output className="ok">{message}</output>}
     {error && <output role="alert" className="err">{error}</output>}
     <div className="row-gap">{onContinue && devices && devices.length < 2 && <button type="button" className="btn" disabled={busy} onClick={continueSignIn}>Sign in on this device</button>}<button type="button" className="text-link" disabled={busy} onClick={onClose}>{onContinue ? "Back to sign in" : "Close devices"}</button></div>
   </section>;
@@ -92,7 +92,7 @@ export function DeviceSettings() {
     <h2>Signed-in devices</h2><p className="muted">See your active sign-ins and sign out a browser you no longer use. Up to two can be signed in.</p>
     {username ? <form onSubmit={event => { event.preventDefault(); if (password) setOpen(true); }}>
       <label htmlFor="devices-password">Confirm password to manage devices</label><input id="devices-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
-      <button className="btn ghost" disabled={!password}>Manage devices</button>
+      <button type="submit" className="btn ghost" disabled={!password}>Manage devices</button>
     </form> : <p className="muted">Set a sign-in password above to manage your devices.</p>}
   </section>;
 }

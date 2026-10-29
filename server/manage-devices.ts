@@ -1,8 +1,7 @@
 import type { PoolClient } from "@neondatabase/serverless";
 
 type SessionRow = { id: string; dripDeviceId: string | null; userAgent: string | null; createdAt: Date | string };
-export function deviceName(agent: string | null) {
-  const ua = agent ?? "";
+export function deviceName(ua = "") {
   let browser = "Browser";
   if (/Edg\//.test(ua)) browser = "Edge";
   else if (/Firefox\/|FxiOS\//.test(ua)) browser = "Firefox";
@@ -20,7 +19,7 @@ export function deviceName(agent: string | null) {
 export async function signedInDevices(client: PoolClient, owner: string, currentDevice: string) {
   const { rows } = await client.query<SessionRow>('SELECT id, "dripDeviceId", "userAgent", "createdAt" FROM "session" WHERE "userId" = $1 AND "expiresAt" > now() ORDER BY "createdAt" DESC, id', [owner]);
   // Never return bearer tokens, IP addresses or raw user-agent strings.
-  return rows.map(row => ({ id: row.id, name: deviceName(row.userAgent), signedInAt: new Date(row.createdAt).toISOString(), current: row.dripDeviceId === currentDevice }));
+  return rows.map(row => ({ id: row.id, name: deviceName(row.userAgent ?? undefined), signedInAt: new Date(row.createdAt).toISOString(), current: row.dripDeviceId === currentDevice }));
 }
 export async function revokeDevice(client: PoolClient, owner: string, id: string, currentDevice: string) {
   const { rows } = await client.query<{ dripDeviceId: string | null }>('SELECT "dripDeviceId" FROM "session" WHERE "userId" = $1 AND id = $2 AND "expiresAt" > now()', [owner, id]);

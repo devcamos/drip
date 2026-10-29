@@ -92,4 +92,4 @@ it.each([
   ["Mozilla/5.0 (iPhone) Version/18.0 Safari/605.1.15", "Safari on iPhone"], ["Mozilla/5.0 (iPad) FxiOS/18.0", "Firefox on iPad"],
   ["Mozilla/5.0 (Windows) Chrome/130.0 Edg/130.0", "Edge on Windows"], ["Mozilla/5.0 (Android) Chrome/130.0", "Chrome on Android"],
   [null, "Unknown browser"], ["Mozilla/5.0 (Macintosh)", "Browser on Mac"], ["Firefox/130.0 Linux", "Firefox on Linux"],
-])("uses a safe estimated label for %s", (agent, expected) => { expect(deviceName(agent)).toBe(expected); });
+])("uses a safe estimated label for %s", (agent, expected) => { expect(deviceName(agent ?? undefined)).toBe(expected); });
