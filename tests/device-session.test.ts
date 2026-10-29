@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const cloud = vi.hoisted(() => ({ connect: vi.fn(), restoreCloud: vi.fn(), authClient: { signOut: vi.fn() } }));
 vi.mock("../lib/cloud", () => cloud);
 import { finishDeviceSignOut, readDeviceSession, resumeDevice, signOutDevice, restoreOtherAccount, unlockDevice } from "../lib/device-session";
-import { cloudSnapshot, completeDeviceSession, emptyData, getItem, loadData, saveData, setItem, commitCloudRestore, storeCloudConnection, unlockLocalVault, lockLocalVault } from "../lib/db";
+import { cloudSnapshot, completeDeviceSession, emptyData, getItem, loadData, saveData, setItem, commitCloudRestore, storeCloudConnection, unlockLocalVault, lockLocalVault, localSessionBinding } from "../lib/db";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
 import { seedVault, rawStore } from "./storage-fixtures";
+import * as storage from "../lib/db";
 const code = generateRecoveryCode();
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "rampage201", createdAt: "now" } };
 beforeEach(async () => {
@@ -14,6 +15,30 @@ beforeEach(async () => {
   await seedVault(data, code, { userId: "owner", identityId: data.identity.id, key: {} as CryptoKey, version: 1, dirty: true, lastSyncAt: null, generation: "cloud", revision: 0 });
 });
 describe("encrypted sign-out and return", () => {
+  it("keeps a newer generation when another tab signs in while local sign-out is waiting for accepted edits", async () => {
+    await saveData({ ...data, lastBackupAt: "accepted-before-signout" });
+    const expected = await localSessionBinding();
+    let ready!: () => void, finish!: () => void;
+    const prepared = new Promise<void>(resolve => { ready = resolve; });
+    const resume = new Promise<void>(resolve => { finish = resolve; });
+    const original = storage.prepareLocalSignOut;
+    vi.spyOn(storage, "prepareLocalSignOut").mockImplementationOnce(async () => { await original(); ready(); await resume; });
+    const pending = signOutDevice(expected);
+    await prepared;
+    await setItem("deviceSession", { signedOut: false, remotePending: false, generation: "newer-while-waiting" });
+    finish(); await expect(pending).rejects.toThrow(/newer sign-in|session changed/);
+    expect(await readDeviceSession()).toMatchObject({ signedOut: false, generation: "newer-while-waiting" });
+    expect(cloud.authClient.signOut).not.toHaveBeenCalled();
+    await unlockLocalVault(code); expect((await loadData()).lastBackupAt).toBe("accepted-before-signout");
+  });
+  it("rejects an old managed sign-out after the local account is replaced even when its generation is unchanged", async () => {
+    const original = await localSessionBinding();
+    const other = { ...data, identity: { ...data.identity, id: crypto.randomUUID(), handle: "newer_user" } };
+    await seedVault(other, generateRecoveryCode());
+    const newer = await localSessionBinding(); expect(newer.generation).toBe(original.generation); expect(newer.vaultId).not.toBe(original.vaultId);
+    await expect(signOutDevice(original)).rejects.toThrow(/newer sign-in/);
+    expect(await loadData()).toEqual(other); expect(cloud.authClient.signOut).not.toHaveBeenCalled(); expect(await localSessionBinding()).toEqual(newer);
+  });
   it("ends the server session, drops keys and rejects stale writes/restores until explicit resume", async () => {
     const verifier = (await getItem<{ salt: string; hash: string }>("verifier"))!;
     const retained = (await rawStore()).data;

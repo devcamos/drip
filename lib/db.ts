@@ -13,6 +13,7 @@ type Device = { signedOut: boolean; generation: string; remotePending?: boolean;
 type Metadata = Omit<CloudState, "key">;
 type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap }; signupRecovery?: { vaultId: string } };
 export interface VaultBinding { vaultId: string; generation?: string; passkeyCiphertext?: string | null; passwordCiphertext?: string | null }
+export interface LocalSessionBinding { vaultId?: string; generation?: string }
 export interface RetainedAccount { vaultId: string; generation?: string; records: string }
 function checkBinding(value: Stored, expected: VaultBinding) {
   if (value.vault?.id !== expected.vaultId || value.gate?.generation !== expected.generation ||
@@ -351,6 +352,19 @@ export async function completeDeviceSession(generation: string, value: unknown):
     t.oncomplete = () => { db.close(); resolve(changed); };
     t.onerror = t.onabort = () => { db.close(); reject(new Error("Could not update the device session.", { cause: t.error })); };
   });
+}
+export async function localSessionBinding(): Promise<LocalSessionBinding> {
+  const value = await stored(); return { vaultId: value.vault?.id, generation: value.gate?.generation };
+}
+/** Compare the expected account/session inside the write transaction. A remote
+ * response or pending local write must not sign out a later tab's sign-in. */
+export async function commitLocalSignOut(expected: LocalSessionBinding) {
+  const before = await stored(); const stamp = epoch;
+  if (before.vault?.id !== expected.vaultId || before.gate?.generation !== expected.generation) throw new Error("Device session changed. Your newer sign-in has been kept.");
+  await guardedWrite(before, stamp, store => {
+    store.put({ signedOut: true, remotePending: true, generation: crypto.randomUUID() }, "deviceSession");
+  }, { allowSignedOut: true });
+  lockLocalVault(true);
 }
 
 /** Reserve a fresh browser for password recovery without racing another onboarding. */

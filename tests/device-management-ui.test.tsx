@@ -28,7 +28,7 @@ it("turns a verified device-limit failure into management and resumes login only
   expect(await screen.findByText(/Device signed out/)).toBeInTheDocument();
   expect(actions.remove).toHaveBeenCalledWith("tester", "Synthetic password 42!", first.id, expect.any(AbortSignal));
   expect(actions.login).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole("button", { name: "Sign in on this device" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Sign in on this device" }));
   await waitFor(() => expect(signedIn).toHaveBeenCalledOnce());
 });
 it("does not offer account/device details after incorrect credentials and invalidates the old limit state when credentials change", async () => {
@@ -63,6 +63,7 @@ it("locks this browser only after its own online sessions are revoked; failures 
 it("aborts obsolete reads when management closes and handles missing password setup", async () => {
   let finish!: (value: typeof first[]) => void; actions.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const { unmount } = render(<DeviceManager username="tester" password="Synthetic password 42!" onClose={vi.fn()} />);
+  await waitFor(() => expect(actions.list).toHaveBeenCalledOnce());
   const signal = actions.list.mock.calls[0][2] as AbortSignal; unmount(); expect(signal.aborted).toBe(true);
   await act(async () => finish([first]));
   actions.username.mockResolvedValueOnce(undefined); render(<DeviceSettings />); expect(await screen.findByText(/Set a sign-in password/)).toBeInTheDocument();
@@ -81,4 +82,11 @@ it("handles an already-expired sign-in and a failed login after space has been f
   await screen.findByText("Safari on iPhone"); fireEvent.click(screen.getByRole("button", { name: "Sign out Safari on iPhone" })); fireEvent.click(screen.getByRole("button", { name: "Confirm sign out" }));
   expect(await screen.findByRole("status")).toHaveTextContent("already signed out"); expect(screen.getByText("No devices are currently signed in.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Sign in on this device" })); expect(await screen.findByRole("alert")).toHaveTextContent("Sign-in changed");
+});
+it("keeps a successful remote sign-out visible if refreshing the list fails afterward", async () => {
+  actions.list.mockResolvedValueOnce([first]).mockRejectedValueOnce(new Error("Could not refresh devices."));
+  render(<DeviceManager username="tester" password="Synthetic password 42!" onClose={vi.fn()} />);
+  await screen.findByText("Safari on iPhone"); fireEvent.click(screen.getByRole("button", { name: "Sign out Safari on iPhone" })); fireEvent.click(screen.getByRole("button", { name: "Confirm sign out" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not refresh");
+  expect(screen.getByRole("status")).toHaveTextContent("Device signed out"); expect(screen.queryByRole("region", { name: "Confirm device sign-out" })).toBeNull();
 });

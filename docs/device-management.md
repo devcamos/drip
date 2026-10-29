@@ -32,6 +32,9 @@ agents, financial data or encrypted root/password wrappers.
 - Removing this browser also uses the existing local sign-out flow. The password
   is held only in component memory during management and cleared on close or
   successful sign-in; neither it nor its proof is persisted by this feature.
+- Management captures the original local session/vault before its network work.
+  Local sign-out compares that binding atomically after waiting for accepted
+  edits; a delayed response cannot sign out a later sign-in or replaced account.
 
 The implementation uses existing auth/session tables and settings. **No new
 database migration, dependency, key or permission is required by the feature.**

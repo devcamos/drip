@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { listSignedInDevices, signOutRemoteDevice, type SignedInDevice } from "@/lib/device-management";
 import { passwordUsername } from "@/lib/password-login";
 import { signOutDevice } from "@/lib/device-session";
+import { localSessionBinding, type LocalSessionBinding } from "@/lib/db";
 
 function signedInDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -13,13 +14,20 @@ export function DeviceManager({ username, password, onClose, onContinue }: Reado
   const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(""); const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
+  const binding = useRef<LocalSessionBinding | null>(null);
   const heading = useRef<HTMLHeadingElement>(null); const confirmation = useRef<HTMLElement>(null);
   useEffect(() => { if (selected) confirmation.current?.focus(); }, [selected]);
   useEffect(() => {
     heading.current?.focus();
     const pending = new AbortController(); controller.current = pending;
     setLoading(true);
-    void listSignedInDevices(username, password, pending.signal).then(value => { if (!pending.signal.aborted) setDevices(value); })
+    void (async () => {
+      const original = await localSessionBinding();
+      if (pending.signal.aborted) return;
+      binding.current = original;
+      const value = await listSignedInDevices(username, password, pending.signal);
+      if (!pending.signal.aborted) setDevices(value);
+    })()
       .catch(() => { if (!pending.signal.aborted) setError("Could not load devices. Go back and check your password, or try again online."); })
       .finally(() => { if (!pending.signal.aborted) setLoading(false); });
     return () => pending.abort();
@@ -31,11 +39,15 @@ export function DeviceManager({ username, password, onClose, onContinue }: Reado
     try {
       const result = await signOutRemoteDevice(username, password, selected.id, signal);
       if (signal?.aborted) return;
-      if (result.current && !onContinue) { await signOutDevice(); return; }
+      if (result.current && !onContinue) {
+        if (!binding.current) throw new Error("Reopen device management before signing out this browser.");
+        await signOutDevice(binding.current); return;
+      }
+      setSelected(undefined);
+      setMessage(result.removed ? "Device signed out. Its saved accounts have not been erased." : "That device is already signed out.");
       const fresh = await listSignedInDevices(username, password, signal);
       if (signal?.aborted) return;
-      setDevices(fresh); setSelected(undefined);
-      setMessage(result.removed ? "Device signed out. Its saved accounts have not been erased." : "That device is already signed out.");
+      setDevices(fresh);
     } catch (cause) { if (!signal?.aborted) setError(cause instanceof Error ? cause.message : "Could not sign out this device. Try again."); }
     finally { if (!signal?.aborted) setBusy(false); }
   }
