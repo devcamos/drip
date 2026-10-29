@@ -9,6 +9,7 @@ import { saveData, setItem, loadData, emptyData } from "@/lib/db";
 import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
 import type { AppData, Account } from "@/lib/types";
+import { pence } from "./money-fixtures";
 
 const signup = vi.hoisted(() => vi.fn());
 vi.mock("../lib/password-login", async importOriginal => ({ ...await importOriginal<typeof import("../lib/password-login")>(), signUpPassword: signup }));
@@ -19,7 +20,7 @@ const click = (name: string | RegExp) => fireEvent.click(screen.getByRole("butto
 const tab = (name: string) => fireEvent.click(within(screen.getByRole("navigation")).getByRole("button", { name }));
 
 function acct(o: Partial<Account> = {}): Account {
-  return { id: "a1", provider: "Zopa", label: "Rainy day pot", balance: 3000, ratePct: 7, rateType: "interest", frequency: "monthly",
+  return { id: "a1", provider: "Zopa", label: "Rainy day pot", balance: pence(3000), currency: "GBP", ratePct: 7, rateType: "interest", frequency: "monthly",
     nextPayoutDate: today, colour: "#2b2d86", payouts: [], events: [], createdAt: "2026-01-01T00:00:00Z",
     rateHistory: [{ from: "2026-01-01", ratePct: 7 }], ...o };
 }
@@ -135,7 +136,7 @@ describe("accounts", () => {
   it("does not apply queued edits to a replacement backup with the same account id", async () => {
     const code = await seed({ accounts: [acct()] });
     const original = await loadData();
-    const backup = await C.encryptBackup({ ...original, accounts: [acct({ balance: 8000 })] }, code, 100_000);
+    const backup = await C.encryptBackup({ ...original, accounts: [acct({ balance: pence(8000) })] }, code, 100_000);
     let fail!: (reason: Error) => void;
     const persist = DB.saveData;
     const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
@@ -148,11 +149,11 @@ describe("accounts", () => {
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(backup)], "replacement.json")] } });
     type(screen.getByLabelText("Restore recovery code"), code); click("Restore");
-    await waitFor(async () => expect((await loadData()).accounts[0].balance).toBe(8000));
+    await waitFor(async () => expect((await loadData()).accounts[0].balance).toBe(pence(8000)));
     await act(async () => fail(new Error("QuotaExceededError")));
     await waitFor(() => expect(screen.getByTestId("local-save-status")).not.toHaveTextContent("Saving"));
     expect(writer).toHaveBeenCalledTimes(1);
-    expect((await loadData()).accounts[0]).toMatchObject({ balance: 8000, payouts: [], events: [] });
+    expect((await loadData()).accounts[0]).toMatchObject({ balance: pence(8000), payouts: [], events: [] });
   });
   it("does not carry a failed edit into another queued action", async () => {
     await seed({ accounts: [acct()] });
@@ -170,11 +171,11 @@ describe("accounts", () => {
     await screen.findByText("Income recorded. Update your balance separately if needed.");
     expect(await screen.findByText("Balance change could not be saved. Your entry is kept; retry.")).toBeInTheDocument();
     const received = (await loadData()).accounts[0];
-    expect(received.balance).toBe(3000); expect(received.events).toHaveLength(0); expect(received.payouts).toHaveLength(1);
+    expect(received.balance).toBe(pence(3000)); expect(received.events).toHaveLength(0); expect(received.payouts).toHaveLength(1);
     click("Save");
     await waitFor(() => expect(screen.queryByRole("form", { name: "Top up" })).toBeNull());
     const retried = (await loadData()).accounts[0];
-    expect(retried.balance).toBe(3100); expect(retried.events).toHaveLength(1); expect(retried.payouts).toHaveLength(1);
+    expect(retried.balance).toBe(pence(3100)); expect(retried.events).toHaveLength(1); expect(retried.payouts).toHaveLength(1);
   });
   it("retries failed top-ups, withdrawals and income without applying them twice", async () => {
     await seed({ accounts: [acct()] });
@@ -190,7 +191,7 @@ describe("accounts", () => {
       await screen.findByText("Changes could not be saved. Your saved data is unchanged; retry the action.");
       await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeEnabled());
       expect((await loadData()).accounts[0]).toEqual(previous);
-      expect(document.querySelector(".bal")).toHaveTextContent(new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(previous.balance));
+      expect(document.querySelector(".bal")).toHaveTextContent(new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(previous.balance / 100));
       expect(screen.getByLabelText("amount")).toHaveValue(amount);
       click("Save");
       await waitFor(() => expect(screen.queryByRole("form", { name: action })).toBeNull());
@@ -198,8 +199,8 @@ describe("accounts", () => {
       expect(saved.balance).toBe(expected);
       expect(saved.events!.filter(e => e.type === eventType)).toHaveLength(1);
     }
-    await retryBalance("Top up", "100", 3100, "topup");
-    await retryBalance("Withdraw", "50", 3050, "withdraw");
+    await retryBalance("Top up", "100", pence(3100), "topup");
+    await retryBalance("Withdraw", "50", pence(3050), "withdraw");
 
     type(screen.getByLabelText("Income amount"), "22.65");
     writer.mockRejectedValueOnce(new Error("QuotaExceededError")); click("Record income");
@@ -209,9 +210,24 @@ describe("accounts", () => {
     click("Record income");
     await screen.findByText("Income recorded. Update your balance separately if needed.");
     const saved = (await loadData()).accounts[0];
-    expect(saved.balance).toBe(3050);
-    expect(saved.payouts).toEqual([{ date: today, amount: 22.65, kind: "actual", incomeType: "interest" }]);
+    expect(saved.balance).toBe(pence(3050));
+    expect(saved.payouts).toEqual([{ id: expect.any(String), date: today, amount: pence(22.65), kind: "actual", incomeType: "interest" }]);
     expect(screen.queryByText("Changes could not be saved. Your saved data is unchanged; retry the action.")).toBeNull();
+  });
+  it("double-clicked Save / Record income records one event each", async () => {
+    await seed({ accounts: [acct()] });
+    render(<Drip />); await screen.findByText("Rainy day pot");
+    fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
+    click("Top up"); type(screen.getByLabelText("amount"), "25");
+    const save = screen.getByRole("button", { name: "Save" });
+    fireEvent.click(save); fireEvent.click(save);
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Top up" })).toBeNull());
+    expect((await loadData()).accounts[0].events!.filter(e => e.type === "topup")).toHaveLength(1);
+    type(screen.getByLabelText("Income amount"), "1.50");
+    const record = screen.getByRole("button", { name: "Record income" });
+    fireEvent.click(record); fireEvent.click(record);
+    await screen.findByText("Income recorded. Update your balance separately if needed.");
+    expect((await loadData()).accounts[0].payouts).toHaveLength(1);
   });
   it("shows a balance change as saved only after the encrypted write completes", async () => {
     await seed({ accounts: [acct()] });
@@ -224,11 +240,11 @@ describe("accounts", () => {
     click("Update balance"); type(screen.getByLabelText("amount"), "3200"); click("Save");
     expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saving changes…");
     expect(document.querySelector(".bal")).toHaveTextContent("£3,000.00");
-    expect((await loadData()).accounts[0].balance).toBe(3000);
+    expect((await loadData()).accounts[0].balance).toBe(pence(3000));
     await act(async () => { release(); });
     await waitFor(() => expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saved on this device."));
     expect(document.querySelector(".bal")).toHaveTextContent("£3,200.00");
-    expect((await loadData()).accounts[0].balance).toBe(3200);
+    expect((await loadData()).accounts[0].balance).toBe(pence(3200));
   });
   it("adds an account with a custom provider, then edits, tops up, withdraws, sets balance, logs payout, changes rate, deletes", async () => {
     await seed({});
@@ -299,7 +315,7 @@ describe("accounts", () => {
   }, 30_000);
 
   it("home shows stacked cards and upcoming payouts; back button works", async () => {
-    await seed({ accounts: [acct(), acct({ id: "a2", provider: "Chip", label: "", balance: 1000, ratePct: 3 })] });
+    await seed({ accounts: [acct(), acct({ id: "a2", provider: "Chip", label: "", balance: pence(1000), ratePct: 3 })] });
     render(<Drip />);
     expect(await screen.findByText("£4,000.00")).toBeInTheDocument();
     expect(screen.getByText("Upcoming estimated payments")).toBeInTheDocument();
@@ -313,7 +329,7 @@ describe("accounts", () => {
 describe("trends", () => {
   it("shows stats, breakdown and projection", async () => {
     const m = (o: number) => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + o); return d.toISOString().slice(0, 7); };
-    await seed({ accounts: [acct()], snapshots: [{ month: m(-1), totalBalance: 2500, monthlyIncome: 10 }, { month: m(0), totalBalance: 3000, monthlyIncome: 17.5, deposits: 600, withdrawals: 117.5 }] });
+    await seed({ accounts: [acct()], snapshots: [{ month: m(-1), totalBalance: pence(2500), monthlyIncome: pence(10) }, { month: m(0), totalBalance: pence(3000), monthlyIncome: pence(17.5), deposits: pence(600), withdrawals: pence(117.5)}] });
     render(<Drip />);
     await screen.findByText("Total balance");
     tab("Trends");
@@ -527,10 +543,10 @@ describe("daily interest accounts", () => {
   });
   it("keeps an older daily balance authoritative on open and separates legacy estimates", async () => {
     const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
-    await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, frequency: "daily", accruedThrough: past, events: [{ type: "interest", date: past, amount: 12 }], rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
+    await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: pence(10000), ratePct: 3.65, frequency: "daily", accruedThrough: past, events: [{ id: "legacy-interest", type: "interest", date: past, amount: pence(12) }], rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
     render(<Drip />);
     await screen.findByText("Total balance");
-    expect((await loadData()).accounts[0]).toMatchObject({ balance: 10000, accruedThrough: past });
+    expect((await loadData()).accounts[0]).toMatchObject({ balance: pence(10000), accruedThrough: past });
     fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
     expect(await screen.findByText("Previous interest estimates")).toBeInTheDocument();
     expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
@@ -553,7 +569,7 @@ describe("sign-out", () => {
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
     type(screen.getByLabelText("Recovery code"), code); click("Recover account");
     expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
-    expect((await loadData()).accounts[0].balance).toBe(3000);
+    expect((await loadData()).accounts[0].balance).toBe(pence(3000));
   });
   it("does not let delayed startup overwrite a sign-out from another tab", async () => {
     await seed({ accounts: [acct()] });

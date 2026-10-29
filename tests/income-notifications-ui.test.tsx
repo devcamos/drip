@@ -10,7 +10,7 @@ import { holding } from "./notification-fixtures";
 vi.mock("../lib/phone-reminders", async original => ({ ...await original<typeof Phone>(), phoneCapability: vi.fn(() => "unsupported"), phoneConfiguration: vi.fn(), phoneReminderStatus: vi.fn(), enablePhoneReminders: vi.fn(), disablePhoneReminders: vi.fn(), testPhoneReminder: vi.fn(), syncPhoneReminders: vi.fn() }));
 it("shows received dividends, periods, holdings, empty history and empty portfolio", () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
-  const open = vi.fn(), add = vi.fn(), a = holding({ payouts: [{ kind: "actual", date: "2026-09-01", amount: 5 }, { kind: "actual", date: "2026-10-01", amount: 6 }] });
+  const open = vi.fn(), add = vi.fn(), a = holding({ payouts: [{ kind: "actual", date: "2026-09-01", amount: 500 }, { kind: "actual", date: "2026-10-01", amount: 600 }] });
   const view = render(<DividendPortfolio accounts={[a, holding({ rateType: "interest", holdingName: "Cash only" })]} onOpen={open} onAdd={add} />);
   expect(screen.getByTestId("dividend-income-total")).toHaveTextContent("£11.00");
   fireEvent.click(screen.getByRole("button", { name: "This month" })); expect(screen.getByTestId("dividend-income-total")).toHaveTextContent("£6.00");
@@ -22,7 +22,7 @@ it("shows received dividends, periods, holdings, empty history and empty portfol
 });
 it("lists daily cash and dividend reminders without changing balances", () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
-  const accounts = [holding({ nextPayoutDate: "2026-10-29", payouts: [{ kind: "actual", date: "2026-10-29", amount: 5 }] }), holding({ id: "cash", rateType: "interest", holdingName: undefined, provider: "Zopa", frequency: "daily" }), holding({ id: "future", nextPayoutDate: "2026-11-01" })], open = vi.fn(), before = JSON.stringify(accounts);
+  const accounts = [holding({ nextPayoutDate: "2026-10-29", payouts: [{ kind: "actual", date: "2026-10-29", amount: 500 }] }), holding({ id: "cash", rateType: "interest", holdingName: undefined, provider: "Zopa", frequency: "daily" }), holding({ id: "future", nextPayoutDate: "2026-11-01" })], open = vi.fn(), before = JSON.stringify(accounts);
   const view = render(<PaymentNotifications accounts={accounts} onOpen={open} />);
   expect(screen.getByText("1 to check")).toBeVisible(); expect(screen.getByText("Payment logged today")).toBeVisible(); fireEvent.click(screen.getAllByRole("button", { name: "Open" })[0]); expect(open).toHaveBeenCalled(); expect(JSON.stringify(accounts)).toBe(before);
   view.rerender(<PaymentNotifications accounts={[]} onOpen={open} />); expect(screen.getByText("No payments expected today.")).toBeVisible(); act(() => { vi.setSystemTime(new Date("2026-10-30T12:00:00Z")); window.dispatchEvent(new Event("focus")); }); vi.useRealTimers();

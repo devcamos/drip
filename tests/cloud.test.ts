@@ -225,12 +225,12 @@ describe("versioned offline sync", () => {
 });
 
 const privateAccount = {
-  id: "account-1", provider: "Zopa", label: "DEVICE_PRIVATE_NICKNAME", balance: 3000, ratePct: 7,
+  id: "account-1", provider: "Zopa", label: "DEVICE_PRIVATE_NICKNAME", balance: 300_000, currency: "GBP" as const, ratePct: 7,
   rateType: "interest" as const, frequency: "monthly" as const, nextPayoutDate: "2030-01-01", colour: "#2b2d86", createdAt: "2026-01-01",
-  payouts: [{ date: "2026-01-01", amount: 1, kind: "actual" as const }],
-  events: [{ date: "2026-01-01", amount: 200, type: "topup" as const }], rateHistory: [{ from: "2026-01-01", ratePct: 7 }],
+  payouts: [{ id: "pay-1", date: "2026-01-01", amount: 100, kind: "actual" as const }],
+  events: [{ id: "evt-1", date: "2026-01-01", amount: 20_000, type: "topup" as const }], rateHistory: [{ from: "2026-01-01", ratePct: 7 }],
 };
-const labelled: AppData = { ...data, accounts: [privateAccount], snapshots: [{ month: "2026-01", totalBalance: 3000, monthlyIncome: 17.5 }], projection: { monthlyDeposit: 200, years: 1 } };
+const labelled: AppData = { ...data, money: "pence" as const, accounts: [privateAccount], snapshots: [{ month: "2026-01", totalBalance: 300_000, monthlyIncome: 1750 }], projection: { monthlyDeposit: 20_000, years: 1 } };
 async function rawCloudPayload(envelope: cloud.Envelope) {
   const bytes = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(envelope.iv), additionalData: new TextEncoder().encode("drip-cloud-v1") }, key, bytes(envelope.ct));
@@ -254,14 +254,14 @@ describe("device-only nickname boundary", () => {
   });
   it("round-trips financial product and income fields while excluding new nested private fields", async () => {
     const input = { ...labelled, accounts: [{ ...privateAccount, productCategory: "cash-isa" as const, taxWrapper: "cash-isa" as const, reinvestIncome: true,
-      bonus: { amount: 15.44, expectedDate: "2030-05-06", note: "PRIVATE_BONUS_NOTE" },
-      payouts: [{ date: "2026-09-30", amount: 22.65, kind: "actual" as const, incomeType: "interest" as const, note: "PRIVATE_RECEIPT_NOTE" }] }] };
+      bonus: { amount: 1544, expectedDate: "2030-05-06", note: "PRIVATE_BONUS_NOTE" },
+      payouts: [{ id: "pay-2", date: "2026-09-30", amount: 2265, kind: "actual" as const, incomeType: "interest" as const, note: "PRIVATE_RECEIPT_NOTE" }] }] };
     const envelope = await cloud.seal(input, key);
     const portable = await rawCloudPayload(envelope);
     expect(JSON.stringify(portable)).not.toMatch(/PRIVATE_|DEVICE_PRIVATE|"label"|"note"/);
     const restored = await cloud.unseal(envelope, key);
     expect(restored.accounts[0]).toMatchObject({ productCategory: "cash-isa", taxWrapper: "cash-isa", reinvestIncome: true,
-      bonus: { amount: 15.44, expectedDate: "2030-05-06" }, payouts: [{ date: "2026-09-30", amount: 22.65, kind: "actual", incomeType: "interest" }], label: "" });
+      bonus: { amount: 1544, expectedDate: "2030-05-06" }, payouts: [{ id: "pay-2", date: "2026-09-30", amount: 2265, kind: "actual", incomeType: "interest" }], label: "" });
   });
   it("omits nicknames, locks and unknown local fields from the actual encrypted payload without changing local data", async () => {
     const input = { ...labelled, localNote: "PRIVATE_ROOT_NOTE", lock: { credentialId: "PRIVATE_CREDENTIAL", enabledAt: "now" }, accounts: [{ ...privateAccount, localNote: "PRIVATE_ACCOUNT_NOTE", events: [{ ...privateAccount.events[0], note: "PRIVATE_EVENT_NOTE" }] }] };
@@ -275,13 +275,13 @@ describe("device-only nickname boundary", () => {
   it("drops nicknames from older cloud copies restored onto a fresh device", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ version: 1, envelope: await legacyEnvelope(labelled) })));
     const restored = await cloud.restoreCloud(code);
-    expect(restored.accounts[0].label).toBe(""); expect((await loadData()).accounts[0].balance).toBe(3000);
+    expect(restored.accounts[0].label).toBe(""); expect((await loadData()).accounts[0].balance).toBe(300_000);
   });
   it("preserves this unlocked device's nicknames when restoring the same account", async () => {
     await seedVault(labelled, code);
-    const remote = { ...labelled, accounts: [{ ...privateAccount, label: "OLD_REMOTE_NICKNAME", balance: 4200 }] };
+    const remote = { ...labelled, accounts: [{ ...privateAccount, label: "OLD_REMOTE_NICKNAME", balance: 420_000 }] };
     vi.stubGlobal("fetch", vi.fn(async () => response({ version: 2, envelope: await legacyEnvelope(remote) })));
-    expect((await cloud.restoreCloud(code)).accounts[0]).toMatchObject({ label: "DEVICE_PRIVATE_NICKNAME", balance: 4200 });
+    expect((await cloud.restoreCloud(code)).accounts[0]).toMatchObject({ label: "DEVICE_PRIVATE_NICKNAME", balance: 420_000 });
     expect((await loadData()).accounts[0].label).toBe("DEVICE_PRIVATE_NICKNAME");
   });
   it("does not carry local nicknames into a different account even when an account id matches", async () => {

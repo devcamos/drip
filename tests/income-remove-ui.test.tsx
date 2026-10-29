@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { AccountDetail } from "../app/AccountDetail";
 import type { Account } from "../lib/types";
 
-const account: Account = { id: "a", provider: "Moneybox", label: "", balance: 3000, ratePct: 4,
+const account: Account = { id: "a", provider: "Moneybox", label: "", balance: 300_000, currency: "GBP", ratePct: 4,
   rateType: "interest", frequency: "monthly", nextPayoutDate: "2026-11-20", colour: "", createdAt: "2026-10-01",
-  payouts: [{ date: "2026-10-10", amount: 22.65, kind: "actual", incomeType: "interest" }], events: [] };
+  payouts: [{ id: "pay-1", date: "2026-10-10", amount: 2265, kind: "actual", incomeType: "interest" }], events: [] };
 
 function Harness({ persist }: Readonly<{ persist: () => Promise<boolean> }>) {
   const [data, setData] = useState(account);

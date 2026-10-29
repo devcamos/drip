@@ -8,7 +8,7 @@ import type { Account } from "../lib/types";
 import { addMonths } from "../lib/maths";
 const today = new Date().toISOString().slice(0, 10);
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
-const a: Account = { id: "a", provider: "MoneyFarm", label: "", productCategory: "cash-isa", taxWrapper: "cash-isa", balance: 3000, ratePct: 4, rateType: "interest", frequency: "daily", nextPayoutDate: today, payouts: [], events: [], colour: "", createdAt: today, bonus: { amount: 15.44, expectedDate: "2030-05-06" } };
+const a: Account = { id: "a", provider: "MoneyFarm", label: "", productCategory: "cash-isa", taxWrapper: "cash-isa", balance: 300_000, currency: "GBP", ratePct: 4, rateType: "interest", frequency: "daily", nextPayoutDate: today, payouts: [], events: [], colour: "", createdAt: today, bonus: { amount: 1544, expectedDate: "2030-05-06" } };
 function DetailHarness() {
   const [account, setAccount] = useState(a);
   return <AccountDetail a={account} onBack={() => {}} onEdit={() => {}} onDelete={() => {}} onChange={setAccount} />;
@@ -26,7 +26,7 @@ describe("category-driven accounts", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     change("Pending bonus amount £", "15.44"); change("Expected bonus payment date", "2030-05-06");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "Any Broker", productCategory: "stocks-funds", taxWrapper: "stocks-shares-isa", rateType: "dividend", frequency: "annually", reinvestIncome: false, bonus: { amount: 15.44, expectedDate: "2030-05-06" } }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "Any Broker", productCategory: "stocks-funds", taxWrapper: "stocks-shares-isa", rateType: "dividend", frequency: "annually", reinvestIncome: false, bonus: { amount: 1544, expectedDate: "2030-05-06" } }));
     for (const category of ["regular-saver", "current-account", "easy-access", "cash-isa", "cash-lisa"]) {
       change("Product category", category); expect(screen.getByLabelText("Reinvest predicted income")).toBeChecked();
       expect(screen.getByLabelText("Next payout date")).toHaveValue(addMonths(today, category === "regular-saver" ? 12 : 1));
@@ -41,7 +41,7 @@ describe("category-driven accounts", () => {
     expect(screen.getByLabelText("Paid")).toHaveValue("daily");
     change("Product category", "cash-isa"); change("Balance", "3200");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 3200, ratePct: 4, productCategory: "cash-isa", payouts: [], events: [{ type: "set", amount: 3200, date: today }] }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 320_000, currency: "GBP", ratePct: 4, productCategory: "cash-isa", payouts: [], events: [expect.objectContaining({ type: "set", amount: 320_000, date: today })] }));
   });
   it("records income and a bonus without changing the balance, and allows correcting a payment", async () => {
     vi.stubGlobal("confirm", () => true); render(<DetailHarness />);

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Account, IncomeType } from "@/lib/types";
 import { displayProvider, productLabel, validDate } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
@@ -18,6 +18,7 @@ type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDe
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState(""); const [value, setValue] = useState(""); const [date, setDate] = useState(today());
   const labels = { topup: "Top up", withdraw: "Withdraw", set: "Update balance" };
   const descriptions = {
@@ -26,19 +27,20 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
     set: "Enter the balance shown by your provider. This replaces your balance and updates predictions. The difference isn't recorded as income.",
   };
   const n = Number(value);
-  const valid = value.trim() !== "" && Number.isFinite(n) && (mode === "set" ? n >= 0 : M.round2(n) > 0) && validDate(date);
+  const pence = Number.isFinite(n) ? M.toPence(n) : NaN;
+  const valid = value.trim() !== "" && Number.isFinite(n) && (mode === "set" ? pence >= 0 : pence > 0) && validDate(date);
   return <>
-    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { setMode(action); setValue(action === "set" ? String(a.balance) : ""); setError(""); }}>{labels[action]}</button>)}</div>
+    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { setMode(action); setValue(action === "set" ? String(M.fromPence(a.balance)) : ""); setError(""); }}>{labels[action]}</button>)}</div>
     {mode && <form className="panel" aria-label={labels[mode]} onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
-      if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
-      setBusy(true); setError("");
+      event.preventDefault(); if (!valid || submitting.current) return;
+      if (mode === "withdraw" && pence > a.balance) { setError("You can't withdraw more than the balance."); return; }
+      submitting.current = true; setBusy(true); setError("");
       try {
-        if (await onChange(x => balanceChange[mode](x, n, date)) === false) setError("Balance change could not be saved. Your entry is kept; retry.");
+        if (await onChange(x => balanceChange[mode](x, pence, date)) === false) setError("Balance change could not be saved. Your entry is kept; retry.");
         else setMode(null);
       }
       catch { setError("Could not save the balance. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <h2 style={{ marginTop: 0 }}>{labels[mode]}</h2><p className="muted">{descriptions[mode]}</p>
       <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input disabled={busy} id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input disabled={busy} id="balance-date" type="date" aria-label="date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
@@ -51,6 +53,7 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
 function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [amount, setAmount] = useState(""); const [date, setDate] = useState(today());
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [type, setType] = useState<IncomeType>(a.rateType);
   const [by, setBy] = useState<"week" | "month">("month");
   const [message, setMessage] = useState("");
@@ -60,14 +63,16 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
     const period = by === "month" ? p.date.slice(0, 7) : M.weekStart(p.date);
     groups.set(period, (groups.get(period) ?? 0) + p.amount);
   }
-  const valid = Number.isFinite(Number(amount)) && M.round2(Number(amount)) > 0 && validDate(date) && date <= today();
+  const pounds = Number(amount);
+  const pence = Number.isFinite(pounds) ? M.toPence(pounds) : NaN;
+  const valid = Number.isFinite(pounds) && pence > 0 && validDate(date) && date <= today();
   return <section className="panel" aria-label="Income history">
     <h2 style={{ marginTop: 0 }}>Income received</h2>
     <p className="muted">Log individual payments or one monthly total. Only log each amount once. Recording income leaves your saved balance unchanged.</p>
     {history.length === 0 ? <p className="muted">No income logged yet.</p> : <>
       <fieldset className="row-gap"><legend>Group payments</legend><button className={`btn small ${by === "week" ? "" : "ghost"}`} aria-pressed={by === "week"} onClick={() => setBy("week")}>By week</button><button className={`btn small ${by === "month" ? "" : "ghost"}`} aria-pressed={by === "month"} onClick={() => setBy("month")}>By month</button></fieldset>
       <ul className="list" data-testid="income-history">{[...groups].map(([period, total]) => <li key={period}><span>{by === "week" ? `Week of ${fmtDate(period)}` : new Date(period + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</span><b className="ok">+{M.gbp(total)}</b></li>)}</ul>
-      <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" disabled={busy} aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={async () => {
+      <details><summary>View payments</summary><ul className="list">{history.map(p => <li key={p.id ?? p.index}><span>{incomeLabel[p.incomeType ?? a.rateType]}<br /><span className="muted">{fmtDate(p.date)}</span></span><span><b>{M.gbp(p.amount)}</b><br /><button className="btn ghost small" disabled={busy} aria-label={`Remove ${incomeLabel[p.incomeType ?? a.rateType].toLowerCase()} payment of ${M.gbp(p.amount)} on ${fmtDate(p.date)}`} onClick={async () => {
         if (!confirm("Remove this recorded payment? Your balance will stay unchanged.")) return;
         setBusy(true); setMessage("");
         try {
@@ -79,14 +84,14 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
       }}>Remove</button></span></li>)}</ul></details>
     </>}
     <form onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
-      setBusy(true); setMessage("");
+      event.preventDefault(); if (!valid || submitting.current) return;
+      submitting.current = true; setBusy(true); setMessage("");
       try {
-        const saved = await onChange(x => M.recordIncome(x, Number(amount), date, type));
+        const saved = await onChange(x => M.recordIncome(x, pence, date, type));
         if (saved === false) { setMessage("Income could not be saved. Keep Drip open and retry."); return; }
         setAmount(""); setType(a.rateType); setMessage("Income recorded. Update your balance separately if needed.");
       } catch { setMessage("Income could not be saved. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <label htmlFor="income-type">Payment type</label><select disabled={busy} id="income-type" value={type} onChange={e => setType(e.target.value as IncomeType)}><option value={a.rateType}>{incomeLabel[a.rateType]}</option><option value="bonus">Bonus</option></select>
       <div className="grid"><div><label htmlFor="income-amount">Amount received £</label><input disabled={busy} id="income-amount" aria-label="Income amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} /></div><div><label htmlFor="income-date">Payment date</label><input disabled={busy} id="income-date" type="date" max={today()} aria-label="Income date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
@@ -122,7 +127,7 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
       {a.bonus && <div className="panel"><h3 style={{ marginTop: 0 }}>Pending bonus · {M.gbp(a.bonus.amount)}</h3><p className="muted">Expected {fmtDate(a.bonus.expectedDate)}. Kept outside your balance and received income.</p><p className="muted">{a.bonus.expectedDate < today() ? "The expected date has passed. Edit the date or record the payment; this bonus is excluded from future predictions." : "Included once in predictions on its expected date. Update the amount from your provider when needed."}</p></div>}
     </section>
     <IncomeHistory a={a} onChange={onChange} />
-    {events.length > 0 && <section className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2><ul className="list" data-testid="events">{events.map((e, i) => <li key={`${e.date}-${i}`}><span>{eventStyle[e.type].label}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={eventStyle[e.type].className}>{eventStyle[e.type].prefix}{M.gbp(e.amount)}</b></li>)}</ul></section>}
+    {events.length > 0 && <section className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2><ul className="list" data-testid="events">{events.map((e) => <li key={e.id}><span>{eventStyle[e.type].label}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={eventStyle[e.type].className}>{eventStyle[e.type].prefix}{M.gbp(e.amount)}</b></li>)}</ul></section>}
     {legacy.length > 0 && <details className="panel"><summary>Previous interest estimates</summary><p className="muted">Older Drip versions added these estimates to your balance. They aren&apos;t recorded income. Your saved balance has been preserved; update it using your provider&apos;s current figure.</p><ul className="list">{legacy.map(row => <li key={row.period}><span>{row.period}</span><b>{M.gbp(row.amount)}</b></li>)}</ul></details>}
     {(a.rateHistory?.length ?? 0) > 1 && <section className="panel"><h2 style={{ marginTop: 0 }}>Rate history</h2><ul className="list">{a.rateHistory!.toReversed().map(r => <li key={r.from}><span>{r.from === "0000-01-01" ? "Since added" : `From ${fmtDate(r.from)}`}</span><b>{r.ratePct}%</b></li>)}</ul></section>}
     <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button><button className="btn danger" onClick={onDelete}>Delete</button></div>

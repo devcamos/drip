@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "@/lib/types";
 import { PRODUCTS, PROVIDERS, TRADING_212_HOLDINGS, displayProvider, validDate } from "@/lib/products";
 import { accountCardStyle, normaliseColour } from "@/lib/account-colour";
@@ -18,7 +18,7 @@ function validForm(input: FormInputs) {
   if (!Number.isFinite(rate) || rate < 0 || rate >= 100 || !input.rate.trim()) return false;
   if (!input.provider.trim() || (input.frequency !== "daily" && !validDate(input.next))) return false;
   if (input.rateFrom !== undefined && !validDate(input.rateFrom)) return false;
-  return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.round2(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
+  return !input.bonus || (Number.isFinite(Number(input.bonus.amount)) && M.toPence(Number(input.bonus.amount)) > 0 && validDate(input.bonus.date));
 }
 
 function isCustomHolding(holding?: string) {
@@ -33,8 +33,8 @@ function initialValues(existing?: Account, category?: ProductCategory) {
   const provider = existing?.provider ?? (product === "stocks-funds" ? "Trading212" : "Zopa");
   const defaults = PRODUCTS[product];
   return { product, provider, colour: normaliseColour(existing ? existing.colour : PROVIDERS[provider]),
-    balance: existing ? String(existing.balance) : "", rate: existing ? String(existing.ratePct) : "",
-    bonusAmount: existing?.bonus ? String(existing.bonus.amount) : "",
+    balance: existing ? String(M.fromPence(existing.balance)) : "", rate: existing ? String(existing.ratePct) : "",
+    bonusAmount: existing?.bonus ? String(M.fromPence(existing.bonus.amount)) : "",
     reinvest: existing?.reinvestIncome ?? (existing ? existing.rateType !== "dividend" : defaults.reinvestIncome) };
 }
 function validHoldingName(category: ProductCategory, provider: string, custom: boolean, holding: string) {
@@ -48,6 +48,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const initialProduct = initial.product;
   const initialProvider = initial.provider;
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
   const [provider, setProvider] = useState(initialProvider);
@@ -83,18 +84,20 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   return <>
     <h1>{existing ? "Edit account" : "Add account"}</h1>
     <form onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
+      event.preventDefault(); if (!valid || submitting.current) return;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
-      const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
+      const balancePence = M.toPence(b);
+      const bonusPence = hasBonus ? M.toPence(Number(bonusAmount)) : undefined;
+      const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, balance: balancePence, currency: "GBP", ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,
-        bonus: hasBonus ? { amount: M.round2(Number(bonusAmount)), expectedDate: bonusDate } : undefined,
+        bonus: hasBonus && bonusPence !== undefined ? { amount: bonusPence, expectedDate: bonusDate } : undefined,
         colour, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
         rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };
       const account = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
-      setBusy(true); setError("");
-      try { if (await onSave(existing && b !== existing.balance ? M.applySetBalance(account, b, today()) : account) === false) setError("Could not save this account. Keep Drip open and retry."); }
+      submitting.current = true; setBusy(true); setError("");
+      try { if (await onSave(existing && balancePence !== existing.balance ? M.applySetBalance(account, balancePence, today()) : account) === false) setError("Could not save this account. Keep Drip open and retry."); }
       catch { setError("Could not save this account. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <label htmlFor="account-category">Product category</label>
       <select disabled={busy} id="account-category" value={category} onChange={e => chooseCategory(e.target.value as ProductCategory)}>{Object.entries(PRODUCTS).map(([value, product]) => <option value={value} key={value}>{product.label}</option>)}</select>
@@ -135,7 +138,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <label htmlFor="bonus-date">Expected bonus payment date</label><input disabled={busy} id="bonus-date" type="date" value={bonusDate} onChange={e => setBonusDate(e.target.value)} />
         <p className="muted">Enter your provider&apos;s accrued amount or your own estimate. Drip predicts this amount once on the expected date; it doesn&apos;t calculate eligibility or further bonus accrual.</p>
       </fieldset>}
-      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(b, r))} a month</p>}
+      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(M.toPence(b), r))} a month</p>}
       <div className="row-gap"><button className="btn" type="submit" disabled={!valid || busy}>{busy ? "Saving…" : "Save"}</button><button className="btn ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button></div>
       {error && <p role="alert" className="err">{error}</p>}
     </form>

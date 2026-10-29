@@ -44,8 +44,8 @@ describe("projection save completion", () => {
     expect(screen.getByText("Estimated balance in 1 year")).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save projection" })); });
     expect(update).toHaveBeenCalledTimes(2);
-    expect(update).toHaveBeenNthCalledWith(1, { monthlyDeposit: 200, years: 3 });
-    expect(update).toHaveBeenNthCalledWith(2, { monthlyDeposit: 200, years: 3 });
+    expect(update).toHaveBeenNthCalledWith(1, { monthlyDeposit: 20_000, years: 3 });
+    expect(update).toHaveBeenNthCalledWith(2, { monthlyDeposit: 20_000, years: 3 });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Planned monthly top-up (£)")).not.toBeInTheDocument();
   });

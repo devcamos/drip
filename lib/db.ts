@@ -1,5 +1,6 @@
 import type { AppData, CloudState } from "./types";
 import { migrateData } from "./maths";
+import { isPence } from "./money";
 import { isIdentity } from "./identity";
 import { validProductFields } from "./products";
 import { checkCode, codeVerifier } from "./crypto";
@@ -8,7 +9,7 @@ import type { PasskeyWrap } from "./passkey-crypto";
 import type { PasswordWrap } from "./password-crypto";
 
 const DB = "drip", STORE = "kv", KEY = "data";
-export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
+export const emptyData = (): AppData => ({ version: 1, money: "pence", accounts: [], snapshots: [], lastBackupAt: null });
 type Device = { signedOut: boolean; generation: string; remotePending?: boolean; signupNonce?: string };
 type Metadata = Omit<CloudState, "key">;
 type Stored = { data?: AppData | LocalEnvelope; cloud?: Metadata; vault?: VaultHeader; gate?: Device; verifier?: { salt: string; hash: string }; passkey?: PasskeyWrap; password?: { vaultId: string; envelope: PasswordWrap }; signupRecovery?: { vaultId: string } };
@@ -335,12 +336,58 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   lastWrite = Promise.resolve();
 }
 
-/** Validates an imported object before it replaces local data. */
+const EVENT_TYPES = new Set(["topup", "withdraw", "set", "interest"]);
+const PAYOUT_KINDS = new Set(["expected", "actual"]);
+
+function isMoneyField(n: unknown, pence: boolean): boolean {
+  if (typeof n !== "number" || !Number.isFinite(n)) return false;
+  return pence ? isPence(n) : true;
+}
+
+function isBalanceEvent(e: unknown, pence: boolean): boolean {
+  if (!e || typeof e !== "object") return false;
+  const ev = e as Record<string, unknown>;
+  if (typeof ev.type !== "string" || !EVENT_TYPES.has(ev.type)) return false;
+  if (typeof ev.date !== "string" || !ev.date) return false;
+  if (!isMoneyField(ev.amount, pence)) return false;
+  if (ev.id !== undefined && (typeof ev.id !== "string" || !ev.id)) return false;
+  if (pence && (typeof ev.id !== "string" || !ev.id)) return false;
+  return true;
+}
+
+function isPayout(p: unknown, pence: boolean): boolean {
+  if (!p || typeof p !== "object") return false;
+  const pay = p as Record<string, unknown>;
+  if (typeof pay.date !== "string" || !pay.date) return false;
+  if (!isMoneyField(pay.amount, pence)) return false;
+  if (typeof pay.kind !== "string" || !PAYOUT_KINDS.has(pay.kind)) return false;
+  if (pay.incomeType !== undefined && !["interest", "dividend", "bonus"].includes(pay.incomeType as string)) return false;
+  if (pay.id !== undefined && (typeof pay.id !== "string" || !pay.id)) return false;
+  if (pence && (typeof pay.id !== "string" || !pay.id)) return false;
+  return true;
+}
+
+function isAccountData(a: unknown, pence: boolean): boolean {
+  if (!a || typeof a !== "object") return false;
+  const acct = a as AppData["accounts"][number];
+  if (typeof acct.id !== "string" || !isMoneyField(acct.balance, pence) || !Number.isFinite(acct.ratePct)) return false;
+  if (acct.currency !== undefined && acct.currency !== "GBP") return false;
+  if (pence && acct.currency !== "GBP") return false;
+  if (acct.events !== undefined && !(Array.isArray(acct.events) && acct.events.every(e => isBalanceEvent(e, pence)))) return false;
+  if (acct.payouts !== undefined && !(Array.isArray(acct.payouts) && acct.payouts.every(p => isPayout(p, pence)))) return false;
+  return validProductFields(acct);
+}
+
+/** Validates an imported object before it replaces local data. Legacy float-pound backups (no money/currency) still pass; pence records require ids and integer amounts. */
 export function isAppData(x: unknown): x is AppData {
   const d = x as AppData;
-  return !!d && d.version === 1 && Array.isArray(d.accounts) && Array.isArray(d.snapshots) &&
-    (d.projection === undefined || (!!d.projection && Number.isFinite(d.projection.monthlyDeposit) && d.projection.monthlyDeposit >= 0 && d.projection.monthlyDeposit <= 1_000_000 && [1, 3, 5].includes(d.projection.years))) &&
-    (d.identity === undefined || isIdentity(d.identity)) && d.accounts.every((a) => !!a && typeof a.id === "string" && Number.isFinite(a.balance) && Number.isFinite(a.ratePct) && validProductFields(a));
+  if (!d || d.version !== 1 || !Array.isArray(d.accounts) || !Array.isArray(d.snapshots)) return false;
+  if (d.money !== undefined && d.money !== "pence") return false;
+  const pence = d.money === "pence";
+  const maxDeposit = pence ? 100_000_000 : 1_000_000;
+  if (d.projection !== undefined && !(d.projection && Number.isFinite(d.projection.monthlyDeposit) && d.projection.monthlyDeposit >= 0 && d.projection.monthlyDeposit <= maxDeposit && [1, 3, 5].includes(d.projection.years) && (!pence || Number.isSafeInteger(d.projection.monthlyDeposit)))) return false;
+  if (d.identity !== undefined && !isIdentity(d.identity)) return false;
+  return d.accounts.every(a => isAccountData(a, pence || a?.currency === "GBP"));
 }
 export async function completeDeviceSession(generation: string, value: unknown): Promise<boolean> {
   const db = await open();

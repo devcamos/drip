@@ -1,6 +1,6 @@
 import { createECDH, randomBytes, randomUUID } from "node:crypto";
 import type { Account } from "../lib/types";
-export const holding = (extra: Partial<Account> = {}): Account => ({ id: "holding", productCategory: "stocks-funds", provider: "Trading212", holdingName: "Realty Income", label: "Private name", balance: 1200, ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2026-01-31", createdAt: "2026-01-01T12:00:00Z", colour: "#176b9a", payouts: [], ...extra });
+export const holding = (extra: Partial<Account> = {}): Account => ({ id: "holding", productCategory: "stocks-funds", provider: "Trading212", holdingName: "Realty Income", label: "Private name", balance: 120_000, currency: "GBP", ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2026-01-31", createdAt: "2026-01-01T12:00:00Z", colour: "#176b9a", payouts: [], ...extra });
 export function pushFixture() {
   const pair = createECDH("prime256v1"); pair.generateKeys();
   const publicKey = pair.getPublicKey().toString("base64url"), privateKey = pair.getPrivateKey().toString("base64url"), storageKey = randomBytes(32);
