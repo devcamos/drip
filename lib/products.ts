@@ -26,10 +26,12 @@ export function validDate(value: unknown): value is string {
 }
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
+  const pence = account.currency === "GBP";
+  const amountOk = (n: number) => Number.isFinite(n) && n > 0 && (!pence || Number.isSafeInteger(n));
   return (account.productCategory === undefined || Object.hasOwn(PRODUCTS, account.productCategory)) &&
     (account.holdingName === undefined || (account.productCategory === "stocks-funds" && typeof account.holdingName === "string" && account.holdingName.trim().length > 0 && account.holdingName.length <= 100)) &&
     (account.taxWrapper === undefined || ["none", "cash-isa", "lifetime-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&
     (account.reinvestIncome === undefined || typeof account.reinvestIncome === "boolean") &&
-    (account.bonus === undefined || (!!account.bonus && Number.isFinite(account.bonus.amount) && account.bonus.amount > 0 && validDate(account.bonus.expectedDate))) &&
+    (account.bonus === undefined || (!!account.bonus && amountOk(account.bonus.amount) && validDate(account.bonus.expectedDate))) &&
     (account.payouts === undefined || (Array.isArray(account.payouts) && account.payouts.every(p => !!p && (p.incomeType === undefined || ["interest", "dividend", "bonus"].includes(p.incomeType)))));
 }

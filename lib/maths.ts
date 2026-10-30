@@ -1,9 +1,13 @@
 import { validDate } from "./products";
+import { toPence } from "./money";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
+export { toPence, fromPence, gbp, isPence } from "./money";
+
+/** Legacy float-pound rounding (not used for stored money). Prefer toPence. */
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-/** Expected income per month: balance × rate ÷ 12. */
+/** Expected income per month in pence: balance × rate ÷ 12. */
 export function monthlyIncome(balance: number, ratePct: number): number {
   if (!(balance > 0) || !(ratePct > 0)) return 0;
   return (balance * ratePct) / 100 / 12;
@@ -11,7 +15,7 @@ export function monthlyIncome(balance: number, ratePct: number): number {
 
 const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
 
-/** Amount paid at each payout for the account's frequency. */
+/** Amount paid at each payout for the account's frequency (pence). */
 export function payoutAmount(a: Pick<Account, "balance" | "ratePct" | "frequency">): number {
   return (monthlyIncome(a.balance, a.ratePct) * 12) / PER_YEAR[a.frequency];
 }
@@ -50,7 +54,7 @@ export function momGrowth(snaps: Snapshot[]): number | null {
 }
 
 type ForecastAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
-/** Monthly forecast only: never writes estimates into saved accounts or recorded income. */
+/** Monthly forecast only: never writes estimates into saved accounts or recorded income. Amounts in pence. */
 export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = ymd(new Date())) {
   const total = totalBalance(accts);
   const holdings = accts.map(a => ({ account: a, balance: Math.max(a.balance, 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
@@ -74,7 +78,7 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
   return out;
 }
 
-/** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
+/** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. Amounts in pence. */
 export function recordedIncome(accts: Pick<Account, "payouts">[], month?: string, asOf = ymd(new Date())): number {
   return accts.reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
 }
@@ -83,12 +87,13 @@ export function pendingBonuses(accts: Pick<Account, "bonus">[]): number {
   return accts.reduce((sum, a) => sum + (a.bonus?.amount ?? 0), 0);
 }
 
-/** Recording a payment does not assume it is missing from the user's confirmed balance. */
-export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType): Account {
-  if (!Number.isFinite(amount) || round2(amount) <= 0) throw new Error("Income must be at least £0.01.");
+/** Recording a payment does not assume it is missing from the user's confirmed balance. Amount in pence. */
+export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType, id = crypto.randomUUID()): Account {
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error("Income must be at least £0.01.");
   if (!validDate(date)) throw new Error("Enter a valid payment date.");
-  const payout: Payout = { date, amount: round2(amount), kind: "actual", incomeType };
-  return { ...a, payouts: [...a.payouts, payout], bonus: incomeType === "bonus" ? undefined : a.bonus };
+  if ((a.payouts ?? []).some(p => p.id === id)) return a;
+  const payout: Payout = { id, date, amount, kind: "actual", incomeType };
+  return { ...a, currency: a.currency ?? "GBP", payouts: [...a.payouts, payout], bonus: incomeType === "bonus" ? undefined : a.bonus };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -124,10 +129,16 @@ export function upcoming(accts: Account[], today: string, days = 31) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Insert/replace the snapshot for the current month. */
+/** Insert/replace the snapshot for the current month. Amounts in pence. */
 export function upsertSnapshot(snaps: Snapshot[], accts: Account[], now: Date): Snapshot[] {
   const key = monthKey(now);
-  const snap: Snapshot = { month: key, totalBalance: round2(totalBalance(accts)), monthlyIncome: round2(totalMonthlyIncome(accts)), deposits: round2(depositsInMonth(accts, key)), withdrawals: round2(withdrawalsInMonth(accts, key)) };
+  const snap: Snapshot = {
+    month: key,
+    totalBalance: totalBalance(accts),
+    monthlyIncome: Math.round(totalMonthlyIncome(accts)),
+    deposits: depositsInMonth(accts, key),
+    withdrawals: withdrawalsInMonth(accts, key),
+  };
   return [...snaps.filter((s) => s.month !== key), snap].sort((a, b) => a.month.localeCompare(b.month));
 }
 
@@ -137,8 +148,6 @@ export function backupDue(lastBackupAt: string | null, hasData: boolean, now: Da
   if (!lastBackupAt) return true;
   return now.getTime() - new Date(lastBackupAt).getTime() > days * 86400000;
 }
-
-export const gbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
 
 const DAY = 86400000;
 const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
@@ -159,27 +168,45 @@ function rateOnSorted(h: RatePeriod[], date: string): number {
 }
 
 /**
+ * Rate scaled to millionths of one percent (ratePct * 1e6), for integer daily interest.
+ * Daily interest (pence) = balance × rateFP / (100 × 365 × 1e6) = balance × rateFP / 36_500_000_000.
+ */
+const RATE_SCALE = 1_000_000;
+const DAY_DENOM = 100n * 365n * BigInt(RATE_SCALE); // 36_500_000_000
+
+/**
  * Daily-compounding accrual from `start` (inclusive) to `end` (exclusive).
- * Each day uses the rate in force that day. Top-ups and withdrawals apply on their date,
- * so interest before them uses the old balance and compounding continues from the new one.
+ * Amounts are integer pence. Each day credits floor(carry + exact) pence and keeps the
+ * fractional remainder so Σ interest events === closing − opening − deposits + withdrawals.
+ * The day-count divisor is always 365 (including spans that cover a leap day).
  */
 export function accrue(opening: number, rates: number | RatePeriod[], events: Pick<BalanceEvent, "type" | "date" | "amount">[], start: string, end: string) {
-  // Sorted once here: rateOn is called for every day in the period.
   const hist = sortRates(typeof rates === "number" ? [{ from: "0000-01-01", ratePct: rates }] : rates);
   const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw") && x.date >= start && x.date < end && x.amount > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const open = Math.max(opening, 0);
+  const open = Math.max(Math.trunc(opening), 0);
   let bal = open, deposits = 0, withdrawals = 0, interest = 0, i = 0;
+  let carry = 0n;
+  const interestEvents: BalanceEvent[] = [];
   for (let day = t(start); day < t(end); day += DAY) {
     const d = ymd(new Date(day));
     for (; i < evs.length && evs[i].date === d; i++) {
       if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
       else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
     }
-    const inc = bal * (Math.max(rateOnSorted(hist, d), 0) / 100 / 365);
-    bal += inc; interest += inc;
+    const rateFP = BigInt(Math.round(Math.max(rateOnSorted(hist, d), 0) * RATE_SCALE));
+    if (bal > 0 && rateFP > 0n) {
+      carry += BigInt(bal) * rateFP;
+      const credited = Number(carry / DAY_DENOM);
+      carry = carry % DAY_DENOM;
+      if (credited > 0) {
+        bal += credited;
+        interest += credited;
+        interestEvents.push({ id: crypto.randomUUID(), type: "interest", date: d, amount: credited });
+      }
+    }
   }
-  return { opening: open, deposits, withdrawals, interest, closing: bal };
+  return { opening: open, deposits, withdrawals, interest, closing: bal, interestEvents };
 }
 
 /** Back-compatible wrapper: top-ups only, single or historical rate. */
@@ -187,22 +214,23 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
   return accrue(opening, rates, topups.map((x) => ({ type: "topup" as const, ...x })), start, end);
 }
 
-/** Set a new balance and append the matching event, leaving the original account untouched. */
-function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
-  return { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+/** Set a new balance and append the matching event, leaving the original account untouched. Amounts in pence. */
+function withEvent<A extends Pick<Account, "balance" | "events" | "currency">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number, id: string): A {
+  if ((a.events ?? []).some(e => e.id === id)) return a;
+  return { ...a, currency: a.currency ?? "GBP", balance, events: [...(a.events ?? []), { id, type, date, amount }] };
 }
 
-/** Apply a top-up: adds to balance and logs the event. */
-export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
-  if (!(amount > 0)) throw new Error("Top-up must be more than £0");
-  return withEvent(a, a.balance + amount, "topup", date, amount);
+/** Apply a top-up: adds to balance and logs the event. Amount in pence. Same id twice is a no-op. */
+export function applyTopUp<A extends Pick<Account, "balance" | "events" | "currency">>(a: A, amount: number, date: string, id = crypto.randomUUID()): A {
+  if (!Number.isSafeInteger(amount) || !(amount > 0)) throw new Error("Top-up must be more than £0");
+  return withEvent(a, a.balance + amount, "topup", date, amount, id);
 }
 
-/** Apply a withdrawal: reduces balance from that date and logs it. Can't exceed the balance. */
-export function applyWithdraw<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
-  if (!(amount > 0)) throw new Error("Withdrawal must be more than £0");
-  if (amount > a.balance + 1e-9) throw new Error("You can't withdraw more than the balance");
-  return withEvent(a, a.balance - amount, "withdraw", date, amount);
+/** Apply a withdrawal: reduces balance from that date and logs it. Compared in pence (exact balance OK, +1p refused). */
+export function applyWithdraw<A extends Pick<Account, "balance" | "events" | "currency">>(a: A, amount: number, date: string, id = crypto.randomUUID()): A {
+  if (!Number.isSafeInteger(amount) || !(amount > 0)) throw new Error("Withdrawal must be more than £0");
+  if (amount > a.balance) throw new Error("You can't withdraw more than the balance");
+  return withEvent(a, a.balance - amount, "withdraw", date, amount, id);
 }
 
 /** Record a rate change effective from `date`; ratePct becomes the rate in force on `today`. */
@@ -220,17 +248,65 @@ export function migrateRates<A extends Pick<Account, "ratePct" | "rateHistory" |
   return { ...a, rateHistory: [{ from, ratePct: a.ratePct }] };
 }
 
+function ensureEventId(e: BalanceEvent): BalanceEvent {
+  return e.id ? e : { ...e, id: crypto.randomUUID() };
+}
+function ensurePayoutId(p: Payout): Payout {
+  return p.id ? p : { ...p, id: crypto.randomUUID() };
+}
+
+/** Convert a legacy float-pound money field to integer pence. */
+function legacyToPence(amount: number): number {
+  return toPence(amount);
+}
+
+function migrateAccountMoney(a: Account): Account {
+  const m = migrateRates(a);
+  if (m.currency === "GBP") {
+    return {
+      ...m,
+      events: (m.events ?? []).map(ensureEventId),
+      payouts: m.payouts.map(ensurePayoutId),
+    };
+  }
+  return {
+    ...m,
+    currency: "GBP",
+    balance: legacyToPence(m.balance),
+    bonus: m.bonus ? { ...m.bonus, amount: legacyToPence(m.bonus.amount) } : undefined,
+    payouts: m.payouts.map(p => ensurePayoutId({ ...p, amount: legacyToPence(p.amount) })),
+    events: (m.events ?? []).map(e => ensureEventId({ ...e, amount: legacyToPence(e.amount) })),
+  };
+}
+
 export function migrateData(d: AppData, today: string): AppData {
-  return { ...d, accounts: d.accounts.map((a) => { const m = migrateRates(a); return { ...m, events: m.events ?? [], ratePct: rateOn(m.rateHistory!, today) }; }) };
+  const legacyMoney = d.money !== "pence";
+  const accounts = d.accounts.map((a) => {
+    const money = migrateAccountMoney(a);
+    return { ...money, ratePct: rateOn(money.rateHistory!, today) };
+  });
+  const snapshots = legacyMoney
+    ? d.snapshots.map(s => ({
+      ...s,
+      totalBalance: legacyToPence(s.totalBalance),
+      monthlyIncome: legacyToPence(s.monthlyIncome),
+      deposits: s.deposits !== undefined ? legacyToPence(s.deposits) : undefined,
+      withdrawals: s.withdrawals !== undefined ? legacyToPence(s.withdrawals) : undefined,
+    }))
+    : d.snapshots;
+  const projection = d.projection && legacyMoney
+    ? { ...d.projection, monthlyDeposit: legacyToPence(d.projection.monthlyDeposit) }
+    : d.projection;
+  return { ...d, money: "pence", accounts, snapshots, projection };
 }
 
-/** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. */
-export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, date: string): A {
-  if (!(balance >= 0)) throw new Error("Balance can't be negative");
-  return withEvent(a, balance, "set", date, balance);
+/** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. Amount in pence. */
+export function applySetBalance<A extends Pick<Account, "balance" | "events" | "currency">>(a: A, balance: number, date: string, id = crypto.randomUUID()): A {
+  if (!Number.isSafeInteger(balance) || !(balance >= 0)) throw new Error("Balance can't be negative");
+  return withEvent(a, balance, "set", date, balance, id);
 }
 
-/** Sum of top-ups across accounts in a YYYY-MM month. */
+/** Sum of top-ups across accounts in a YYYY-MM month (pence). */
 export function depositsInMonth(accts: Pick<Account, "events">[], month: string, type: "topup" | "withdraw" = "topup"): number {
   return accts.reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === type && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
 }
@@ -252,7 +328,7 @@ export function weekStart(date: string): string {
   return ymd(new Date(t(date) - dow * DAY));
 }
 
-/** Interest events grouped by week (Monday) or month, newest first. */
+/** Interest events grouped by week (Monday) or month, newest first. Amounts in pence. */
 export function interestHistory(events: BalanceEvent[] | undefined, by: "week" | "month"): { period: string; amount: number }[] {
   const m = new Map<string, number>();
   for (const e of events ?? []) if (e.type === "interest") {

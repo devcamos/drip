@@ -5,21 +5,21 @@ import { saveDraft, loadDraft, clearDraft } from "../lib/draft";
 import { rawStore } from "./storage-fixtures";
 import type { Account } from "../lib/types";
 
-const acct = (o: Partial<Account> = {}): Account => ({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, rateType: "interest",
+const acct = (o: Partial<Account> = {}): Account => ({ id: "d", provider: "MoneyFarm", label: "", balance: 1_000_000, currency: "GBP", ratePct: 3.65, rateType: "interest",
   frequency: "daily", nextPayoutDate: "2026-10-01", colour: "", payouts: [], events: [], createdAt: "2026-10-01T09:00:00Z", ...o });
 
 describe("daily interest", () => {
   it("predicts daily income without crediting the saved balance or creating payments", () => {
     const a = acct();
-    expect(M.payoutAmount(a)).toBeCloseTo(1);
-    expect(M.projection([a], 12).at(-1)!.income).toBeGreaterThan(365);
-    expect(a.balance).toBe(10000);
+    expect(M.payoutAmount(a)).toBeCloseTo(100);
+    expect(M.projection([a], 12).at(-1)!.income).toBeGreaterThan(36500);
+    expect(a.balance).toBe(1_000_000);
     expect(a.events).toEqual([]);
     expect(a.payouts).toEqual([]);
     expect(M.recordedIncome([a])).toBe(0);
   });
   it("daily accounts: per-day amount, no payout date, skipped from upcoming", () => {
-    expect(M.payoutAmount(acct())).toBeCloseTo(1);
+    expect(M.payoutAmount(acct())).toBeCloseTo(100);
     expect(M.nextPayout("2020-01-01", "daily", "2026-10-15")).toBe("2026-10-15");
     expect(M.upcoming([acct(), acct({ id: "m", frequency: "monthly", nextPayoutDate: "2026-10-20" })], "2026-10-15").map((u) => u.account.id)).toEqual(["m"]);
   });

@@ -1,13 +1,13 @@
 import type { Account } from "./types";
-import { addMonths, monthlyIncome, round2, totalBalance, weightedYield } from "./maths";
+import { addMonths, monthlyIncome, totalBalance, weightedYield } from "./maths";
 import { validDate } from "./products";
 
 export type IncomePeriod = "month" | "year" | "all";
 export function dividendIncome(accounts: Account[], asOf: string, period: IncomePeriod = "all") {
-  return round2(accounts.reduce((sum, account) => sum + account.payouts.filter(payment =>
+  return accounts.reduce((sum, account) => sum + account.payouts.filter(payment =>
     payment.kind === "actual" && (payment.incomeType ?? account.rateType) === "dividend" && validDate(payment.date) && payment.date <= asOf &&
     (period === "all" || payment.date.startsWith(asOf.slice(0, period === "month" ? 7 : 4))) && Number.isFinite(payment.amount) && payment.amount > 0,
-  ).reduce((amount, payment) => amount + payment.amount, 0), 0));
+  ).reduce((amount, payment) => amount + payment.amount, 0), 0);
 }
 export function dividendPortfolio(accounts: Account[], asOf: string) {
   const holdings = accounts.filter(account => account.rateType === "dividend");

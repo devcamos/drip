@@ -7,7 +7,7 @@ import { TRADING_212_HOLDINGS } from "../lib/products";
 import { accountCardStyle, normaliseColour } from "../lib/account-colour";
 import type { Account } from "../lib/types";
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
-const old: Account = { id: "stock", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", label: "Private pot", balance: 1000, ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#ffeedd", payouts: [{ date: "2026-10-01", amount: 4, kind: "actual" }], events: [], createdAt: "2026-10-01" };
+const old: Account = { id: "stock", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", label: "Private pot", balance: 100_000, currency: "GBP", ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#ffeedd", payouts: [{ id: "p1", date: "2026-10-01", amount: 400, kind: "actual" }], events: [], createdAt: "2026-10-01" };
 
 it("offers Lloyds with category-driven interest defaults, without choosing an ISA for the provider", () => {
   const save = vi.fn(); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
@@ -27,7 +27,7 @@ it("offers the six requested stocks and keeps yield and schedule user-entered wh
   change("Stock / fund", "Realty Income"); change("Stock / fund", "Digital Realty");
   expect(screen.getByLabelText("Rate")).toHaveValue("5.75"); expect(screen.getByLabelText("Paid")).toHaveValue("monthly");
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ holdingName: "Digital Realty", provider: "Trading212", ratePct: 5.75, frequency: "monthly", rateType: "dividend", balance: 1200 }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ holdingName: "Digital Realty", provider: "Trading212", ratePct: 5.75, frequency: "monthly", rateType: "dividend", balance: 120_000 }));
 });
 
 it("supports custom holdings and whole-account entries without confusing them with private nicknames", () => {

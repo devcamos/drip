@@ -4,6 +4,7 @@ import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
 import { createVault, encryptLocal } from "../lib/local-vault";
 import { wrapPasswordRoot } from "../lib/password-crypto";
 import { emptyData } from "../lib/db";
+import { toPence } from "../lib/money";
 
 test.use({ baseURL: "http://127.0.0.1:4347" });
 test("a saved password and encrypted records survive an old-to-new build update while signed out", async ({ page, context }) => {
@@ -22,7 +23,7 @@ test("a saved password and encrypted records survive an old-to-new build update 
     const username = "update_saver201", password = "Synthetic update meadow 42!";
     const root = generateRecoveryCode(), keys = await createVault(root);
     const data = { ...emptyData(), identity: { id: crypto.randomUUID(), handle: username, createdAt: "2026-10-26" }, accounts: [{
-      id: crypto.randomUUID(), provider: "Zopa", balance: 1234, ratePct: 4, rateType: "interest" as const,
+      id: crypto.randomUUID(), provider: "Zopa", balance: toPence(1234), currency: "GBP" as const, ratePct: 4, rateType: "interest" as const,
       frequency: "monthly" as const, nextPayoutDate: "2030-01-01", colour: "#2b2d86", payouts: [], createdAt: "2026-10-26",
     }] };
     const values = { data: await encryptLocal(data, keys), localVault: keys.header, verifier: await codeVerifier(root),

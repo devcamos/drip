@@ -8,7 +8,7 @@ const ranges = ["3m", "6m", "1y", "Max", "Future"] as const;
 type Range = typeof ranges[number];
 const rangeMonths: Record<Range, number> = { "3m": -3, "6m": -6, "1y": -12, Max: -12, Future: -12 };
 const dateLabel = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
-const compactGBP = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 1 }).format(n);
+const compactGBP = (pence: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 1 }).format(pence / 100);
 /** Keep chart calculations separate from controls and accessible rendering. */
 function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   const today = M.ymd(new Date()); const currentMonth = today.slice(0, 7);
@@ -34,7 +34,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
   const [range, setRange] = useState<Range>("Future"); const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState("");
   const assumptions = data.projection ?? { monthlyDeposit: 0, years: 1 };
-  const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
+  const [deposit, setDeposit] = useState(String(M.fromPence(assumptions.monthlyDeposit))); const [years, setYears] = useState(assumptions.years);
   const fillId = useId();
   const { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path } = balanceChart(data, range, assumptions);
   const br = M.momBreakdown(data.snapshots); const growth = br ? br.growthPct : M.momGrowth(data.snapshots);
@@ -76,7 +76,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
           event.preventDefault(); if (!validDeposit || saving) return;
           setSaving(true); setSaveError("");
           try {
-            if (await onAssumptions({ monthlyDeposit: Number(deposit), years })) setEditing(false);
+            if (await onAssumptions({ monthlyDeposit: M.toPence(Number(deposit)), years })) setEditing(false);
             else setSaveError("Projection could not be saved. Your entries are kept; retry Save projection.");
           } catch { setSaveError("Projection could not be saved. Your entries are kept; retry Save projection."); }
           finally { setSaving(false); }
