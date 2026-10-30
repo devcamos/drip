@@ -13,12 +13,12 @@ async function capture(page: Page, state: string) {
 
 test("password visibility works without altering credentials or submitting sign-in", async ({ page }) => {
   await page.goto("/#login");
-  await page.getByLabel("Sign-in gamertag", { exact: true }).fill("synthetic_entry");
+  await page.getByLabel("Gamertag", { exact: true }).fill("synthetic_entry");
   const input = page.getByLabel("Password", { exact: true });
   await input.fill(" A synthetic passphrase! ");
   await page.getByRole("button", { name: "Show password", exact: true }).click();
   await expect(input).toHaveAttribute("type", "text"); await expect(input).toHaveValue(" A synthetic passphrase! ");
-  await expect(page.getByRole("button", { name: "Sign in with password" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Hide password", exact: true }).click();
   await expect(input).toHaveAttribute("type", "password");
   await capture(page, "signin");

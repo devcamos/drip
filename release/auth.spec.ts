@@ -26,9 +26,9 @@ async function readiness(context: BrowserContext) {
 async function login(page: Page, username: string, password: string) {
   await page.goto(`${target.origin}/#login`);
   const form = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await form.getByLabel("Sign-in gamertag", { exact: true }).fill(username);
+  await form.getByLabel("Gamertag", { exact: true }).fill(username);
   await form.getByLabel("Password", { exact: true }).fill(password);
-  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in with password", exact: true }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in", exact: true }).click(), page.getByTestId("header-tag"));
   await expect(page.getByTestId("header-tag")).toContainText(username);
   const session = await page.request.get("/api/auth/get-session", { maxRedirects: 0 });
   expect(session.status()).toBe(200);
@@ -37,7 +37,7 @@ async function login(page: Page, username: string, password: string) {
 async function signOut(page: Page) {
   page.once("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Drip is signed out", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
   await expect.poll(async () => {
     const response = await page.request.get("/api/auth/get-session", { maxRedirects: 0 });
     return response.status() === 200 && await response.json() === null;

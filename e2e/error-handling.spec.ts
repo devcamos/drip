@@ -9,9 +9,9 @@ test("sign-in outages show a traceable safe message and keep sensitive payloads 
     headers: { "Content-Type": "application/json", "X-Drip-Request-Id": reference },
     body: JSON.stringify({ code: "AUTH_UNAVAILABLE", message: "private SQL should never appear", requestId: reference }) }));
   await page.goto("/#login");
-  await page.getByLabel("Sign-in gamertag").fill("synthetic_diag");
+  await page.getByLabel("Gamertag", { exact: true }).fill("synthetic_diag");
   await page.getByLabel("Password", { exact: true }).fill("Synthetic-only-password-42!");
-  await page.getByRole("button", { name: "Sign in with password" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   const alert = page.getByRole("form", { name: "Password sign-in", exact: true }).getByRole("alert");
   await expect(alert).toContainText(`Could not complete sign-in. Try again shortly. Reference: ${reference}`);
   await expect(alert).not.toContainText("private SQL");

@@ -26,7 +26,7 @@ test("signed-out accounts can accept a real build update and reopen their encryp
     const oldIdentity = await (await page.request.get("/sw-build.js")).text();
     page.on("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
     const saved = await vaultRecords(page);
     port = 4345;
     const newIdentity = await (await page.request.get("/sw-build.js")).text();
