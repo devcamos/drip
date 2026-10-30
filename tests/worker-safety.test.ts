@@ -90,6 +90,14 @@ it("binds password sign-in to the signed-out generation and rejects stale passwo
   await safeFetch("/api/auth/sign-in/gamertag", { method: "POST", headers: { "X-Drip-Resume": "out" } });
   expect(fetcher).toHaveBeenCalledOnce();
 });
+it.each(["gamertag-devices", "gamertag-revoke-device"])("requires the current signed-out generation for device management (%s)", async path => {
+  const { setItem } = await import("../lib/db"); await setItem("deviceSession", { signedOut: true, generation: "out" });
+  const fetcher = vi.fn(async () => Response.json({ devices: [] })); vi.stubGlobal("fetch", fetcher);
+  const url = `/api/auth/sign-in/${path}`;
+  await expect(safeFetch(url, { method: "POST" })).rejects.toThrow(/signed out/);
+  await expect(safeFetch(url, { method: "POST", headers: { "X-Drip-Resume": "old" } })).rejects.toThrow(/changed/);
+  await safeFetch(url, { method: "POST", headers: { "X-Drip-Resume": "out" } }); expect(fetcher).toHaveBeenCalledOnce();
+});
 it("serializes private requests with sign-out through the browser's shared lock", async () => {
   const { setItem } = await import("../lib/db");
   let tail: Promise<unknown> = Promise.resolve();

@@ -169,3 +169,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .phone-reminders .muted { line-height:1.6; }
 .phone-reminders .row-gap button { flex:1; }
 @media(max-width:359px) { .header-actions { gap:5px; } .header-actions .btn { padding:6px 8px; font-size:12px; } .payment-reminders li { grid-template-columns:48px minmax(0,1fr) auto; gap:7px; } .payment-reminders .btn { padding:7px; } .portfolio-holdings button { padding:14px; } }
+:where(.device-manager) h2 { margin-top: 0; }
+.device-list { list-style: none; padding: 0; margin: 1rem 0; }
+.device-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border, #d5c9b5); }
+.device-list h3 { margin: 0 0 .35rem; font-size: 1rem; }
+.device-list p { margin: .35rem 0 0; font-size: .875rem; }
+.device-list li > div { min-width: 0; overflow-wrap: anywhere; }
+.device-list button { flex-shrink: 0; }
+.device-current { font-size: .75rem; color: var(--accent, #984b26); font-weight: 700; }
+.device-count { font-weight: 700; }
+.device-confirm { padding: 1rem; margin: 1rem 0; border: 1px solid var(--border, #d5c9b5); border-radius: 1rem; background: var(--bg, #fffaf0); }
+.device-manager output { display: block; margin: 1rem 0; }

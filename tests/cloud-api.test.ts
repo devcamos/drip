@@ -23,6 +23,15 @@ describe("vault authorization and version contract", () => {
     expect(backend.handler).not.toHaveBeenCalled();
     expect((await authHandler(new Request(url, { method: "POST", headers: { origin }, body: "{}" }))).status).toBe(200);
   });
+  it.each(["gamertag-devices", "gamertag-revoke-device"])("protects %s with origin and streamed body bounds, including the stable Preview origin", async path => {
+    const url = origin + "/api/auth/sign-in/" + path;
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" }))).status).toBe(403);
+    expect((await authHandler(new Request(url, { method: "POST", headers: { origin }, body: "x".repeat(4097) }))).status).toBe(413);
+    expect(backend.handler).not.toHaveBeenCalled();
+    vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_BRANCH_URL", "drip-stable-preview.vercel.app");
+    expect((await authHandler(new Request("https://drip-stable-preview.vercel.app/api/auth/sign-in/" + path, { method: "POST", headers: { origin: "https://drip-stable-preview.vercel.app" }, body: "{}" }))).status).toBe(200);
+    vi.unstubAllEnvs();
+  });
   it("binds passkey registration to the connected owner, not a newly switched session", async () => {
     const request = new Request(origin + "/api/auth/passkey/verify-registration", { method: "POST", headers: { "X-Drip-Owner": "owner-1" } });
     backend.user = "owner-2";

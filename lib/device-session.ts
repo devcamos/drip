@@ -1,4 +1,4 @@
-import { getItem, setItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut, type VaultBinding, type RetainedAccount } from "./db";
+import { getItem, completeDeviceSession, hasCloudConnection, unlockLocalVault, lockLocalVault, prepareLocalSignOut, cancelLocalSignOut, localSessionBinding, commitLocalSignOut, type LocalSessionBinding, type VaultBinding, type RetainedAccount } from "./db";
 import { authClient, connect, restoreCloud } from "./cloud";
 import { checkCode } from "./crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
@@ -33,10 +33,11 @@ export async function finishDeviceSignOut(): Promise<void> {
   ending = { generation: current.generation, promise };
   try { await promise; } finally { if (ending?.promise === promise) ending = undefined; }
 }
-export async function signOutDevice() {
+export async function signOutDevice(expected?: LocalSessionBinding) {
+  const binding = expected ?? await localSessionBinding();
   // Finish edits already accepted by the UI before dropping their encryption key.
   await prepareLocalSignOut();
-  try { await setItem("deviceSession", { signedOut: true, remotePending: true, generation: crypto.randomUUID() } satisfies DeviceSession); }
+  try { await commitLocalSignOut(binding); }
   catch (error) { cancelLocalSignOut(); throw error; }
   notifyDeviceSession();
   await finishDeviceSignOut();

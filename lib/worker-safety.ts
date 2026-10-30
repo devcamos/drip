@@ -47,7 +47,7 @@ export const safeFetch: typeof fetch = async (input, init) => {
       (signoutGeneration && (!gate?.signedOut || gate.generation !== signoutGeneration)) ||
       (disconnectGeneration && (gate?.signedOut || (gate?.generation ?? "initial") !== disconnectGeneration))
     )) return Response.json({ success: true, stale: true });
-    const resuming = (["/api/auth/sign-in/email", "/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/get-session"].includes(url.pathname) || (url.pathname === "/api/cloud" && method === "GET")) && resumeGeneration === gate?.generation;
+    const resuming = (["/api/auth/sign-in/email", "/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/sign-in/gamertag-devices", "/api/auth/sign-in/gamertag-revoke-device", "/api/auth/get-session"].includes(url.pathname) || (url.pathname === "/api/cloud" && method === "GET")) && resumeGeneration === gate?.generation;
     if (gate?.signedOut && url.pathname !== "/api/auth/sign-out" && !resuming && !signup) throw new Error("Drip is signed out on this device.");
     headers.set("X-Drip-Device", deviceId);
     return fetch(input, { ...init, headers });
