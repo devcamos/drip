@@ -77,7 +77,8 @@ describe("vault authorization and version contract", () => {
     expect((await PUT(put("A".repeat(2_001_500)))).status).toBe(413);
     expect(isCloudEnvelope(null)).toBe(false);
   });
-  it("enforces compare-and-swap and reports conflicts instead of overwriting", async () => {
+  it.each([1, 2])("enforces compare-and-swap for encrypted format v%s and reports conflicts instead of overwriting", async v => {
+    const envelope = { app: "drip-cloud", v, iv: "AAAAAAAAAAAAAAAA", ct: "A".repeat(32) };
     const r = await PUT(put({ version: 1, envelope })); expect(r.status).toBe(409);
     expect(backend.query).toHaveBeenLastCalledWith(expect.stringContaining("version = $3"), ["owner-1", JSON.stringify(envelope), 1]);
     backend.query.mockImplementation(async (sql: string) => sql.includes("drip_vault_limits") ? { rows: [{ hits: 1 }] } : { rows: [{ version: 2 }] });

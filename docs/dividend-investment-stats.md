@@ -31,6 +31,17 @@ valid. Financial fields are explicitly included in the existing encrypted
 cloud allowlist; unknown nested fields and local nicknames are excluded. No
 server schema, dependency, authentication, service-worker or permission change.
 
+Cloud copies and encrypted backup files containing investment stats use format
+v2, with that version authenticated by AES-GCM. Updated Drip reads v1 and v2;
+copies without investment details stay v1. Older clients reject v2 before
+restoring or cleaning/reuploading it, preserving fields they cannot understand.
+The regression executes the actual pre-feature sync implementation against a
+new v2 copy: it rejects before any PUT or cloud-revision acknowledgement. Header
+downgrades fail decryption. Historical code fixtures are frozen test evidence,
+not a second runtime implementation. Server validation accepts both formats in
+the existing encrypted JSON column; no database migration is needed. An older
+app must update to read these newer copies, without clearing local storage.
+
 Evidence: new calculation/validation/allowlist/actual encrypted-IDB tests,
 component tests and browser journey in `e2e/stock-investment.spec.ts`. That
 journey uses a synthetic legacy fixture, actual local encryption/recovery/save/
