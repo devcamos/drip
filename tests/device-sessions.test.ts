@@ -36,6 +36,18 @@ function fixture(initial: Row[]) {
 const row = (id: string, device: string | null = null, active = true): Row => ({ id, userId: "owner", dripDeviceId: device, active });
 beforeEach(() => vi.clearAllMocks());
 
+it("admits four distinct browsers and rejects only the fifth without evicting existing sign-ins", async () => {
+  const f = fixture([]);
+  for (let i = 1; i <= 4; i++) {
+    f.rows.push(row(`browser-${i}`, crypto.randomUUID()));
+    await f.hooks.session.create.after({ id: `browser-${i}`, userId: "owner" }, { path: "/sign-in/email" });
+    expect(f.rows).toHaveLength(i);
+  }
+  f.rows.push(row("fifth", crypto.randomUUID()));
+  await expect(f.hooks.session.create.after({ id: "fifth", userId: "owner" }, { path: "/sign-in/email" })).rejects.toMatchObject({ statusCode: 409, body: { code: "DEVICE_LIMIT_REACHED" } });
+  expect(f.rows.map(item => item.id)).toEqual(["browser-1", "browser-2", "browser-3", "browser-4"]);
+});
+
 it("sets only a valid public browser UUID, ignores missing legacy headers and rejects malformed identifiers", async () => {
   const { hooks } = fixture([]);
   expect(await hooks.session.create.before({}, { headers: new Headers({ "X-Drip-Device": first.toUpperCase() }) })).toEqual({ data: { dripDeviceId: first } });
@@ -43,18 +55,18 @@ it("sets only a valid public browser UUID, ignores missing legacy headers and re
   await expect(hooks.session.create.before({}, { headers: new Headers({ "X-Drip-Device": "skip-this-device" }) })).rejects.toThrow(/Invalid browser identifier/);
 });
 
-it("counts legacy sessions separately, ignores expired sessions and rejects a third browser without evicting either signed-in browser", async () => {
-  const f = fixture([row("old-1"), row("old-2"), row("expired", null, false), row("candidate", first)]);
+it("counts legacy sessions separately, ignores expired sessions and rejects a fifth browser without evicting existing browsers", async () => {
+  const f = fixture([row("old-1"), row("old-2"), row("old-3"), row("old-4"), row("expired", null, false), row("candidate", first)]);
   await expect(f.hooks.session.create.after({ id: "candidate", userId: "owner" }, { path: "/sign-in/email" })).rejects.toThrow(DEVICE_LIMIT_MESSAGE);
-  expect(f.rows.map(item => item.id)).toEqual(["old-1", "old-2", "expired"]);
+  expect(f.rows.map(item => item.id)).toEqual(["old-1", "old-2", "old-3", "old-4", "expired"]);
   expect(f.events.at(-1)).toBe("COMMIT");
   expect(f.events).not.toContain("ROLLBACK");
 });
 
-it("renews the same browser by rotating its previous sessions, retaining at most two active tokens", async () => {
-  const f = fixture([row("old", first), row("other", second), row("candidate", first)]);
+it("renews the same browser at the four-device cap by rotating only its previous sessions", async () => {
+  const f = fixture([row("old", first), row("other", second), row("third"), row("fourth"), row("candidate", first)]);
   await f.hooks.session.create.after({ id: "candidate", userId: "owner" }, { path: "/sign-in/email" });
-  expect(f.rows.map(item => item.id)).toEqual(["other", "candidate"]);
+  expect(f.rows.map(item => item.id)).toEqual(["other", "third", "fourth", "candidate"]);
 });
 
 it("does not rotate any session if the candidate was revoked or expired before admission", async () => {
@@ -63,17 +75,17 @@ it("does not rotate any session if the candidate was revoked or expired before a
   expect(f.rows).toEqual([row("old", first)]);
 });
 
-it("serializes simultaneous candidates and conservatively rejects pending candidates rather than exceeding two sessions", async () => {
-  const f = fixture([row("old", first), row("candidate-a", second), row("candidate-b")]);
+it("serializes simultaneous candidates for the last slot without exceeding four sessions", async () => {
+  const f = fixture([row("old", first), row("second"), row("third"), row("candidate-a", second), row("candidate-b")]);
   const outcomes = await Promise.allSettled(["candidate-a", "candidate-b"].map(id => f.hooks.session.create.after({ id, userId: "owner" }, null)));
   expect(outcomes.filter(result => result.status === "fulfilled")).toHaveLength(1);
-  expect(f.rows).toHaveLength(2);
+  expect(f.rows).toHaveLength(4);
 });
 
 it.each(["/sign-up/email", "/sign-in/email", "/passkey/verify-authentication", "/passkey/verify-registration", "/other-plugin-sign-in"])('covers session creation from %s', async path => {
-  const f = fixture([row("one"), row("two"), row("candidate")]);
+  const f = fixture([row("one"), row("two"), row("three"), row("four"), row("candidate")]);
   await expect(f.hooks.session.create.after({ id: "candidate", userId: "owner" }, { path })).rejects.toMatchObject({ statusCode: 409, body: { code: "DEVICE_LIMIT_REACHED" } });
-  expect(f.rows).toHaveLength(2);
+  expect(f.rows).toHaveLength(4);
 });
 
 it("defers only the exact custom password endpoint, retaining its owner-locked fresh credential recheck", async () => {
@@ -86,7 +98,7 @@ it("defers only the exact custom password endpoint, retaining its owner-locked f
 });
 
 it.each([false, true])("strips queued signup cookies and tokens after cap or database admission failure (database: %s)", async databaseFailure => {
-  const f = fixture([row("one"), row("two"), row("candidate")]);
+  const f = fixture([row("one"), row("two"), row("three"), row("four"), row("candidate")]);
   if (databaseFailure) f.execute.mockRejectedValue(new Error("Database secret must not escape"));
   const response = await guardDeviceAuthResponse(async () => {
     const queued = Response.json({ token: "private-candidate-token" }, { headers: { "Set-Cookie": "session=private-cookie; HttpOnly" } });

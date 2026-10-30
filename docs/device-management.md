@@ -1,9 +1,9 @@
 # Signed-in device management
 
-When password login reaches the two-device limit, **Manage devices** lets the
+When password login reaches the four-device limit, **Manage devices** lets the
 user inspect existing sign-ins, explicitly sign out an old one, and continue
 signing in here. The same panel is available from Settings → Signed-in devices
-after password confirmation. The cap stays at two browsers/devices; Safari and
+after password confirmation. The cap is four browsers/devices; Safari and
 an installed Home Screen app may occupy separate slots.
 
 Names are estimates from the session's browser information. Dates mean **signed
@@ -15,7 +15,7 @@ agents, financial data or encrypted root/password wrappers.
 
 - Both management actions require the normal gamertag password proof, even
   when an authenticated cookie exists. They issue no new session or cookie, so
-  a user at the cap can still manage the account without a third sign-in.
+  a user at the cap can still manage the account without a fifth sign-in.
 - The existing login throttles apply. Both POST endpoints use strict schemas,
   same-origin checks and the streamed4KB password-body bound. Success responses
   are `no-store`; old cache-everything workers still block private operations.
@@ -45,7 +45,7 @@ configuration; older branch-specific settings are not inherited.
 
 `integration/device-management.test.ts` runs real Better Auth HTTP handlers and
 Postgres SQL in a fresh schema of the guarded loopback test database. It verifies
-third-browser rejection→password-verified listing→revocation→new login, old
+four successful sign-ins→fifth-browser rejection→password-verified listing→revocation→new login, old
 cookie invalidation, owner isolation, current-device sign-out, strict payloads
 and concurrent revoke/login admission. The schema is removed afterward; no
 hosted database is accessed. Node `pg` exercises the compatible SQL surface of

@@ -54,8 +54,8 @@ copy is already cloud-saved. Cancelling leaves it intact; unsynced or device-onl
 copies must be synced before replacement. Confirmation is bound to the exact
 saved copy, so concurrent edits cancel the switch rather than being overwritten.
 
-Up to two browser profiles/devices can hold active cloud sessions per account.
-Reopening the same browser renews its slot; a third browser must wait for a sign-out.
+Up to four browser profiles/devices can hold active cloud sessions per account.
+Reopening the same browser renews its slot; a fifth browser must wait for a sign-out.
 An opaque browser identifier is shared across tabs and retained across sign-out;
 it is not a hardware fingerprint. Password, recovery and cloud-passkey sign-in
 share server-side admission. The cap cannot revoke offline copies or keys already
