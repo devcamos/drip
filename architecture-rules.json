@@ -7,7 +7,10 @@
     "Treat authentication, authorization, billing, and data integrity changes as high-risk review boundaries; scope sensitivity alone is not evidence of a rule violation.",
     "Before reporting missing authorization, validation, or tests, trace the existing server endpoints, crypto/helpers, and named tests. Cite a concrete failing branch and its impact rather than asking to verify an already implemented control.",
     "If essential surrounding implementation or test context is unavailable, record an unverified follow-up rather than a confirmed architecture finding. Preserve the configured severity when a rule violation is demonstrated.",
-    "Do not treat generated files, lockfiles, or diagnostic noise as architectural violations by themselves."
+    "Do not treat generated files, lockfiles, or diagnostic noise as architectural violations by themselves.",
+    "For ARCH-009, cite the specific failing branch or response behavior. Inspect withApiErrors, logFailure and their route/component call sites before claiming missing handling. If relevant implementation is absent from a truncated diff, report an unverified follow-up instead of an asserted defect.",
+    "Distinguish sensitive change boundaries from demonstrated defects. Explain a high risk rating with concrete evidence; do not describe correct protections as violations or mark a guardrail Pass while reporting a violation of that same protection.",
+    "Dependency availability alone is an upgrade suggestion, not a security finding. Node type definitions should match the deployed Node runtime; audit advisories and major-upgrade compatibility are separate concerns."
   ],
   "rules": [
     {

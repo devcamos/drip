@@ -20,8 +20,11 @@ jobs:
       - name: Security audit (fails on high or critical)
         run: npm audit --audit-level=high
       - run: npm run typecheck
-      - name: Unit + component tests with coverage (global ≥85%, lib ≥90/85)
+      - name: Unit + integration + component coverage (app and server ≥85%, lib ≥90/85)
         run: npm test
+      - uses: actions/upload-artifact@v7
+        if: always() && hashFiles('coverage/**') != ''
+        with: { name: coverage-report, path: coverage, if-no-files-found: error }
       - name: Payment notification Postgres integration
         run: npm run test:integration
         env:

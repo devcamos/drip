@@ -71,6 +71,31 @@ it("authenticates online before opening a cached copy and refuses a stale respon
   await expect(signInPassword("tester", password)).rejects.toThrow(/session changed/);
   await expect(loadData()).rejects.toThrow(/Unlock/);
 });
+it.each([
+  ["HTML rate limit", () => new Response("Too many requests", { status: 429 }), /Too many sign-in attempts/],
+  ["empty denial", () => Response.json(null, { status: 401 }), /Could not sign in\. Try again online/],
+  ["non-string denial", () => Response.json({ message: { private: "detail" } }, { status: 400 }), /Could not sign in\. Try again online/],
+  ["null success", () => Response.json(null), /Invalid encrypted sign-in response/],
+  ["malformed success", () => new Response("<html>Gateway</html>"), /Could not sign in\. Try again online/],
+  ["server outage", () => new Response("private server detail", { status: 503, headers: { "x-drip-request-id": "11111111-1111-4111-8111-111111111111" } }), /Try again shortly\. Reference: 11111111-1111-4111-8111-111111111111/],
+] as const)("handles %s without changing the saved vault", async (_label, response, expected) => {
+  vi.stubGlobal("navigator", { onLine: true });
+  request.mockResolvedValueOnce(response());
+  const before = await rawStore();
+  await expect(signInPassword("tester", password)).rejects.toThrow(expected);
+  expect(await rawStore()).toEqual(before);
+  expect(cloud.restoreCloud).not.toHaveBeenCalled();
+});
+it.each([new TypeError("Failed to fetch"), new DOMException("Private request timeout", "TimeoutError"), new DOMException("Private abort", "AbortError")])("explains a transport failure without exposing browser internals", async error => {
+  vi.stubGlobal("navigator", { onLine: true }); request.mockRejectedValueOnce(error);
+  await expect(signInPassword("tester", password)).rejects.toThrow("Could not connect to Drip. Check your connection and try again.");
+  expect(await loadData()).toEqual(data);
+});
+it("preserves a device-generation safety error instead of treating it as a network failure", async () => {
+  vi.stubGlobal("navigator", { onLine: true }); request.mockRejectedValueOnce(new Error("Device session changed. Try signing in again."));
+  await expect(signInPassword("tester", password)).rejects.toThrow(/Device session changed/);
+  expect(await loadData()).toEqual(data);
+});
 it("restores a fresh browser with just gamertag and password", async () => {
   const envelope = await wrapPasswordRoot(fixtureCode, "tester", password, "owner");
   lockLocalVault(true);

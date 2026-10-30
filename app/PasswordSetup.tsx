@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { passwordRecoveryRoot, passwordUsername, setLoginPassword } from "@/lib/password-login";
 import { hasPasskeyUnlock, passkeyRecoveryRoot } from "@/lib/passkey-unlock";
 import type { AppData } from "@/lib/types";
+import { PasswordInput } from "./PasswordInput";
 
 export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
   const [username, setUsername] = useState(data.identity?.handle ?? ""); const [code, setCode] = useState("");
@@ -40,10 +41,10 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
         <input id="setup-login-code" type="password" autoComplete={method === "password" ? "current-password" : "off"} autoCapitalize="none" value={code} onChange={event => setCode(event.target.value)} disabled={busy} />
       </>}
       <label htmlFor="setup-login-password">New password</label>
-      <input id="setup-login-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
+      <PasswordInput id="setup-login-password" visibilityLabel="new password" autoComplete="new-password" minLength={12} maxLength={256} value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
       <p className="muted">Use at least 12 characters. You can save it in your password manager.</p>
       <label htmlFor="setup-login-confirm">Confirm password</label>
-      <input id="setup-login-confirm" type="password" autoComplete="new-password" value={again} onChange={event => setAgain(event.target.value)} disabled={busy} />
+      <PasswordInput id="setup-login-confirm" visibilityLabel="password confirmation" autoComplete="new-password" value={again} onChange={event => setAgain(event.target.value)} disabled={busy} />
       <button type="submit" className="btn" disabled={busy || !username || (method !== "passkey" && !code) || !password || !again}>{busy ? "Saving password…" : "Save password"}</button>
     </form>
     {message && <output className="muted">{message}</output>}

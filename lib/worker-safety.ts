@@ -1,4 +1,5 @@
 import { browserDeviceId, getItem } from "./db";
+import { logFailure, type DiagnosticOperation } from "./diagnostics";
 let verified: ServiceWorker | null = null;
 /** Old Drip workers cached every GET, including APIs. Do not use cloud auth under one. */
 export async function requireSafeWorker() {
@@ -17,7 +18,7 @@ export async function requireSafeWorker() {
 }
 let privateQueue: Promise<unknown> = Promise.resolve();
 /** Serialize private requests with sign-out, including across tabs on supporting browsers. */
-export const safeFetch: typeof fetch = async (input, init) => {
+const guardedFetch: typeof fetch = async (input, init) => {
   await requireSafeWorker();
   let address: string;
   if (typeof input === "string") address = input;
@@ -56,4 +57,19 @@ export const safeFetch: typeof fetch = async (input, init) => {
   const request = privateQueue.then(run, run);
   privateQueue = request.catch(() => {});
   return request;
+};
+
+export const safeFetch: typeof fetch = async (input, init) => {
+  const address = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  let operation: DiagnosticOperation = "network";
+  try {
+    const path = new URL(address, "https://drip.invalid").pathname;
+    if (path.startsWith("/api/auth/")) operation = "auth";
+    else if (path === "/api/cloud") operation = "cloud";
+    else if (path === "/api/cloud/status") operation = "cloud.status";
+    else if (path === "/api/recovery-codes") operation = "recovery";
+    const response = await guardedFetch(input, init);
+    if (response.status >= 500) logFailure(operation, undefined, { status: response.status, requestId: response.headers.get("x-drip-request-id") ?? undefined });
+    return response;
+  } catch (error) { logFailure(operation, error); throw error; }
 };

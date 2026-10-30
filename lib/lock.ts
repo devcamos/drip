@@ -3,6 +3,7 @@
  * and does not unwrap the local encryption key. The separate local vault needs
  * a recovery code on a fresh page; this extra screen gate keeps its key in memory.
  */
+import { logFailure } from "./diagnostics";
 export const LOCK_AFTER_MS = 5 * 60 * 1000;
 
 /** Lock when enabled and either first open or hidden for at least 5 minutes. */
@@ -18,7 +19,7 @@ const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(
 type Creds = Pick<CredentialsContainer, "create" | "get">;
 
 export async function passkeySupported(pkc: any = (globalThis as any).PublicKeyCredential): Promise<boolean> {
-  try { return !!pkc && (await pkc.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { return false; }
+  try { return !!pkc && (await pkc.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (error) { logFailure("auth", error); return false; }
 }
 
 /** Register a device passkey (Face ID / Touch ID). Returns the credential id. No server: we only need the local check. */
@@ -45,5 +46,5 @@ export async function verifyPasskey(creds: Creds, credentialId: string, rpId: st
         allowCredentials: [{ type: "public-key", id: unb64u(credentialId) }] },
     })) as PublicKeyCredential | null;
     return !!cred && b64u(cred.rawId) === credentialId;
-  } catch { return false; }
+  } catch (error) { logFailure("auth", error); return false; }
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as L from "../lib/lock";
+import * as Diagnostics from "../lib/diagnostics";
 
 describe("lock timing", () => {
   it("locks on open and after 5 minutes hidden, only when enabled", () => {
@@ -13,6 +14,15 @@ describe("lock timing", () => {
 
 describe("passkey", () => {
   const raw = new Uint8Array([251, 255, 1, 2, 3]).buffer; // exercises base64url - and _
+  it("records unexpected authenticator failures while staying closed", async () => {
+    const failure = new Error("Synthetic device service failure");
+    const logged = vi.spyOn(Diagnostics, "logFailure").mockImplementation(() => {});
+    expect(await L.passkeySupported({ isUserVerifyingPlatformAuthenticatorAvailable: async () => { throw failure; } })).toBe(false);
+    expect(logged).toHaveBeenCalledWith("auth", failure);
+    logged.mockClear();
+    expect(await L.verifyPasskey({ create: vi.fn(), get: async () => { throw failure; } } as any, "AQID", "localhost")).toBe(false);
+    expect(logged).toHaveBeenCalledWith("auth", failure);
+  });
   it("support detection", async () => {
     expect(await L.passkeySupported(undefined)).toBe(false);
     expect(await L.passkeySupported({ isUserVerifyingPlatformAuthenticatorAvailable: async () => true })).toBe(true);

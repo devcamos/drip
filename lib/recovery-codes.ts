@@ -1,6 +1,7 @@
 import * as C from "./crypto";
 import { getItem, setItem } from "./db";
 import { safeFetch } from "./worker-safety";
+import { responseError } from "./diagnostics";
 
 export interface RecoveryRecord { locator: string; envelope: C.BackupFile }
 export const isAlternativeCode = (code: string) => C.normaliseCode(code).startsWith("DRIP2");
@@ -21,7 +22,7 @@ export async function resolveRecoveryCode(code: string): Promise<string> {
   let record = cached?.find(r => r.locator === locator);
   if (!record) {
     const response = await safeFetch("/api/recovery-codes", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locator }) });
-    if (!response.ok) throw new Error("Recovery code not found. Check the code and your connection.");
+    if (!response.ok) throw responseError(response, response.status >= 500 ? "Recovery is unavailable. Try again shortly." : "Recovery code not found. Check the code and your connection.");
     record = { locator, envelope: (await response.json()).envelope };
   }
   const value = await C.decryptBackup<{ purpose: string; root: string }>(record.envelope, code);
@@ -34,7 +35,7 @@ export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: 
   const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }), signal });
   if (!response.ok) {
     const value = await response.json().catch(() => ({}));
-    throw new Error(value.code === "RECOVERY_CODES_EXIST" ? "Your original recovery codes are already set up. Use your saved recovery file; another set cannot be created." : "Could not save your original recovery codes. Keep this browser signed in and retry when connected.");
+    throw responseError(response, value.code === "RECOVERY_CODES_EXIST" ? "Your original recovery codes are already set up. Use your saved recovery file; another set cannot be created." : "Could not save your original recovery codes. Keep this browser signed in and retry when connected.");
   }
   const replaced = new Set(records.map(record => record.locator)); try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !replaced.has(old.locator)), ...records].slice(-12)); return true; } catch { return false; }
 }

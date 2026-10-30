@@ -2,6 +2,9 @@ import { expect, it } from "vitest";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { deviceSessionHooks, guardDeviceAuthResponse } from "../server/device-sessions";
+import { withApiErrors } from "../server/http-errors";
+
+const guardedRequest = (work: () => Promise<Response>) => withApiErrors("auth", () => guardDeviceAuthResponse(work), { code: "AUTH_UNAVAILABLE", message: "Could not complete sign-in. Try again shortly." });
 
 it("applies the cap to real email sign-ins and renews a browser without adding a third token", async () => {
   const memory: Record<string, Record<string, any>[]> = { user: [], session: [], account: [], verification: [] };
@@ -23,12 +26,14 @@ it("applies the cap to real email sign-ins and renews a browser without adding a
     emailAndPassword: { enabled: true }, databaseHooks: deviceSessionHooks(db),
     session: { additionalFields: { dripDeviceId: { type: "string", input: false, returned: false, required: false } } },
   });
-  const send = (path: string, device: string) => guardDeviceAuthResponse(() => auth.handler(new Request(origin + "/api/auth/" + path, {
+  const send = (path: string, device: string) => guardedRequest(() => auth.handler(new Request(origin + "/api/auth/" + path, {
     method: "POST", headers: { origin, "Content-Type": "application/json", "X-Drip-Device": device },
     body: JSON.stringify({ email: "synthetic@recovery.drip.invalid", password: "Synthetic-password-only-42!", name: "Synthetic" }),
   })));
   const first = "11111111-1111-4111-8111-111111111111", second = "22222222-2222-4222-8222-222222222222", third = "33333333-3333-4333-8333-333333333333";
-  expect((await send("sign-up/email", first)).status).toBe(200);
+  const created = await send("sign-up/email", first);
+  expect(created.status).toBe(200); expect(created.headers.getSetCookie().length).toBeGreaterThan(0);
+  expect(created.headers.get("x-drip-request-id")).toMatch(/^[0-9a-f-]{36}$/);
   expect((await send("sign-in/email", second)).status).toBe(200);
   const previous = memory.session.find(row => row.dripDeviceId === first)!.token;
   const denied = await send("sign-in/email", third);
@@ -68,7 +73,7 @@ it.each(["limit", "database"])("does not expose a signup cookie/token after a re
       },
     } } },
   });
-  const response = await guardDeviceAuthResponse(() => auth.handler(new Request(origin + "/api/auth/sign-up/email", {
+  const response = await guardedRequest(() => auth.handler(new Request(origin + "/api/auth/sign-up/email", {
     method: "POST", headers: { origin, "Content-Type": "application/json" },
     body: JSON.stringify({ email: "synthetic@recovery.drip.invalid", password: "Synthetic-password-only-42!", name: "Synthetic" }),
   })));

@@ -6,6 +6,10 @@ button, input, select { font-family:inherit; }
 .bal, .big, .stat .v, .list b, input[inputmode="decimal"] { font-variant-numeric:tabular-nums; }
 body { padding: env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom)); }
 main { max-width: 480px; margin: 0 auto; padding: 16px; }
+.password-input { position: relative; }
+.password-input input { padding-right: 76px; }
+.password-visibility { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); min-width: 52px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.password-visibility:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
 h1 { font-size: 28px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 20px 0 8px; }
 .muted { color: var(--muted); font-size: 14px; }
 output { display:block; margin:1em 0; }

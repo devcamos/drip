@@ -28,6 +28,7 @@ import { IncomeSummary } from "./IncomeSummary";
 import { displayProvider, productLabel } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
+import { logFailure } from "@/lib/diagnostics";
 import { DividendPortfolio } from "./DividendPortfolio";
 import { PaymentNotifications } from "./PaymentNotifications";
 import { PhoneReminderSync } from "./PhoneReminders";
@@ -53,7 +54,7 @@ export default function Drip() {
       if (id !== sequence.current) return;
       if (status === "unlocked" && !session?.signedOut && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
       setGate({ status, signedOut: !!session?.signedOut, signupRecovery: !!checkpoint && checkpoint.vaultId === binding?.vaultId }); setError("");
-    } catch { if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
+    } catch (error) { logFailure("app.load", error); if (id === sequence.current) setError("Could not open local storage. Your stored copy has not been changed. Try again."); }
   }, []);
   useEffect(() => {
     const open = (event: MessageEvent) => {
@@ -135,7 +136,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         const already = await navigator.storage.persisted?.();
         if (!already) await navigator.storage.persist();
       }
-    })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
+    })().catch(error => { logFailure("app.load", error); setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."); });
     return () => { loadSequence.current++; };
   }, []);
 
@@ -154,7 +155,8 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         if (latestData.current !== previous || generation !== dataGeneration.current) return false;
         latestData.current = withSnap; setData(withSnap); setSaveError("");
         return true;
-      } catch {
+      } catch (error) {
+        logFailure("app.save", error);
         setSaveError("Changes could not be saved. Your saved data is unchanged; retry the action.");
         return false;
       } finally { setPendingSaves(n => n - 1); }
@@ -268,7 +270,7 @@ function Onboarding({ onDone }: Readonly<{ onDone: (v: Verifier | undefined, res
     void (async () => {
       const d = (await loadDraft()) ?? { handle: "" };
       await saveDraft(d); if (active) setDraft(d);
-    })().catch(() => { if (active) setError("Could not prepare signup on this device. Try again."); });
+    })().catch(error => { logFailure("app.load", error); if (active) setError("Could not prepare signup on this device. Try again."); });
     return () => { active = false; };
   }, [draftAttempt]);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -361,7 +363,7 @@ function LockScreen({ credentialId, verifier, onUnlock }: Readonly<{ credentialI
         <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
         <label>Or use your recovery code</label>
         <input aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
-        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { try { if (await C.checkCode(await resolveRecoveryCode(code), verifier)) onUnlock(); else setErr("That isn't your recovery code."); } catch (e) { setErr((e as Error).message); } }}>Unlock with code</button></div>
+        <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { try { if (await C.checkCode(await resolveRecoveryCode(code), verifier)) onUnlock(); else setErr("That isn't your recovery code."); } catch (e) { logFailure("auth", e); setErr((e as Error).message); } }}>Unlock with code</button></div>
         {err && <p className="err">{err}</p>}
       </div>
     </main>
@@ -380,7 +382,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
       ) : supported === false ? <p className="muted">This device or browser doesn&apos;t support a passkey lock.</p> : (
         <button className="btn" disabled={!supported} onClick={async () => {
           try { const id = await L.registerPasskey(navigator.credentials, location.hostname, { id: I.idBytes(data.identity!.id), name: I.formatTag(data.identity!) }); onLock({ credentialId: id, enabledAt: new Date().toISOString() }); setLockMsg("App lock is on."); }
-          catch { setLockMsg("Couldn't set up the passkey."); }
+          catch (error) { logFailure("auth", error); setLockMsg("Couldn't set up the passkey."); }
         }}>Turn on app lock</button>
       )}
       {lockMsg && <p className="ok">{lockMsg}</p>}
@@ -413,7 +415,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
             if ((navigator as any).canShare?.({ files: [f] })) await navigator.share({ files: [f], title: "Drip backup" });
             else { const u = URL.createObjectURL(blob); const el = document.createElement("a"); el.href = u; el.download = name; el.click(); URL.revokeObjectURL(u); }
             onBackedUp(); setMsg({ ok: true, t: "Backup saved." }); setCode("");
-          } catch (e) { if ((e as Error).name !== "AbortError") setMsg({ ok: false, t: "Backup failed. Please try again." }); }
+          } catch (e) { if ((e as Error).name !== "AbortError") { logFailure("backup.export", e); setMsg({ ok: false, t: "Backup failed. Please try again." }); } }
           finally { setBusy(false); }
         }}>{busy ? "Encrypting…" : "Export backup"}</button></div>
         {msg && <p className={msg.ok ? "ok" : "err"}>{msg.t}</p>}
@@ -451,7 +453,7 @@ function Restore({ onRestored }: Readonly<{ onRestored: (d: AppData, code: strin
           const d = await C.decryptBackup(JSON.parse(await file!.text()), root);
           if (!isAppData(d)) throw new C.BackupError("The backup's contents aren't valid.");
           await onRestored(M.migrateData(d, today()), root, device?.generation);
-        } catch (e) { setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
+        } catch (e) { logFailure("backup.restore", e); setErr(e instanceof C.BackupError ? e.message : "That file couldn't be read."); }
         finally { setBusy(false); }
       }}>{busy ? "Decrypting…" : "Restore"}</button></div>
       {err && <p className="err">{err}</p>}

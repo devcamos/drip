@@ -10,6 +10,27 @@ import { PasswordSetup } from "../app/PasswordSetup";
 import { emptyData } from "../lib/db";
 import { AccountSwitchRequired } from "../lib/account-switch";
 beforeEach(() => { vi.clearAllMocks(); actions.passwordUsername.mockResolvedValue("tester"); actions.signInPassword.mockResolvedValue(undefined); actions.setLoginPassword.mockResolvedValue("tester"); actions.passwordRecoveryRoot.mockResolvedValue("password-verified-root"); passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.passkeyRecoveryRoot.mockResolvedValue("passkey-verified-root"); });
+it("shows a useful fallback for a non-Error rejection and leaves credentials available for retry", async () => {
+  actions.signInPassword.mockRejectedValueOnce("private-synthetic-rejection");
+  const done = vi.fn(); render(<PasswordSignIn onSignedIn={done} />);
+  await waitFor(() => expect(screen.getByLabelText("Gamertag")).toHaveValue("tester"));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not sign in. Try again shortly.");
+  expect(screen.getByLabelText("Password")).toHaveValue("Synthetic password 42!");
+  expect(done).not.toHaveBeenCalled();
+});
+it("keeps manual sign-in available when reading the saved gamertag fails", async () => {
+  actions.passwordUsername.mockRejectedValueOnce(new DOMException("private-synthetic-store", "QuotaExceededError"));
+  const output = vi.spyOn(console, "error").mockImplementation(() => {});
+  const done = vi.fn(); render(<PasswordSignIn onSignedIn={done} />);
+  await waitFor(() => expect(output).toHaveBeenCalled());
+  expect(JSON.stringify(output.mock.calls)).not.toContain("private-synthetic");
+  fireEvent.change(screen.getByLabelText("Gamertag"), { target: { value: "manual_user" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(done).toHaveBeenCalledOnce());
+});
 it("does not replace a typed or autofilled gamertag with a late saved-account lookup", async () => {
   let finishLookup!: (name: string) => void;
   actions.passwordUsername.mockReturnValueOnce(new Promise(resolve => { finishLookup = resolve; }));

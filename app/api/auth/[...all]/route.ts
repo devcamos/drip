@@ -1,5 +1,6 @@
 import { getAuth, cloudConfigured } from "@/server/auth";
 import { guardDeviceAuthResponse } from "@/server/device-sessions";
+import { withApiErrors } from "@/server/http-errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function boundedPasswordRequest(request: Request): Promise<Request | Response> {
@@ -29,4 +30,5 @@ async function handler(request: Request) {
   }
   return guardDeviceAuthResponse(() => getAuth().handler(request));
 }
-export { handler as GET, handler as POST };
+const guarded = (request: Request) => withApiErrors("auth", () => handler(request), { code: "AUTH_UNAVAILABLE", message: "Could not complete sign-in. Try again shortly." }, request);
+export { guarded as GET, guarded as POST };

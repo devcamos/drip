@@ -2,13 +2,15 @@
 import { useEffect, useRef, useState } from "react";
 import { passwordUsername, signInPassword } from "@/lib/password-login";
 import { AccountSwitchRequired } from "@/lib/account-switch";
+import { logFailure } from "@/lib/diagnostics";
+import { PasswordInput } from "./PasswordInput";
 
 export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, showTitle = true }: Readonly<{ onSignedIn: () => void | Promise<void>; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean }>) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [switchRequest, setSwitchRequest] = useState<AccountSwitchRequired>();
   const edited = useRef(false);
-  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name && !edited.current) setUsername(name); }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name && !edited.current) setUsername(name); }).catch(error => { logFailure("auth", error); }); return () => { active = false; }; }, []);
   return <form className="panel password-form" aria-label="Password sign-in" onSubmit={async event => {
     event.preventDefault();
     if (busy || disabled || !username || !password) return;
@@ -17,7 +19,7 @@ export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, sho
     try { await signInPassword(username, password, !!switchRequest, switchRequest?.retained); setPassword(""); setSwitchRequest(undefined); await onSignedIn(); }
     catch (error) {
       if (error instanceof AccountSwitchRequired) { setSwitchRequest(error); setMessage(""); }
-      else { setMessage((error as Error).message); }
+      else { logFailure("auth", error); setMessage(error instanceof Error ? error.message : "Could not sign in. Try again shortly."); }
     }
     finally { setBusy(false); onBusyChange?.(false); }
   }}>
@@ -26,7 +28,7 @@ export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, sho
     <input id="login-tag" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} aria-describedby="login-hint" value={username} onChange={event => { edited.current = true; setUsername(event.target.value); setSwitchRequest(undefined); setMessage(""); }} disabled={busy || disabled} />
     <p id="login-hint" className="muted">Use your full gamertag, including any numbers.</p>
     <label htmlFor="login-password">Password</label>
-    <input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={event => { setPassword(event.target.value); setMessage(""); }} disabled={busy || disabled} />
+    <PasswordInput id="login-password" name="password" autoComplete="current-password" value={password} onChange={event => { setPassword(event.target.value); setMessage(""); }} disabled={busy || disabled} />
     {switchRequest && <section className="account-switch" aria-label="Switch saved account">
       <h2>Another account is saved here</h2>
       {switchRequest.canReplace

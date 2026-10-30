@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "validate:deployment": "node scripts/validate-deployment.mjs",
+    "verify:auth": "playwright test --config release/playwright.config.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
@@ -18,6 +19,7 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.13",
     "@neondatabase/serverless": "1.2.0",
+    "@vercel/queue": "0.10.0",
     "better-auth": "1.7.13",
     "https-proxy-agent": "9.1.0",
     "next": "16.4.3",
@@ -49,6 +51,7 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
+    "@vercel/cli-config": { "zod": "$zod" },
     "postcss": "^8.5.30",
     "compression": "^1.8.2"
   },

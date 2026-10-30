@@ -15,6 +15,37 @@ beforeEach(() => {
   passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
 });
 describe("visible sign-out and code return", () => {
+  it.each(["signedOut", "locked", "migration"] as const)("offers the available app update while %s without requiring authentication", async mode => {
+    const worker = { state: "installed", postMessage: vi.fn() };
+    const registration = Object.assign(new EventTarget(), { waiting: worker, update: vi.fn().mockResolvedValue(undefined) });
+    const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: {} });
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
+    const resumed = vi.fn();
+    try {
+      render(<SignedOut mode={mode} onSignedIn={resumed} />);
+      fireEvent.click(await screen.findByRole("button", { name: "Reload update" }));
+      expect(worker.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+      expect(resumed).not.toHaveBeenCalled();
+    } finally { delete (navigator as any).serviceWorker; }
+  });
+  it("records a failed sign-out without serializing the exception or stored account", async () => {
+    const output = vi.spyOn(console, "error").mockImplementation(() => {});
+    actions.signOutDevice.mockRejectedValueOnce(new Error("Could not lock device. private-synthetic-detail"));
+    render(<SignOutButton />); fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled());
+    await waitFor(() => expect(output).toHaveBeenCalled());
+    expect(JSON.parse(output.mock.calls[0][0])).toMatchObject({ operation: "auth", kind: "unexpected" });
+    expect(JSON.stringify(output.mock.calls)).not.toMatch(/private-synthetic|Could not lock|password|recovery/);
+  });
+  it("handles an unavailable saved-passkey lookup while keeping password sign-in available", async () => {
+    const output = vi.spyOn(console, "error").mockImplementation(() => {});
+    passkeys.hasPasskeyUnlock.mockRejectedValueOnce(new DOMException("private-synthetic-passkey-store", "QuotaExceededError"));
+    const resumed = vi.fn(); render(<SignedOut onSignedIn={resumed} />);
+    await waitFor(() => expect(output).toHaveBeenCalled());
+    expect(screen.getByRole("form", { name: "Password sign-in" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unlock with passkey" })).toBeNull();
+    expect(resumed).not.toHaveBeenCalled(); expect(JSON.stringify(output.mock.calls)).not.toContain("private-synthetic");
+  });
   it.each(["signedOut", "locked"] as const)("uses one gamertag login in %s and shows recovery methods only after Forgot password", async mode => {
     passkeys.hasPasskeyUnlock.mockResolvedValue(true);
     render(<SignedOut mode={mode} onSignedIn={vi.fn()} />);
