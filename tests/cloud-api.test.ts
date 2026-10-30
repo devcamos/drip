@@ -4,7 +4,7 @@ vi.mock("../server/auth", () => ({ cloudConfigured: () => backend.configured, ge
 import { GET, PUT } from "../app/api/cloud/route";
 import { GET as status } from "../app/api/cloud/status/route";
 import { isCloudEnvelope } from "../server/cloud-store";
-import { POST as authHandler } from "../app/api/auth/[...all]/route";
+import { POST as authHandler, GET as sessionHandler } from "../app/api/auth/[...all]/route";
 const origin = "http://localhost:4321";
 const envelope = { app: "drip-cloud", v: 1, iv: "AAAAAAAAAAAAAAAA", ct: "A".repeat(32) };
 const put = (body: unknown, headers: Record<string, string> = { origin, "Content-Type": "application/json", "X-Drip-Owner": "owner-1" }) => new Request(origin + "/api/cloud", { method: "PUT", headers, body: JSON.stringify(body) });
@@ -15,6 +15,40 @@ beforeEach(() => {
   vi.stubEnv("BETTER_AUTH_URL", origin);
 });
 describe("vault authorization and version contract", () => {
+  it("prevents browser and CDN caching for session responses without losing cookies", async () => {
+    const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "public, max-age=600" });
+    headers.append("Set-Cookie", "synthetic-session=synthetic; HttpOnly; Secure");
+    headers.append("Set-Cookie", "synthetic-other=synthetic; HttpOnly; Secure");
+    backend.handler.mockResolvedValue(new Response(JSON.stringify({ user: { id: "owner-1" } }), {
+      headers,
+    }));
+    const response = await sessionHandler(new Request(origin + "/api/auth/get-session"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+    expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
+    expect(response.headers.get("set-cookie")).toContain("synthetic-session=synthetic");
+    expect(response.headers.getSetCookie()).toHaveLength(2);
+    expect(await response.json()).toEqual({ user: { id: "owner-1" } });
+  });
+  it("also prevents caching when auth configuration or owner verification fails", async () => {
+    const request = () => new Request(origin + "/api/auth/get-session", { headers: { "X-Drip-Owner": "owner-1" } });
+    backend.user = "owner-2";
+    const switched = await sessionHandler(request());
+    expect(switched.status).toBe(401);
+    expect(switched.headers.get("cache-control")).toBe("no-store");
+    backend.configured = false;
+    const unavailable = await sessionHandler(request());
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get("cache-control")).toBe("no-store");
+  });
+  it("adds no-store to an immutable auth redirect while preserving its destination", async () => {
+    backend.handler.mockResolvedValue(Response.redirect(origin + "/", 302));
+    const response = await sessionHandler(new Request(origin + "/api/auth/callback"));
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(origin + "/");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
   it("bounds custom password auth bodies and rejects cross-origin requests before invoking auth", async () => {
     const url = origin + "/api/auth/sign-in/gamertag";
     expect((await authHandler(new Request(url, { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" }))).status).toBe(403);

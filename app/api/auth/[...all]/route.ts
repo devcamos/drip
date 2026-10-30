@@ -15,7 +15,7 @@ async function boundedPasswordRequest(request: Request): Promise<Request | Respo
   }
   return new Request(request, { method: "POST", body: new Uint8Array(Buffer.concat(chunks)).buffer });
 }
-async function handler(request: Request) {
+async function handleAuth(request: Request) {
   if (!cloudConfigured()) return Response.json({ error: "Cloud recovery is not configured." }, { status: 503 });
   const path = new URL(request.url).pathname;
   if (request.method === "POST" && ["/api/auth/sign-in/gamertag", "/api/auth/sign-in/gamertag-key", "/api/auth/gamertag-password", "/api/auth/sign-in/gamertag-devices", "/api/auth/sign-in/gamertag-revoke-device"].includes(path)) {
@@ -29,5 +29,16 @@ async function handler(request: Request) {
     if (session?.user.id !== expected) return Response.json({ error: "Cloud account changed. Sign in again." }, { status: 401 });
   }
   return guardDeviceAuthResponse(() => getAuth().handler(request));
+}
+async function handler(request: Request) {
+  const response = await handleAuth(request);
+  // Auth responses (including errors and session reads) are private. Preserve
+  // every Set-Cookie header while preventing browser and shared-CDN storage.
+  // Copy headers because redirect/error responses may have immutable headers.
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store");
+  headers.set("CDN-Cache-Control", "no-store");
+  headers.set("Vercel-CDN-Cache-Control", "no-store");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 export { handler as GET, handler as POST };
