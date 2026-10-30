@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const cloud = vi.hoisted(() => ({ connect: vi.fn(), readCloudState: vi.fn(), syncNow: vi.fn(), vault: vi.fn(), writeCloudState: vi.fn(), recoveryCredentials: vi.fn(), seal: vi.fn(), authClient: { signOut: vi.fn() }, restoreCloud: vi.fn() }));
 const request = vi.hoisted(() => vi.fn());
+const provision = vi.hoisted(() => vi.fn());
+vi.mock("../lib/original-recovery-codes", () => ({ originalRecoveryCodes: provision }));
 vi.mock("../lib/cloud", () => cloud);
 vi.mock("../lib/worker-safety", () => ({ safeFetch: request }));
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validPasswordWrap, wrapPasswordRoot } from "../lib/password-crypto";
@@ -12,7 +14,7 @@ import { AccountSwitchRequired } from "../lib/account-switch";
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "tester", createdAt: "now" } };
 const password = "Green meadow 42!";
 beforeEach(async () => {
-  vi.clearAllMocks(); vi.stubGlobal("navigator", { onLine: false });
+  vi.clearAllMocks(); provision.mockReset().mockResolvedValue({ codes: [], cached: true }); vi.stubGlobal("navigator", { onLine: false });
   cloud.connect.mockResolvedValue({ user: { id: "owner" }, key: {} });
   cloud.readCloudState.mockResolvedValue({ userId: "owner" });
   cloud.vault.mockResolvedValue({ version: 1, envelope: { app: "drip-cloud" } });
@@ -176,6 +178,8 @@ it("registers password access before atomically installing encrypted local signu
   await freshSignupDevice();
   request.mockImplementationOnce(async () => { expect((await passwordUnlockContext()).binding).toBeUndefined(); expect(await getItem("verifier")).toBeUndefined(); return Response.json({ saved: true }); });
   await signUpPassword("tester", password, data);
+  expect(provision).toHaveBeenCalledWith(expect.any(String), "owner", expect.any(AbortSignal));
+  expect(await getItem("signupRecoveryRequired")).toEqual({ vaultId: (await passwordUnlockContext()).binding!.vaultId });
   expect(await loadData()).toEqual(data); expect(await passwordUsername()).toBe("tester");
   const raw = JSON.stringify(await rawStore()); expect(raw).not.toContain(password);
   const root = await passwordRecoveryRoot(password); expect(raw).not.toContain(root);
@@ -188,6 +192,16 @@ it("keeps failed signup off Accounts without leaving a local vault that cannot b
   await expect(signUpPassword("tester", password, data)).rejects.toThrow(/taken/);
   expect((await passwordUnlockContext()).binding).toBeUndefined(); expect(await getItem("verifier")).toBeUndefined();
   expect(await loadData()).toEqual(emptyData());
+});
+it("keeps a created account usable when original-code provisioning stalls until its deadline", async () => {
+  await freshSignupDevice();
+  provision.mockImplementationOnce((_root, _owner, signal: AbortSignal) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  }));
+  await signUpPassword("tester", password, data);
+  expect(await passwordUsername()).toBe("tester");
+  expect(await getItem("signupRecoveryRequired")).toBeDefined();
+  expect(await passwordRecoveryRoot(password)).toBeTruthy();
 });
 it("never replaces an account created in another tab during signup", async () => {
   await freshSignupDevice();

@@ -4,5 +4,6 @@
     "app/api/queues/incidents/route.ts": {
       "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "drip-incidents" }]
     }
-  }
+  },
+  "crons": [{ "path": "/api/notifications/dispatch", "schedule": "0 9 * * *" }]
 }

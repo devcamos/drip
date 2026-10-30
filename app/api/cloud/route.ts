@@ -1,3 +1,4 @@
+import { authBaseURL } from "../../../scripts/deployment-config.mjs";
 import { cloudConfigured, database, getAuth } from "@/server/auth";
 import { isCloudEnvelope, MAX_CLOUD_BYTES } from "@/server/cloud-store";
 import { withApiErrors } from "@/server/http-errors";
@@ -25,7 +26,7 @@ async function read(request: Request) {
 }
 async function write(request: Request) {
   // Same-origin writes only, before parsing or touching the authenticated vault.
-  if (request.headers.get("origin") !== new URL(process.env.BETTER_AUTH_URL ?? request.url).origin) return reply({ error: "Invalid origin." }, 403);
+  if (request.headers.get("origin") !== new URL(authBaseURL(process.env) ?? request.url).origin) return reply({ error: "Invalid origin." }, 403);
   const id = await owner(request);
   if (!id) return reply({ error: "Sign in to save your cloud copy." }, 401);
   if (!(await allowed(id))) return reply({ error: "Too many sync requests. Try again shortly." }, 429);

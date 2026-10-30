@@ -6,6 +6,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { passwordLogin } from "./password-login";
 import { databaseTypes } from "./database-types";
 import { deviceSessionHooks } from "./device-sessions";
+import { authBaseURL } from "../scripts/deployment-config.mjs";
 
 neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
   ? class extends WebSocket { constructor(address: string, protocols?: string | string[]) { super(address, protocols, { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY!) }); } }
@@ -20,7 +21,7 @@ export function database() {
   return pool;
 }
 export function authOptions() {
-  const baseURL = process.env.BETTER_AUTH_URL;
+  const baseURL = authBaseURL(process.env);
   if (!baseURL || !process.env.BETTER_AUTH_SECRET) throw new Error("Cloud recovery is not configured.");
   const origin = new URL(baseURL).origin;
   return {
@@ -39,4 +40,4 @@ export function getAuth() {
   instance ??= createAuth();
   return instance;
 }
-export function cloudConfigured() { return !!(process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET && process.env.BETTER_AUTH_URL); }
+export function cloudConfigured() { return !!(process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET && authBaseURL(process.env)); }

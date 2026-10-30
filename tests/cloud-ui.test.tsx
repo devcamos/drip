@@ -19,7 +19,10 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ json: async () => ({ available: true }) })));
   vi.stubGlobal("confirm", () => true);
 });
-const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+const click = (name: string) => {
+  if (name === "Sign in with passkey") fireEvent.click(screen.getByText("Have an older cloud sign-in passkey?"));
+  fireEvent.click(screen.getByRole("button", { name }));
+};
 const fill = (name: string, value: string) => fireEvent.change(screen.getByLabelText(name), { target: { value } });
 
 describe("returning users", () => {

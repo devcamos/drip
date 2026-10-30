@@ -27,29 +27,32 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
       tx.oncomplete = () => { db.close(); resolve(JSON.stringify(req.result).includes(root) || containsKey(req.result)); };
     });
   }, code)).toBe(false);
-  await page.reload(); await expect(page.getByRole("heading", { name: "Unlock Drip" })).toBeVisible();
+  await page.reload(); await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
 
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await context.setOffline(true); await page.reload();
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+  await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
   await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Remove passkey unlock" }).click();
   await expect(page.getByText(/removed from this browser/)).toBeVisible();
-  await page.reload(); await expect(page.getByRole("heading", { name: "Unlock Drip" })).toBeVisible();
+  await page.reload(); await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
-  await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
+  await page.getByRole("button", { name: "Recover account", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
 });
 
@@ -68,6 +71,6 @@ test("ordinary saved passkeys without PRF do not enable encrypted unlock", async
   await page.reload(); await expect(page.getByRole("button", { name: "Unlock with passkey", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
-  await page.getByRole("button", { name: "Unlock Drip", exact: true }).click();
+  await page.getByRole("button", { name: "Recover account", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("fallbacktester");
 });

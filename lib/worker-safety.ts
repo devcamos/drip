@@ -27,7 +27,7 @@ const guardedFetch: typeof fetch = async (input, init) => {
   // Parsing base only: fetch still receives the caller's original input.
   const url = new URL(address, "https://drip.invalid");
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || (url.pathname === "/api/recovery-codes" && method === "PUT");
+  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || (url.pathname === "/api/recovery-codes" && method !== "POST") || ["/api/notifications/subscription", "/api/notifications/test"].includes(url.pathname);
   if (!privateRequest) return fetch(input, init);
   const run = async () => {
     const deviceId = await browserDeviceId();
@@ -42,7 +42,7 @@ const guardedFetch: typeof fetch = async (input, init) => {
       ((method === "POST" && ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password"].includes(url.pathname)) || (url.pathname === "/api/cloud" && ["GET", "PUT"].includes(method)));
     if (signupNonce && !signup) throw new Error("Signup changed in another tab. Your current local account is kept.");
     if (resumeGeneration && (!gate?.signedOut || gate.generation !== resumeGeneration)) throw new Error("Device session changed. Try signing in again.");
-    if (reconnectGeneration && (gate?.signedOut || gate?.generation !== reconnectGeneration)) throw new Error("Device session changed. Try signing in again.");
+    if (reconnectGeneration && (gate?.signedOut || (gate?.generation ?? "initial") !== reconnectGeneration)) throw new Error("Device session changed. Try signing in again.");
     // An old tab must not revoke a session that another tab has already resumed.
     if (url.pathname === "/api/auth/sign-out" && (
       (signoutGeneration && (!gate?.signedOut || gate.generation !== signoutGeneration)) ||
