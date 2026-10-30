@@ -5,6 +5,7 @@ import { displayProvider, productLabel, validDate } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { IncomeSummary } from "./IncomeSummary";
+import { StockInvestmentSummary } from "./StockInvestment";
 const today = () => M.ymd(new Date());
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
@@ -109,6 +110,7 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
     <p className="muted">Your entered balance. Predictions and recorded income never change it automatically.</p>
+    {a.rateType === "dividend" && <StockInvestmentSummary account={a} onEdit={onEdit} />}
     <BalanceActions a={a} onChange={onChange} />
     <IncomeSummary accounts={[a]} />
     <section className="panel" aria-label="Income predictions"><h2 style={{ marginTop: 0 }}>Predictions</h2>

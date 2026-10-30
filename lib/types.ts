@@ -11,12 +11,18 @@ export interface Payout { date: string; amount: number; kind: "expected" | "actu
 
 export interface BalanceEvent { type: "topup" | "withdraw" | "set" | "interest"; date: string; amount: number }
 export interface RatePeriod { from: string; ratePct: number } // rate in force from this date
+export interface StockInvestment {
+  shares: number;
+  averagePriceGBP: number; // provider's GBP cost per share; independent of market value
+  originalPrice?: { currency: "USD" | "EUR"; averagePrice: number }; // display only; no live FX
+}
 
 export interface Account {
   id: string;
   provider: string;      // e.g. "Zopa"
   label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   holdingName?: string; // stock/fund identity: portable with the encrypted financial record
+  investment?: StockInvestment; // optional on dividend holdings; older records remain valid
   balance: number;       // GBP
   ratePct: number;       // annual %, e.g. 7
   rateType: RateType;
