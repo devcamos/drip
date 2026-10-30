@@ -52,7 +52,7 @@ describe("onboarding", () => {
     render(<Drip />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare signup on this device. Try again.");
     click("Try again");
-    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
     expect(screen.queryByTestId("code")).toBeNull();
   });
   it("keeps registration failures on signup and opens Accounts only after a successful retry", async () => {
@@ -247,9 +247,11 @@ describe("accounts", () => {
     expect(screen.getByText("≈ £5.00 a month")).toBeInTheDocument();
     click("Save");
 
-    // detail
-    expect(await screen.findByText("My Bank")).toBeInTheDocument();
-    expect(await screen.findByText("Estimated next payment")).toBeInTheDocument();
+    // The form preview also contains the provider name. Wait for saved-detail
+    // navigation before asserting, so the query cannot return a detached preview.
+    const predictions = await screen.findByRole("region", { name: "Income predictions" });
+    expect(screen.getByText("My Bank")).toBeInTheDocument();
+    expect(within(predictions).getByText("Estimated next payment")).toBeInTheDocument();
 
     click("Top up");
     type(screen.getByLabelText("amount"), "300");
@@ -542,14 +544,14 @@ describe("sign-out", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
     const first = render(<Drip />); await screen.findByText("Total balance");
     click("Sign out");
-    expect(await screen.findByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
     expect(screen.queryByText("Rainy day pot")).toBeNull();
     first.unmount(); render(<Drip />);
-    await screen.findByRole("heading", { name: "Drip is signed out" });
+    await screen.findByRole("heading", { name: "Sign in to Drip" });
     click("Forgot password?");
-    type(screen.getByLabelText("Recovery code"), "wrong"); click("Sign in");
+    type(screen.getByLabelText("Recovery code"), "wrong"); click("Recover account");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
-    type(screen.getByLabelText("Recovery code"), code); click("Sign in");
+    type(screen.getByLabelText("Recovery code"), code); click("Recover account");
     expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
     expect((await loadData()).accounts[0].balance).toBe(3000);
   });
@@ -563,9 +565,9 @@ describe("sign-out", () => {
     await waitFor(() => expect(release).toBeDefined());
     await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "from-another-tab" });
     await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: "drip-session-notify" })); });
-    await screen.findByRole("heading", { name: "Drip is signed out" });
+    await screen.findByRole("heading", { name: "Sign in to Drip" });
     await act(async () => { release(saved); });
-    expect(screen.getByRole("heading", { name: "Drip is signed out" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
     expect(screen.queryByText("Rainy day pot")).toBeNull(); spy.mockRestore();
   });
 });

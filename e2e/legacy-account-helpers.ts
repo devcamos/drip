@@ -8,7 +8,7 @@ export async function legacyAccount(page: Page, handle = "devo", accounts: Accou
   const code = generateRecoveryCode();
   const verifier = await codeVerifier(code);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await page.evaluate(async ({ verifier, handle, accounts }) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => { const r = indexedDB.open("drip"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(new Error("Could not open the legacy test fixture.", { cause: r.error })); });
     await new Promise<void>((resolve, reject) => {

@@ -3,7 +3,7 @@ import { unwrapPasswordRoot } from "../lib/password-crypto";
 import { mkdir } from "node:fs/promises";
 import { test, expect, type Page } from "@playwright/test";
 import { showRecovery } from "./vault-helpers";
-import { withAuthRetry } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery } from "./auth-helpers";
 const password = "Green meadow 42!";
 const nextPassword = "Blue waterfall 73!";
 const tag = () => "pw_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
@@ -24,7 +24,8 @@ async function onboard(page: Page, handle: string, withPassword = false) {
   await page.getByLabel(/Gamertag/).fill(handle);
   await page.getByLabel("Create password", { exact: true }).fill(password);
   await page.getByLabel("Confirm new account password", { exact: true }).fill(password);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
+  await finishSignupRecovery(page);
   await expect(page.getByText("No accounts yet")).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true })).toHaveClass("on");
   return "";
@@ -34,14 +35,15 @@ async function setPassword(page: Page, handle: string, code: string, secret: str
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   const form = page.getByRole("region", { name: "Sign-in and password" });
   await form.getByLabel("Sign-in gamertag").fill(handle);
+  await form.getByRole("button", { name: "Recovery code", exact: true }).click();
   await form.getByLabel("Recovery code to set or reset your password").fill(code);
   await form.getByLabel("New password", { exact: true }).fill(secret); await form.getByLabel("Confirm password", { exact: true }).fill(secret);
   await withAuthRetry(page, () => form.getByRole("button", { name: "Save password" }).click(), form.getByText(/Password saved. Sign in as/));
 }
 async function login(page: Page, handle: string, secret: string, wrong = false) {
   const form = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await form.getByLabel("Sign-in gamertag").fill(handle); await form.getByLabel("Password", { exact: true }).fill(secret);
-  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in with password" }).click(), wrong ? page.getByText("Gamertag or password is incorrect.") : page.getByTestId("header-tag"));
+  await form.getByLabel("Gamertag").fill(handle); await form.getByLabel("Password", { exact: true }).fill(secret);
+  await withAuthRetry(page, () => form.getByRole("button", { name: "Sign in" }).click(), wrong ? page.getByText("Gamertag or password is incorrect.") : page.getByTestId("header-tag"));
 }
 test("existing encrypted accounts gain ordinary password sign-in, offline unlock, fresh-device access and recovery reset", async ({ page, context, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(120_000);
@@ -51,7 +53,7 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await setPassword(page, handle, code, password);
   page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await login(page, handle, "Wrong password 42!", true); await expect(page.getByText("Gamertag or password is incorrect.")).toBeVisible();
   // The library's durable limiter must return usable seconds, not a bigint
   // timestamp concatenated with its window. Keep the real limit enabled.
@@ -72,14 +74,14 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     await other.goto("http://localhost:4321/"); await login(other, handle, password);
     await expect(other.getByText("£3,000.00").first()).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "Sign out", exact: true }).click(); await showRecovery(page);
-    await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Recover account", exact: true }).click();
     await expect(page.getByTestId("header-tag")).toBeVisible(); await setPassword(page, handle, code, nextPassword);
     await expect.poll(async () => (await other.request.get("http://localhost:4321/api/auth/get-session")).json()).toBeNull();
     await other.reload(); await login(other, handle, password, true); await expect(other.getByText("Gamertag or password is incorrect.")).toBeVisible();
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
   } finally { await second.close(); }
 });
-test("signup opens Accounts without recovery and offers code setup later with password confirmation", async ({ page }) => {
+test("signup saves the original recovery codes and offers the same set later with password confirmation", async ({ page }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(90_000);
   const payloads: string[] = [];
   page.on("request", request => { if (["/api/auth/sign-in/gamertag", "/api/auth/gamertag-password"].some(path => request.url().endsWith(path))) payloads.push(request.postData() ?? ""); });
@@ -94,14 +96,14 @@ test("signup opens Accounts without recovery and offers code setup later with pa
     await page.screenshot({ path: "docs/screenshots/signup-to-accounts/accounts-desktop.png", fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
   }
-  // Recovery setup is optional after signup, and starts with password confirmation.
+  // Settings opens the same original set, with password confirmation.
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   const codes = page.getByRole("region", { name: "Recovery codes" });
   await expect(codes.getByLabel("Confirm your password", { exact: true })).toBeVisible();
   if (process.env.DRIP_UI_CAPTURE) await codes.screenshot({ path: "docs/screenshots/signup-to-accounts/code-setup-mobile.png" });
   await codes.getByLabel("Confirm your password", { exact: true }).fill(password);
   page.on("dialog", dialog => dialog.accept());
-  await codes.getByRole("button", { name: "Create six recovery codes" }).click();
+  await codes.getByRole("button", { name: "Open original recovery codes" }).click();
   await expect(codes.getByRole("listitem")).toHaveCount(6, { timeout: 30_000 });
   await expect(codes.getByRole("button", { name: "Download recovery codes" })).toBeEnabled();
   await page.reload(); await login(page, handle, password); await expect(page.getByTestId("header-tag")).toContainText(handle);
@@ -141,7 +143,7 @@ test("signed-out signup preserves a recoverable old account through cancellation
     return new Promise<boolean>(resolve => { const t = db.transaction("kv"); const r = t.objectStore("kv").get("cloudState"); t.oncomplete = () => { db.close(); resolve(r.result?.dirty === false && r.result.version > 1); }; });
   }), { timeout: 30_000 }).toBe(true);
   page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expect(page.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0);
   await captureConfidence(page, "signed-out");
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
@@ -161,7 +163,8 @@ test("signed-out signup preserves a recoverable old account through cancellation
   await captureConfidence(page, "duplicate-name");
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await page.getByLabel(/Gamertag/).fill(replacement);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByTestId("header-tag"));
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
+  await finishSignupRecovery(page);
   await expect(page.getByTestId("header-tag")).toContainText(replacement); await expect(page.getByText("No accounts yet")).toBeVisible();
   // Multiple real synthetic users share this test host's auth limiter. Allow
   // the normal automatic retry without weakening or bypassing that limiter.

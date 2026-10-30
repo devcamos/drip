@@ -15,6 +15,20 @@ beforeEach(() => {
   passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
 });
 describe("visible sign-out and code return", () => {
+  it.each(["signedOut", "locked"] as const)("uses one gamertag login in %s and shows recovery methods only after Forgot password", async mode => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    render(<SignedOut mode={mode} onSignedIn={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Password sign-in" })).toBeInTheDocument();
+    await waitFor(() => expect(passkeys.hasPasskeyUnlock).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Unlock with passkey" })).toBeNull();
+    expect(screen.queryByLabelText("Recovery code")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Use another account" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    expect(await screen.findByRole("button", { name: "Unlock with passkey" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Recovery code")).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Password sign-in" })).toBeNull();
+  });
   it.each(["signedOut", "locked"] as const)("offers Sign up from %s, supports the route and returns without replacing data", async mode => {
     const resumed = vi.fn(); render(<SignedOut mode={mode} onSignedIn={resumed} />);
     fireEvent.click(screen.getByRole("button", { name: "Sign up" }));
@@ -32,10 +46,11 @@ describe("visible sign-out and code return", () => {
     passkeys.unlockWithPasskey.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));
     const resumed = vi.fn();
     render(<SignedOut onSignedIn={resumed} mode="locked" />);
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     const button = await screen.findByRole("button", { name: "Unlock with passkey" });
     fireEvent.click(button);
     expect(await screen.findByText(/Passkey unlock was cancelled/)).toBeInTheDocument();
-    expect(resumed).not.toHaveBeenCalled(); expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
+    expect(resumed).not.toHaveBeenCalled(); expect(screen.getByRole("button", { name: "Back to sign in" })).toBeInTheDocument();
     fireEvent.click(button);
     await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
   });
@@ -46,6 +61,7 @@ describe("visible sign-out and code return", () => {
     expect(screen.queryByRole("button", { name: "Unlock with passkey" })).toBeNull(); unmount();
     passkeys.unlockWithPasskey.mockRejectedValueOnce(new Error("Invalid key"));
     render(<SignedOut onSignedIn={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     fireEvent.click(await screen.findByRole("button", { name: "Unlock with passkey" }));
     expect(await screen.findByText(/Could not unlock with this passkey/)).toBeInTheDocument();
   });
@@ -66,14 +82,14 @@ describe("visible sign-out and code return", () => {
     const resumed = vi.fn(); const data = emptyData(); const verifier = { salt: "s", hash: "h" };
     render(<SignedOut data={data} verifier={verifier} onSignedIn={resumed} />);
     fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Recover account" })).toBeDisabled();
     actions.resumeDevice.mockRejectedValueOnce(new Error("That isn't your recovery code."));
     fireEvent.change(screen.getByLabelText("Recovery code"), { target: { value: "wrong" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recover account" }));
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
     expect(resumed).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Recovery code"), { target: { value: "correct" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recover account" }));
     await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
     expect(actions.resumeDevice).toHaveBeenLastCalledWith("correct", verifier, data);
   });

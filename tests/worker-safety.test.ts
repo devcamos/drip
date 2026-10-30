@@ -1,6 +1,17 @@
 import { expect, it, vi } from "vitest";
 import { requireSafeWorker, safeFetch } from "../lib/worker-safety";
 
+it("gates notification mutations with the existing sign-out/generation lock while keeping public configuration accessible", async () => {
+  const { setItem } = await import("../lib/db");
+  const fetcher = vi.fn(async () => Response.json({ available: false })); vi.stubGlobal("fetch", fetcher);
+  await setItem("deviceSession", { signedOut: true, generation: "out" });
+  for (const path of ["subscription", "test"]) await expect(safeFetch(`/api/notifications/${path}`, { method: "POST" })).rejects.toThrow(/signed out/);
+  await safeFetch("/api/notifications/config"); expect(fetcher).toHaveBeenCalledOnce();
+  await setItem("deviceSession", { signedOut: false, generation: "new-owner" });
+  await expect(safeFetch("/api/notifications/subscription", { method: "PUT", headers: { "X-Drip-Reconnect": "old-owner" } })).rejects.toThrow(/session changed/);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
 it("shares a stable browser id across concurrent tabs and rechecks sign-out after identifying the browser", async () => {
   const db = await import("../lib/db");
   const ids = await Promise.all(Array.from({ length: 5 }, () => db.browserDeviceId()));
@@ -120,6 +131,16 @@ it("binds queued cloud renewal to the locally unlocked device generation", async
   await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } })).rejects.toThrow(/session changed/);
   await setItem("deviceSession", { signedOut: false, generation: "other-account" });
   await expect(safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Reconnect": "unlocked" } })).rejects.toThrow(/session changed/);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it("permits a captured initial renewal only while the device still has no generation", async () => {
+  const { setItem } = await import("../lib/db");
+  const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  const request = { method: "POST", headers: { "X-Drip-Reconnect": "initial" } };
+  await safeFetch("/api/auth/sign-in/email", request);
+  await setItem("deviceSession", { signedOut: false, generation: "another-account" });
+  await expect(safeFetch("/api/auth/sign-in/email", request)).rejects.toThrow(/session changed/);
   expect(fetcher).toHaveBeenCalledOnce();
 });
 

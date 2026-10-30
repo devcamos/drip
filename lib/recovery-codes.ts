@@ -30,9 +30,12 @@ export async function resolveRecoveryCode(code: string): Promise<string> {
   await setItem("recoveryRecords", [...(cached ?? []).filter(r => r.locator !== locator), record].slice(-12));
   return value.root;
 }
-export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: string) {
-  const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }) });
-  if (!response.ok) throw new Error("Could not save recovery codes. Your existing codes still work. Sign in again and retry.");
+export async function registerRecoveryCodes(records: RecoveryRecord[], ownerId: string, signal?: AbortSignal) {
+  const response = await safeFetch("/api/recovery-codes", { method: "PUT", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": ownerId }, body: JSON.stringify({ records }), signal });
+  if (!response.ok) {
+    const value = await response.json().catch(() => ({}));
+    throw new Error(value.code === "RECOVERY_CODES_EXIST" ? "Your original recovery codes are already set up. Use your saved recovery file; another set cannot be created." : "Could not save your original recovery codes. Keep this browser signed in and retry when connected.");
+  }
   const replaced = new Set(records.map(record => record.locator)); try { const cached = await getItem<RecoveryRecord[]>("recoveryRecords"); await setItem("recoveryRecords", [...(cached ?? []).filter(old => !replaced.has(old.locator)), ...records].slice(-12)); return true; } catch { return false; }
 }
 export function downloadRecoveryCodes(codes: string[], handle?: string) {
