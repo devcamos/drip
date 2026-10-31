@@ -180,3 +180,29 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .device-count { font-weight: 700; }
 .device-confirm { padding: 1rem; margin: 1rem 0; border: 1px solid var(--border, #d5c9b5); border-radius: 1rem; background: var(--bg, #fffaf0); }
 .device-manager output { display: block; margin: 1rem 0; }
+.investment-summary h2 { margin:0; }
+.investment-summary > .row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.investment-stats { margin:20px 0; }
+.investment-stats > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); gap:12px; align-items:baseline; padding:12px 0; border-bottom:1px solid var(--border); }
+.investment-stats dt { color:var(--muted); }
+.investment-stats dd { margin:0; font-size:18px; font-weight:650; text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.investment-stats dd span { font-size:14px; }
+.investment-fields { margin-top:20px; min-width:0; }
+.investment-fields .grid { align-items:end; }
+.portfolio-holdings .portfolio-position { grid-column:1 / -1; overflow-wrap:anywhere; }
+.currency-estimate { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+.currency-estimate summary { cursor:pointer; font-weight:650; }
+.currency-estimate .btn { margin-top:12px; }
+.currency-estimate p { line-height:1.6; overflow-wrap:anywhere; }
+.currency-result { display:flex; flex-direction:column; gap:6px; margin:18px 0; }
+.currency-result strong { font-size:28px; font-variant-numeric:tabular-nums; }
+.currency-result span { color:var(--muted); font-size:13px; }
+.payment-calendar > h2 { margin-top:0; }
+.payment-calendar > .muted { line-height:1.6; }
+.payment-month { border-top:1px solid var(--border); }
+.payment-month summary { cursor:pointer; padding:16px 0; }
+.payment-month summary > span { display:block; margin:6px 0 0 18px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.payment-month .payment-reminders { margin-top:0; }
+.payment-month .payment-date { gap:4px; }
+.calendar-assumptions { font-size:12px; margin-bottom:0; }
+@media (max-width:359px) { .investment-stats dd { font-size:16px; } .investment-stats dt { font-size:13px; } }

@@ -1,7 +1,7 @@
 # Device management screenshots
 
-Running optimized implementation from branch `feat/device-management`, based on
-main4370e315. Local origin localhost:4340; synthetic `demo_saver29`, generated
+Running optimized implementation from branch `feat/dividend-investment-stats`,
+with the four-device limit. Local origin localhost:4321; synthetic `demo_saver29`, generated
 encrypted vault and sample balance. These are implementation screenshots, not
 design mockups. Synthetic API session responses are used for the UI journey;
 real HTTP/auth/database behavior has separate local Postgres integration tests.

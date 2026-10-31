@@ -123,6 +123,7 @@ export function CloudPanel({ data, verifier, onRestored }: Readonly<{ data: AppD
       const state = await readCloudState(); const session = await authClient.getSession();
       if (!state || state.userId !== session.data?.user.id) throw new Error("Sign in to the connected cloud account before adding a passkey.");
       const result = await authClient.passkey.addPasskey({ name: data.identity?.handle ?? "Drip", fetchOptions: { headers: { "X-Drip-Owner": state.userId } } });
+      if (result.error && "code" in result.error && result.error.code === "SESSION_NOT_FRESH") throw new Error("Sign in again with your gamertag and password below, then retry adding the passkey. Your accounts stay on this device.");
       if (result.error) throw new Error("Passkey was not saved. Your recovery code still works; you can retry later.");
       setMessage("Cloud sign-in passkey saved. Keep your recovery code for decryption and recovery.");
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }

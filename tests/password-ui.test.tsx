@@ -60,7 +60,7 @@ it("offers an inline account switch after verification and cancellation makes no
   fireEvent.click(await screen.findByRole("button", { name: "Switch account on this browser" }));
   await waitFor(() => expect(actions.signInPassword).toHaveBeenLastCalledWith("tester", "Some password 123!", true, retained));
 });
-it("keeps unsynced account protection separate from the two-device error", async () => {
+it("keeps unsynced account protection separate from the four-device error", async () => {
   actions.signInPassword.mockRejectedValueOnce(new AccountSwitchRequired({ vaultId: "saved", records: "sealed" }, false));
   render(<PasswordSignIn onSignedIn={vi.fn()} />);
   await waitFor(() => expect(screen.getByLabelText("Gamertag")).toHaveValue("tester"));
@@ -70,9 +70,9 @@ it("keeps unsynced account protection separate from the two-device error", async
   expect(screen.queryByRole("button", { name: "Switch account on this browser" })).toBeNull();
   fireEvent.change(screen.getByLabelText("Gamertag"), { target: { value: "original" } });
   expect(screen.queryByRole("region", { name: "Switch saved account" })).toBeNull();
-  actions.signInPassword.mockRejectedValueOnce(new Error("Two devices are already signed in. Sign out on one, then try again."));
+  actions.signInPassword.mockRejectedValueOnce(new Error("4 devices are already signed in. Sign out on one, then try again."));
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Two devices");
+  expect(await screen.findByRole("alert")).toHaveTextContent("4 devices");
 });
 it("sets and resets passwords only after recovery-code verification, clearing secrets on success", async () => {
   render(<PasswordSetup data={emptyData()} />);

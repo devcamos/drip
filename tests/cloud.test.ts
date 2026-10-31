@@ -38,7 +38,7 @@ describe("encrypted recovery", () => {
     expect((await cloud.unseal(sealed, key)).lock).toBeUndefined();
     await expect(cloud.unseal(sealed, await cloud.cloudKey(generateRecoveryCode()))).rejects.toThrow();
     await expect(cloud.unseal({ ...sealed, ct: sealed.ct.slice(4) }, key)).rejects.toThrow();
-    await expect(cloud.unseal({ ...sealed, v: 2 } as any, key)).rejects.toThrow("Unsupported");
+    await expect(cloud.unseal({ ...sealed, v: 3 } as any, key)).rejects.toThrow("Unsupported");
     await expect(cloud.unseal(await cloud.seal({ ...data, identity: undefined }, key), key)).rejects.toThrow("Invalid cloud copy");
   });
   it("signs in existing users; creates only on explicit enable and reports auth failure", async () => {

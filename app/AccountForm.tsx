@@ -4,6 +4,8 @@ import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "
 import { PRODUCTS, PROVIDERS, TRADING_212_HOLDINGS, displayProvider, validDate } from "@/lib/products";
 import { accountCardStyle, normaliseColour } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
+import { investmentInputs, parseInvestment } from "@/lib/stock-investment";
+import { StockInvestmentFields } from "./StockInvestment";
 const today = () => M.ymd(new Date());
 const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
 const colourChoices = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
@@ -62,6 +64,8 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [balance, setBalance] = useState(initial.balance);
   const [rate, setRate] = useState(initial.rate);
   const [rateType, setRateType] = useState<RateType>(existing?.rateType ?? PRODUCTS[initialProduct].rateType);
+  const [investmentFields, setInvestmentFields] = useState(() => investmentInputs(existing?.investment));
+  const investment = rateType === "dividend" ? parseInvestment(investmentFields) : undefined;
   const [frequency, setFrequency] = useState<Frequency>(existing?.frequency ?? PRODUCTS[initialProduct].frequency);
   const [reinvest, setReinvest] = useState(initial.reinvest);
   const [next, setNext] = useState(existing?.nextPayoutDate ?? M.addMonths(today(), payoutMonths[PRODUCTS[initialProduct].frequency]));
@@ -74,7 +78,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
   const validHolding = validHoldingName(category, provider, customHolding, holding);
-  const valid = validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
+  const valid = investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
     setFrequency(defaults.frequency); setReinvest(defaults.reinvestIncome);
@@ -85,7 +89,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
     <form onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
-      const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
+      const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, investment: investment ?? undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,
         bonus: hasBonus ? { amount: M.round2(Number(bonusAmount)), expectedDate: bonusDate } : undefined,
         colour, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
@@ -119,11 +123,12 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <div className="card colour-preview" style={accountCardStyle(colour)} aria-label="Account card preview"><span className="prov">{displayProvider(name) || "Your account"}</span><div className="meta">{category === "stocks-funds" && holding.trim() ? holding.trim() : PRODUCTS[category].label}</div></div>
       </fieldset>
       <div className="grid">
-        <div><label htmlFor="account-balance">Balance £</label><input disabled={busy} id="account-balance" inputMode="decimal" aria-label="Balance" value={balance} onChange={e => setBalance(e.target.value)} placeholder="3000" /></div>
+        <div><label htmlFor="account-balance">{rateType === "dividend" ? "Current investment value £" : "Balance £"}</label><input disabled={busy} id="account-balance" inputMode="decimal" aria-label="Balance" value={balance} onChange={e => setBalance(e.target.value)} placeholder="3000" /></div>
         <div><label htmlFor="account-rate">{rateType === "dividend" ? "Expected dividend yield % a year" : "Standard interest rate % a year"}</label><input disabled={busy} id="account-rate" inputMode="decimal" aria-label="Rate" value={rate} onChange={e => setRate(e.target.value)} placeholder="7" /></div>
         {category === "other" && <div><label htmlFor="account-type">Income type</label><select disabled={busy} id="account-type" aria-label="Type" value={rateType} onChange={e => { const value = e.target.value as RateType; setRateType(value); setReinvest(value === "interest"); }}><option value="interest">Interest</option><option value="dividend">Dividend</option></select></div>}
         <div><label htmlFor="account-paid">Paid</label><select disabled={busy} id="account-paid" value={frequency} onChange={e => setFrequency(e.target.value as Frequency)}><option value="daily">Daily</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
       </div>
+      {rateType === "dividend" && <StockInvestmentFields value={investmentFields} onChange={setInvestmentFields} disabled={busy} />}
       {rateChanged && <><label htmlFor="rate-from">New rate applies from</label><input disabled={busy} id="rate-from" type="date" value={rateFrom} onChange={e => setRateFrom(e.target.value)} /></>}
       {frequency !== "daily" ? <><label htmlFor="next-payout">Next payout date</label><input disabled={busy} id="next-payout" type="date" value={next} onChange={e => setNext(e.target.value)} /></>
         : <p className="muted">Daily payments need no payout date. Predictions never change your saved balance.</p>}

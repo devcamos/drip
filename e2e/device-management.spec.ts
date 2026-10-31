@@ -28,7 +28,7 @@ test("manages the cap from sign-in, preserves encrypted accounts and exposes man
   const proof = await passwordProof(username, password);
   const data = { ...emptyData(), identity: { id: crypto.randomUUID(), handle: username, createdAt: "2026-10-29" }, accounts: [{ id: crypto.randomUUID(), provider: "Zopa", balance: 1234.56, ratePct: 4, rateType: "interest" as const, frequency: "monthly" as const, nextPayoutDate: "2030-01-01", colour: "#2b2d86", payouts: [], createdAt: "2026-10-29" }] };
   const records = { data: await encryptLocal(data, keys), localVault: keys.header, verifier: await codeVerifier(root), passwordUnlock: { vaultId: keys.header.id, envelope }, deviceSession: { signedOut: true, remotePending: false, generation: "synthetic-signout" } };
-  let devices = [{ id: "synthetic-a", name: "Safari on iPhone", signedInAt: "2026-10-29T09:15:00Z", current: false }, { id: "synthetic-b", name: "Chrome on Windows", signedInAt: "2026-10-28T18:30:00Z", current: false }];
+  let devices = [{ id: "synthetic-a", name: "Safari on iPhone", signedInAt: "2026-10-29T09:15:00Z", current: false }, { id: "synthetic-b", name: "Chrome on Windows", signedInAt: "2026-10-28T18:30:00Z", current: false }, { id: "synthetic-c", name: "Firefox on Mac", signedInAt: "2026-10-27T08:30:00Z", current: false }, { id: "synthetic-d", name: "Edge on Windows", signedInAt: "2026-10-26T17:00:00Z", current: false }];
   let revocations = 0;
   await context.route("**/api/**", async route => {
     const req = route.request(), path = new URL(req.url()).pathname;
@@ -37,7 +37,8 @@ test("manages the cap from sign-in, preserves encrypted accounts and exposes man
       if (body.username !== username || body.proof !== proof) return route.fulfill({ status: 401, json: { message: "Gamertag or password is incorrect." } });
       if (path.endsWith("gamertag-devices")) return route.fulfill({ json: { devices } });
       if (path.endsWith("gamertag-revoke-device")) { devices = devices.filter(device => device.id !== body.sessionId); revocations++; return route.fulfill({ json: { removed: true, current: false } }); }
-      if (path.endsWith("gamertag") && devices.length >= 2) return route.fulfill({ status: 409, json: { code: "DEVICE_LIMIT_REACHED", message: "Two devices are already signed in. Sign out on one, then try again." } });
+      if (path.endsWith("gamertag") && devices.length >= 4) return route.fulfill({ status: 409, json: { code: "DEVICE_LIMIT_REACHED", message: "4 devices are already signed in. Sign out on one, then try again." } });
+      if (path.endsWith("gamertag")) devices.push({ id: "synthetic-this-browser", name: "Chrome on Linux", signedInAt: "2026-10-30T18:00:00Z", current: true });
       return route.fulfill({ json: { owner, envelope } });
     }
     if (path === "/api/cloud/status" || path === "/api/notifications/config") return route.fulfill({ json: { available: false } });
@@ -52,19 +53,20 @@ test("manages the cap from sign-in, preserves encrypted accounts and exposes man
   }, records);
   await page.reload();
   await page.getByLabel("Password", { exact: true }).fill(password); await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("form", { name: "Password sign-in", exact: true }).getByRole("alert")).toContainText("Two devices"); await capture(page, "device-limit");
+  await expect(page.getByRole("form", { name: "Password sign-in", exact: true }).getByRole("alert")).toContainText("4 devices"); await capture(page, "device-limit");
   await page.getByRole("button", { name: "Manage devices", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your signed-in devices" })).toBeVisible(); await expect(page.getByText("2 of 2 sign-ins in use")).toBeVisible(); await capture(page, "devices");
+  await expect(page.getByRole("heading", { name: "Your signed-in devices" })).toBeVisible(); await expect(page.getByText("4 of 4 sign-ins in use")).toBeVisible(); await capture(page, "devices");
   await page.getByRole("button", { name: "Sign out Safari on iPhone" }).click();
   await expect(page.getByRole("region", { name: "Confirm device sign-out" })).toBeVisible(); await capture(page, "confirm-sign-out");
   await page.getByRole("button", { name: "Keep device" }).click(); expect(revocations).toBe(0);
   await page.getByRole("button", { name: "Sign out Safari on iPhone" }).click(); await page.getByRole("button", { name: "Confirm sign out" }).click();
   await expect(page.getByRole("region", { name: "Manage signed-in devices", exact: true }).getByRole("status")).toContainText("Device signed out"); expect(revocations).toBe(1);
+  await expect(page.getByText("3 of 4 sign-ins in use")).toBeVisible();
   await page.getByRole("button", { name: "Sign in on this device" }).click();
   await expect(page.getByRole("region", { name: "Account cards", exact: true })).toContainText("£1,234.56");
   await page.getByRole("navigation").getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("region", { name: "Signed-in devices", exact: true })).toBeVisible(); await capture(page, "settings-devices");
   await page.getByLabel("Confirm password to manage devices").fill(password); await page.getByRole("button", { name: "Manage devices", exact: true }).click();
-  await expect(page.getByText("1 of 2 sign-ins in use")).toBeVisible();
+  await expect(page.getByText("4 of 4 sign-ins in use")).toBeVisible();
   await page.getByRole("button", { name: "Close devices" }).click(); await expect(page.getByLabel("Confirm password to manage devices")).toHaveValue("");
 });

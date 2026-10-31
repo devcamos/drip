@@ -5,6 +5,7 @@ import { paymentReminders } from "@/lib/payment-reminders";
 import { displayProvider } from "@/lib/products";
 import { useCalendarDay } from "./useCalendarDay";
 import { PhoneReminders } from "./PhoneReminders";
+import { PaymentCalendar } from "./PaymentCalendar";
 
 function paymentType(account: Account) {
   if (account.frequency === "daily") return "Daily";
@@ -25,5 +26,6 @@ export function PaymentNotifications({ accounts, identityId, onOpen }: Readonly<
     </section>
     <PhoneReminders accounts={accounts} identityId={identityId} />
     <section className="panel" aria-labelledby="payments-next"><h2 id="payments-next">Next payment by account</h2>{future.length ? list(future) : <p className="muted">{due.length ? "Daily payments appear in Today each day. Other accounts will appear here when their next date is in the future." : "Add an account and its payment schedule to see reminders here."}</p>}</section>
+    <PaymentCalendar accounts={accounts} today={day} onOpen={onOpen} />
   </>;
 }

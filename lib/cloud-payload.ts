@@ -8,9 +8,11 @@ export function cloudPayload(data: AppData) {
     identity: identity ? { id: identity.id, handle: identity.handle, suffix: identity.suffix, createdAt: identity.createdAt } : undefined,
     projection: projection ? { monthlyDeposit: projection.monthlyDeposit, years: projection.years } : undefined,
     snapshots: data.snapshots.map(({ month, totalBalance, monthlyIncome, deposits, withdrawals }) => ({ month, totalBalance, monthlyIncome, deposits, withdrawals })),
-    accounts: data.accounts.map(({ id, provider, holdingName, balance, ratePct, rateType, productCategory, taxWrapper, reinvestIncome, bonus, frequency, nextPayoutDate, colour, payouts, events, accruedThrough, rateHistory, createdAt }): Omit<Account, "label"> => ({
+    accounts: data.accounts.map(({ id, provider, holdingName, investment, balance, ratePct, rateType, productCategory, taxWrapper, reinvestIncome, bonus, frequency, nextPayoutDate, colour, payouts, events, accruedThrough, rateHistory, createdAt }): Omit<Account, "label"> => ({
       id, provider, balance, ratePct, rateType, frequency, nextPayoutDate, colour, accruedThrough, createdAt,
       productCategory, taxWrapper, reinvestIncome, holdingName,
+      investment: investment ? { shares: investment.shares, averagePriceGBP: investment.averagePriceGBP,
+        originalPrice: investment.originalPrice ? { currency: investment.originalPrice.currency, averagePrice: investment.originalPrice.averagePrice } : undefined } : undefined,
       bonus: bonus ? { amount: bonus.amount, expectedDate: bonus.expectedDate } : undefined,
       payouts: payouts.map(({ date, amount, kind, incomeType }) => ({ date, amount, kind, incomeType })),
       events: events?.map(({ type, date, amount }) => ({ type, date, amount })),
