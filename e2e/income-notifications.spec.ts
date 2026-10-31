@@ -18,7 +18,8 @@ test("portfolio and reminders work on saved encrypted accounts at mobile and des
   await page.getByRole("button", { name: /Payment notifications, / }).click();
   await expect(page.getByRole("heading", { name: "Payment notifications", exact: true })).toBeVisible();
   await expect(page.getByText(/Phone notifications are not available on this deployment yet/)).toBeVisible();
-  await expect(page.getByText("Realty Income", { exact: true })).toBeVisible(); await expect(page.getByText("Zopa", { exact: true })).toBeVisible();
+  const due = page.getByRole("region", { name: "Today", exact: true });
+  await expect(due.getByText("Realty Income", { exact: true })).toBeVisible(); await expect(due.getByText("Zopa", { exact: true })).toBeVisible();
   for (const width of [390, 1280, 320]) {
     await page.setViewportSize({width,height:900}); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (directory && width !== 320) await page.screenshot({ path: `${directory}/reminders-${width}.png`, fullPage: true });

@@ -197,4 +197,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .currency-result { display:flex; flex-direction:column; gap:6px; margin:18px 0; }
 .currency-result strong { font-size:28px; font-variant-numeric:tabular-nums; }
 .currency-result span { color:var(--muted); font-size:13px; }
+.payment-calendar > h2 { margin-top:0; }
+.payment-calendar > .muted { line-height:1.6; }
+.payment-month { border-top:1px solid var(--border); }
+.payment-month summary { cursor:pointer; padding:16px 0; }
+.payment-month summary > span { display:block; margin:6px 0 0 18px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.payment-month .payment-reminders { margin-top:0; }
+.payment-month .payment-date { gap:4px; }
+.calendar-assumptions { font-size:12px; margin-bottom:0; }
 @media (max-width:359px) { .investment-stats dd { font-size:16px; } .investment-stats dt { font-size:13px; } }
