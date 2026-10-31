@@ -13,7 +13,11 @@
     "audit": "npm audit --audit-level=high",
     "postinstall": "node tools/depcruise/link-bin.mjs",
     "depcruise": "depcruise app lib server --output-type err",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "test:calendar:unit": "vitest run --config vitest.calendar.config.mts --project calendar-unit",
+    "test:calendar:integration": "vitest run --config vitest.calendar.config.mts --project calendar-integration",
+    "test:calendar:e2e": "playwright test e2e/payment-calendar.e2e.spec.ts",
+    "test:calendar": "npm run test:calendar:unit && npm run test:calendar:integration && npm run test:calendar:e2e"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.14",
