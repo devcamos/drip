@@ -74,6 +74,8 @@ Password reset and login finalization share an owner-row lock in a short READ CO
 
 Cloud sign-ins have an explicit seven-day expiry without automatic extension, host-only HttpOnly/Secure-on-HTTPS cookies, no cached session authorization and no-store auth responses. Better Auth sensitive endpoints use a five-minute freshness window; ordinary access is not logged out after five minutes. Local vault unlock remains separate. See [session policy and its limits](docs/session-policy.md), including the optional screen lock and the absence of a mandatory server idle timeout.
 
+Dividend holdings with shares and USD/EUR original-price details offer [daily GBP currency estimates](docs/exchange-rates.md) using Frankfurter's free blended reference rates. Enter the current share price to calculate a separate estimate; recorded balances, purchase cost and dividend assumptions stay unchanged. No API key or live stock-price feed is involved. [UI evidence](docs/screenshots/daily-exchange-rates/README.md).
+
 ## Encrypted local accounts
 
 Local unlock is independent of cloud authentication. After sign-out, a valid recovery code opens the existing encrypted device copy before a best-effort cloud sign-in runs. Authentication outages keep local accounts, edits and queued uploads usable. The renewal is bound to the device generation and cannot start after a later sign-out/account switch. If it fails, sync reports that sign-in is needed; Settings → Device sign-in options → Sign in without replacing local data renews the session later. A cached password wrapper, configured passkey, original code or already cached alternative can unlock offline without a server lookup.

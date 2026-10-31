@@ -190,4 +190,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .investment-fields { margin-top:20px; min-width:0; }
 .investment-fields .grid { align-items:end; }
 .portfolio-holdings .portfolio-position { grid-column:1 / -1; overflow-wrap:anywhere; }
+.currency-estimate { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+.currency-estimate summary { cursor:pointer; font-weight:650; }
+.currency-estimate .btn { margin-top:12px; }
+.currency-estimate p { line-height:1.6; overflow-wrap:anywhere; }
+.currency-result { display:flex; flex-direction:column; gap:6px; margin:18px 0; }
+.currency-result strong { font-size:28px; font-variant-numeric:tabular-nums; }
+.currency-result span { color:var(--muted); font-size:13px; }
 @media (max-width:359px) { .investment-stats dd { font-size:16px; } .investment-stats dt { font-size:13px; } }
