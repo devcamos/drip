@@ -18,14 +18,14 @@ const pool = new Pool({ connectionString: url.href, options: `-c search_path=${s
 // against a real guarded loopback database without any hosted credentials.
 const authPool = pool as unknown as NeonPool;
 const origin = "http://localhost:4321";
-const devices = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"];
+const devices = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"];
 const password = "Synthetic garden 42!";
 const createAuth = () => betterAuth({ database: pool, baseURL: origin, secret: "Synthetic-only-device-management-test-42!", trustedOrigins: [origin],
   emailAndPassword: { enabled: true }, rateLimit: { enabled: false }, plugins: [passwordLogin(authPool)], databaseHooks: deviceSessionHooks(authPool),
   session: { additionalFields: { dripDeviceId: { type: "string", input: false, returned: false, required: false } } },
 });
 let auth: ReturnType<typeof createAuth>;
-const send = (path: string, body: object, device = devices[2], cookie = "") => guardDeviceAuthResponse(() => auth.handler(new Request(`${origin}/api/auth/${path}`, { method: "POST", headers: { origin, "content-type": "application/json", "x-drip-device": device, cookie, "user-agent": "Mozilla/5.0 (iPhone) Version/18.0 Safari/605.1.15" }, body: JSON.stringify(body) })));
+const send = (path: string, body: object, device = devices[4], cookie = "") => guardDeviceAuthResponse(() => auth.handler(new Request(`${origin}/api/auth/${path}`, { method: "POST", headers: { origin, "content-type": "application/json", "x-drip-device": device, cookie, "user-agent": "Mozilla/5.0 (iPhone) Version/18.0 Safari/605.1.15" }, body: JSON.stringify(body) })));
 const cookieFrom = (response: Response) => response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
 async function session(cookie: string) { return (await auth.handler(new Request(`${origin}/api/auth/get-session`, { headers: { cookie } }))).json(); }
 async function owner() {
@@ -53,17 +53,21 @@ beforeAll(async () => {
 afterEach(async () => { await pool.query("TRUNCATE drip_recovery_limits"); });
 afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); vi.unstubAllEnvs(); });
 
-it("lets a third browser verify, revoke an old device and sign in; the old cookie stops working and the cap remains two", async () => {
+it("admits four browsers, blocks the fifth, then recovers its slot by revoking only the selected device", async () => {
   const a = await owner(); const credentials = { username: a.username, proof: a.proof };
-  const b = await send("sign-in/gamertag", credentials, devices[1]); expect(b.status).toBe(200); const cookieB = cookieFrom(b);
+  const others: string[] = [];
+  for (const device of devices.slice(1, 4)) {
+    const signed = await send("sign-in/gamertag", credentials, device); expect(signed.status).toBe(200); others.push(cookieFrom(signed));
+    expect((await session(cookieFrom(signed))).user.id).toBe(a.id);
+  }
   const denied = await send("sign-in/gamertag", credentials); expect(denied.status).toBe(409); expect(denied.headers.has("set-cookie")).toBe(false);
   const listing = await send("sign-in/gamertag-devices", credentials); expect(listing.status).toBe(200); expect(listing.headers.has("set-cookie")).toBe(false); expect(listing.headers.get("cache-control")).toBe("no-store");
-  const value = await listing.json(); expect(value.devices).toHaveLength(2); expect(JSON.stringify(value)).not.toMatch(/token|ipAddress|userAgent|password|envelope|proof/);
+  const value = await listing.json(); expect(value.devices).toHaveLength(4); expect(JSON.stringify(value)).not.toMatch(/token|ipAddress|userAgent|password|envelope|proof/);
   const old = (await pool.query('SELECT id FROM "session" WHERE "userId"=$1 AND "dripDeviceId"=$2', [a.id, devices[0]])).rows[0].id;
   const removal = await send("sign-in/gamertag-revoke-device", { ...credentials, sessionId: old }); expect(await removal.json()).toEqual({ removed: true, current: false }); expect(removal.headers.has("set-cookie")).toBe(false);
-  expect(await session(a.cookie)).toBeNull(); expect((await session(cookieB)).user.id).toBe(a.id);
+  expect(await session(a.cookie)).toBeNull(); for (const cookie of others) expect((await session(cookie)).user.id).toBe(a.id);
   const c = await send("sign-in/gamertag", credentials); expect(c.status).toBe(200); expect((await session(cookieFrom(c))).user.id).toBe(a.id);
-  expect(Number((await pool.query('SELECT count(*) FROM "session" WHERE "userId"=$1 AND "expiresAt">now()', [a.id])).rows[0].count)).toBe(2);
+  expect(Number((await pool.query('SELECT count(*) FROM "session" WHERE "userId"=$1 AND "expiresAt">now()', [a.id])).rows[0].count)).toBe(4);
 });
 it("never lists devices for bad credentials and cannot revoke another owner's session", async () => {
   const a = await owner(), b = await owner();
@@ -80,13 +84,13 @@ it("revokes this browser, treats expired/deleted sessions idempotently and rejec
   expect((await send("sign-in/gamertag-devices", { ...credentials, userId: "other" })).status).toBe(400);
   expect((await send("sign-in/gamertag-revoke-device", { ...credentials, sessionId: "" })).status).toBe(400);
 });
-it("serializes simultaneous revoke/login requests without admitting a third active session", async () => {
+it("serializes simultaneous revoke/login requests without admitting a fifth active session", async () => {
   const a = await owner(), credentials = { username: a.username, proof: a.proof };
-  expect((await send("sign-in/gamertag", credentials, devices[1])).status).toBe(200);
+  for (const device of devices.slice(1, 4)) expect((await send("sign-in/gamertag", credentials, device)).status).toBe(200);
   const target = (await pool.query('SELECT id FROM "session" WHERE "userId"=$1 AND "dripDeviceId"=$2', [a.id, devices[0]])).rows[0].id;
   const [removal, candidate] = await Promise.all([send("sign-in/gamertag-revoke-device", { ...credentials, sessionId: target }), send("sign-in/gamertag", credentials)]);
   expect(removal.status).toBe(200); expect([200, 409]).toContain(candidate.status);
-  expect(Number((await pool.query('SELECT count(*) FROM "session" WHERE "userId"=$1 AND "expiresAt">now()', [a.id])).rows[0].count)).toBeLessThanOrEqual(2);
+  expect(Number((await pool.query('SELECT count(*) FROM "session" WHERE "userId"=$1 AND "expiresAt">now()', [a.id])).rows[0].count)).toBeLessThanOrEqual(4);
 });
 it.each([
   ["Mozilla/5.0 (iPhone) Version/18.0 Safari/605.1.15", "Safari on iPhone"], ["Mozilla/5.0 (iPad) FxiOS/18.0", "Firefox on iPad"],

@@ -54,8 +54,8 @@ copy is already cloud-saved. Cancelling leaves it intact; unsynced or device-onl
 copies must be synced before replacement. Confirmation is bound to the exact
 saved copy, so concurrent edits cancel the switch rather than being overwritten.
 
-Up to two browser profiles/devices can hold active cloud sessions per account.
-Reopening the same browser renews its slot; a third browser must wait for a sign-out.
+Up to four browser profiles/devices can hold active cloud sessions per account.
+Reopening the same browser renews its slot; a fifth browser must wait for a sign-out.
 An opaque browser identifier is shared across tabs and retained across sign-out;
 it is not a hardware fingerprint. Password, recovery and cloud-passkey sign-in
 share server-side admission. The cap cannot revoke offline copies or keys already
@@ -71,6 +71,10 @@ Password setup saves/links encrypted cloud recovery where no cloud copy exists. 
 Apply `scripts/migrate.mjs` to the intended environment before deploying this feature. Development migration was tested only on the isolated Preview database; Production migration/release needs its own authorization. No Production data copying is involved.
 
 Password reset and login finalization share an owner-row lock in a short READ COMMITTED transaction. Better Auth creates a candidate session before that transaction, but Drip publishes no cookie or encrypted unlock wrapper until the current credential and session are checked under the lock. A reset that wins the overlap causes the stale login's candidate to be removed and rejected. If login finalizes first, reset revokes that session. The reset mutation runs in a separate statement after taking the lock so it sees sessions committed while waiting. Auth-adapter calls stay outside the transaction to avoid exhausting the shared connection pool. Transaction failures fail closed without publishing the candidate token. This does not revoke encryption roots or offline wrappers already held elsewhere.
+
+Cloud sign-ins have an explicit seven-day expiry without automatic extension, host-only HttpOnly/Secure-on-HTTPS cookies, no cached session authorization and no-store auth responses. Better Auth sensitive endpoints use a five-minute freshness window; ordinary access is not logged out after five minutes. Local vault unlock remains separate. See [session policy and its limits](docs/session-policy.md), including the optional screen lock and the absence of a mandatory server idle timeout.
+
+Dividend holdings with shares and USD/EUR original-price details offer [daily GBP currency estimates](docs/exchange-rates.md) using Frankfurter's free blended reference rates. Enter the current share price to calculate a separate estimate; recorded balances, purchase cost and dividend assumptions stay unchanged. No API key or live stock-price feed is involved. [UI evidence](docs/screenshots/daily-exchange-rates/README.md).
 
 ## Encrypted local accounts
 

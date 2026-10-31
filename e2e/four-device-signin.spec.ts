@@ -20,13 +20,13 @@ async function login(page: Page, name: string, success: Locator) {
 }
 async function capture(page: Page, name: string) {
   if (!process.env.DRIP_SIGNIN_CAPTURE) return;
-  await mkdir("docs/screenshots/two-device-signin", { recursive: true });
+  await mkdir("docs/screenshots/four-device-signin", { recursive: true });
   // Clear the visible secret input without changing the verified switch state.
   await page.getByLabel("Password", { exact: true }).fill("");
   for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
     await page.setViewportSize({ width, height: 1000 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: `docs/screenshots/two-device-signin/${name}-${device}.png`, scale: "css" });
+    await page.screenshot({ path: `docs/screenshots/four-device-signin/${name}-${device}.png`, scale: "css" });
   }
 }
 async function savedRecords(page: Page) {
@@ -42,11 +42,11 @@ async function synced(page: Page) {
   }), { timeout: 30_000 }).toBe(true);
 }
 
-test("two browsers restore the same account; a third is blocked; account switching preserves local data until consent", async ({ page, browser }) => {
+test("four browsers restore the same account; a fifth is blocked; account switching preserves local data until consent", async ({ page, browser }) => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview test database.");
   test.setTimeout(240_000);
   const name = tag(), otherName = tag();
-  const second = await browser.newContext(), third = await browser.newContext(), target = await browser.newContext();
+  const second = await browser.newContext(), third = await browser.newContext(), fourth = await browser.newContext(), fifth = await browser.newContext(), target = await browser.newContext();
   try {
     await signup(page, name);
     await page.getByRole("button", { name: "Add account", exact: true }).click();
@@ -55,8 +55,13 @@ test("two browsers restore the same account; a third is blocked; account switchi
     const b = await second.newPage(); await b.goto("http://localhost:4321/");
     await login(b, name, b.getByTestId("header-tag"));
     await expect(b.getByRole("region", { name: "Account cards", exact: true })).toContainText("£3,000.00");
-    const c = await third.newPage(); await c.goto("http://localhost:4321/");
-    const limit = c.getByRole("alert").filter({ hasText: "Two devices are already signed in" });
+    for (const context of [third, fourth]) {
+      const extra = await context.newPage(); await extra.goto("http://localhost:4321/");
+      await login(extra, name, extra.getByTestId("header-tag"));
+      await expect(extra.getByRole("region", { name: "Account cards", exact: true })).toContainText("£3,000.00");
+    }
+    const c = await fifth.newPage(); await c.goto("http://localhost:4321/");
+    const limit = c.getByRole("alert").filter({ hasText: "4 devices are already signed in" });
     await login(c, name, limit);
     await expect(limit).toBeVisible();
     expect(await (await c.request.get("http://localhost:4321/api/auth/get-session")).json()).toBeNull();
@@ -107,5 +112,5 @@ test("two browsers restore the same account; a third is blocked; account switchi
     await capture(b, "unsynced-account");
     await login(b, name, b.getByTestId("header-tag"));
     await expect(b.getByRole("region", { name: "Account cards", exact: true })).toContainText("£3,200.00");
-  } finally { await second.close(); await third.close(); await target.close(); }
+  } finally { await second.close(); await third.close(); await fourth.close(); await fifth.close(); await target.close(); }
 });

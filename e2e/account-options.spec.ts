@@ -56,7 +56,7 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".holding")).toHaveText("Realty Income");
   await expect(page.locator(".bal")).toHaveText("£1,200.00");
-  await expect(page.getByText("5.75%", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Income predictions", exact: true }).getByText("5.75%", { exact: true })).toBeVisible();
   await capture(page, "stock-detail");
 
   await page.getByRole("navigation").getByRole("button", { name: "Add", exact: true }).click();
@@ -98,14 +98,14 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
     await restored.getByRole("button", { name: "Restore", exact: true }).click();
     await restored.getByRole("button", { name: /Realty Income/ }).click();
     await expect(restored.locator(".holding")).toHaveText("Realty Income");
-    await expect(restored.getByText("5.75%", { exact: true })).toBeVisible();
+    await expect(restored.getByRole("region", { name: "Income predictions", exact: true }).getByText("5.75%", { exact: true })).toBeVisible();
     await restored.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(restored.getByLabel("Custom account colour", { exact: true })).toHaveValue("#6b2d83");
     await expect(restored.getByLabel("Paid", { exact: true })).toHaveValue("monthly");
     await restored.getByRole("button", { name: "Cancel", exact: true }).click();
     await restored.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
     await restored.getByRole("button", { name: /Custom investment trust/ }).click();
-    await expect(restored.getByText("4.25%", { exact: true })).toBeVisible();
+    await expect(restored.getByRole("region", { name: "Income predictions", exact: true }).getByText("4.25%", { exact: true })).toBeVisible();
     await restored.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(restored.getByLabel("Stock / fund name", { exact: true })).toHaveValue("Custom investment trust");
     await expect(restored.getByLabel("Custom account colour", { exact: true })).toHaveValue("#176b9a");

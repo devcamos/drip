@@ -116,6 +116,17 @@ describe("cloud recovery settings", () => {
     fireEvent.click(screen.getByText("Restore an existing cloud copy")); fill("Recovery code", code); click("Restore cloud accounts");
     await waitFor(() => expect(restored).toHaveBeenCalledWith(data, code));
   });
+  it("explains recent-authentication requirements without replacing local accounts", async () => {
+    cloud.readCloudState.mockResolvedValue({ userId: "user" });
+    cloud.authClient.passkey.addPasskey.mockResolvedValue({ error: { code: "SESSION_NOT_FRESH" } });
+    const restored = await panel();
+    await screen.findByText(/Cloud recovery is connected/);
+    fireEvent.click(screen.getByText("Device sign-in options")); click("Add cloud sign-in passkey");
+    expect(await screen.findByText(/Sign in again with your gamertag and password below/)).toBeInTheDocument();
+    expect(cloud.restoreCloud).not.toHaveBeenCalled();
+    expect(cloud.writeCloudState).not.toHaveBeenCalled();
+    expect(restored).not.toHaveBeenCalled();
+  });
   it("keeps local recovery available when the backend status cannot be fetched", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     await panel(); expect(await screen.findByText(/Could not check cloud availability/)).toBeInTheDocument();

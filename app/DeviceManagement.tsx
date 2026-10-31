@@ -4,6 +4,7 @@ import { listSignedInDevices, signOutRemoteDevice, type SignedInDevice } from "@
 import { passwordUsername } from "@/lib/password-login";
 import { signOutDevice } from "@/lib/device-session";
 import { localSessionBinding, type LocalSessionBinding } from "@/lib/db";
+import { SIGNED_IN_DEVICE_LIMIT } from "@/lib/device-policy";
 
 function signedInDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -60,11 +61,11 @@ export function DeviceManager({ username, password, onClose, onContinue }: Reado
   }
   return <section className="panel device-manager" aria-label="Manage signed-in devices" aria-busy={loading || busy}>
     <h2 ref={heading} tabIndex={-1}>Your signed-in devices</h2>
-    <p>You can use Drip on two browsers or devices. Sign out an old one to make room.</p>
+    <p>You can use Drip on up to {SIGNED_IN_DEVICE_LIMIT} browsers or devices. Sign out an old one to make room.</p>
     <p className="muted">Safari and a Home Screen app can count separately. Names are estimated from browser information.</p>
     {loading && <output>Checking your devices…</output>}
     {devices && <>
-      <p className="device-count">{devices.length} of 2 sign-ins in use</p>
+      <p className="device-count">{devices.length} of {SIGNED_IN_DEVICE_LIMIT} sign-ins in use</p>
       <ul className="device-list">{devices.map(device => <li key={device.id}>
         <div><h3>{device.name}</h3>{device.current && <span className="device-current">This browser</span>}<p className="muted">Signed in {signedInDate(device.signedInAt)}</p></div>
         <button type="button" className="btn ghost small" disabled={busy} aria-label={`Sign out ${device.name}`} onClick={() => { setSelected(device); setError(""); setMessage(""); }}>Sign out</button>
@@ -79,7 +80,7 @@ export function DeviceManager({ username, password, onClose, onContinue }: Reado
     </section>}
     {message && <output className="ok">{message}</output>}
     {error && <output role="alert" className="err">{error}</output>}
-    <div className="row-gap">{onContinue && devices && devices.length < 2 && <button type="button" className="btn" disabled={busy} onClick={continueSignIn}>Sign in on this device</button>}<button type="button" className="text-link" disabled={busy} onClick={onClose}>{onContinue ? "Back to sign in" : "Close devices"}</button></div>
+    <div className="row-gap">{onContinue && devices && devices.length < SIGNED_IN_DEVICE_LIMIT && <button type="button" className="btn" disabled={busy} onClick={continueSignIn}>Sign in on this device</button>}<button type="button" className="text-link" disabled={busy} onClick={onClose}>{onContinue ? "Back to sign in" : "Close devices"}</button></div>
   </section>;
 }
 
@@ -89,7 +90,7 @@ export function DeviceSettings() {
   useEffect(() => { let active = true; void passwordUsername().then(value => { if (active) setUsername(value); }).catch(() => {}); return () => { active = false; }; }, []);
   if (open && username) return <DeviceManager username={username} password={password} onClose={() => { setOpen(false); setPassword(""); }} />;
   return <section className="panel" aria-label="Signed-in devices">
-    <h2>Signed-in devices</h2><p className="muted">See your active sign-ins and sign out a browser you no longer use. Up to two can be signed in.</p>
+    <h2>Signed-in devices</h2><p className="muted">See your active sign-ins and sign out a browser you no longer use. Up to {SIGNED_IN_DEVICE_LIMIT} can be signed in.</p>
     {username ? <form onSubmit={event => { event.preventDefault(); if (password) setOpen(true); }}>
       <label htmlFor="devices-password">Confirm password to manage devices</label><input id="devices-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
       <button type="submit" className="btn ghost" disabled={!password}>Manage devices</button>

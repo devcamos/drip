@@ -5,6 +5,11 @@ Estimates use saved balances and annual yields, and are labelled separately.
 The bell and Settings open payment reminders for all earning cash and dividend
 accounts. Logging income never automatically changes an account balance.
 
+The bell also includes a [twelve-month expected payment calendar](payment-calendar.md),
+derived from each earning account's next date and frequency. Daily payments are
+grouped by month; editing a schedule recalculates future dates without adding
+received income. [Calendar screenshots](screenshots/payment-calendar/README.md).
+
 Phone notifications require explicit per-device permission and an installed
 Home Screen app on iPhone/iPad. Lock-screen messages contain no account names,
 balances or amounts. Payment dates/frequencies and time zone are stored beside

@@ -2,8 +2,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { APIError } from "better-auth/api";
 import type { Pool, PoolClient } from "@neondatabase/serverless";
 import { withPasswordOwner } from "./password-transaction";
+import { DEVICE_LIMIT_MESSAGE, SIGNED_IN_DEVICE_LIMIT } from "../lib/device-policy";
 
-export const DEVICE_LIMIT_MESSAGE = "Two devices are already signed in. Sign out on one, then try again.";
+export { DEVICE_LIMIT_MESSAGE } from "../lib/device-policy";
 const requestAdmission = new AsyncLocalStorage<{ failure?: APIError }>();
 type Candidate = { id: string; userId: string };
 type HookContext = { path?: string; headers?: Headers; request?: Request } | null;
@@ -22,7 +23,7 @@ export function assertDeviceAdmission(result: Admission) {
 
 /** Call only while holding this owner's lock, after any credential recheck.
  * Pending candidates count conservatively. A public browser UUID groups renewals;
- * it is not authentication and cannot grant more than two live session rows.
+ * it is not authentication and cannot grant more than the configured session cap.
  * Return failures so candidate deletion COMMITs before the endpoint throws.
  */
 export async function admitDeviceSession(client: PoolClient, session: Candidate): Promise<Admission> {
@@ -34,7 +35,7 @@ export async function admitDeviceSession(client: PoolClient, session: Candidate)
   }
   const sameDevice = (row: { id: string; dripDeviceId?: string | null }) => candidate.dripDeviceId && row.dripDeviceId === candidate.dripDeviceId;
   const other = rows.filter(row => row.id !== session.id && !sameDevice(row));
-  if (other.length >= 2) {
+  if (other.length >= SIGNED_IN_DEVICE_LIMIT) {
     await client.query('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', [session.id, session.userId]);
     return "limit";
   }

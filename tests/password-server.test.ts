@@ -89,7 +89,7 @@ it("rejects a preflight whose password is reset during verification, without cre
 });
 it("commits deletion of a third-device password candidate before returning the device-limit error", async () => {
   const envelope = await wrapPasswordRoot(fixtureCode, "tester", "Some password 123!", "owner");
-  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.startsWith('SELECT id, "dripDeviceId"') ? [{ id: "one" }, { id: "two" }, { id: "new-session" }] : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
+  db.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("drip_recovery_limits") ? [{ key: "login:global", hits: 1 }] : sql.startsWith('SELECT id, "dripDeviceId"') ? ["one", "two", "three", "four", "new-session"].map(id => ({ id })) : [{ user_id: "owner", password_hash: "hashed", envelope }] }));
   const ctx = context({ username: "tester", proof });
   await expect(endpoints.signInGamertag(ctx)).rejects.toMatchObject({ statusCode: 409, body: { code: "DEVICE_LIMIT_REACHED" } });
   expect(client.query).toHaveBeenCalledWith('DELETE FROM "session" WHERE id = $1 AND "userId" = $2', ["new-session", "owner"]);

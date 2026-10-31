@@ -1,4 +1,5 @@
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "./types";
+import { validInvestment } from "./stock-investment";
 
 export const PROVIDERS: Record<string, string> = {
   Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
@@ -27,6 +28,7 @@ export function validDate(value: unknown): value is string {
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
   return (account.productCategory === undefined || Object.hasOwn(PRODUCTS, account.productCategory)) &&
+    (account.investment === undefined || (account.rateType === "dividend" && validInvestment(account.investment))) &&
     (account.holdingName === undefined || (account.productCategory === "stocks-funds" && typeof account.holdingName === "string" && account.holdingName.trim().length > 0 && account.holdingName.length <= 100)) &&
     (account.taxWrapper === undefined || ["none", "cash-isa", "lifetime-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&
     (account.reinvestIncome === undefined || typeof account.reinvestIncome === "boolean") &&

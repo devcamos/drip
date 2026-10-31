@@ -30,7 +30,22 @@ export function authOptions() {
     emailAndPassword: { enabled: true, minPasswordLength: 32, requireEmailVerification: false },
     // Identifiers are generated from high-entropy recovery codes, not real email addresses.
     user: { changeEmail: { enabled: false } },
-    session: { additionalFields: { dripDeviceId: { type: "string" as const, required: false, input: false, returned: false } } },
+    session: {
+      // A remembered sign-in has a finite lifetime. Background sync/get-session
+      // must not turn it into an indefinitely renewable bearer credential.
+      expiresIn: 7 * 24 * 60 * 60,
+      disableSessionRefresh: true,
+      freshAge: 5 * 60,
+      // Revoking a device must affect its next authenticated request, rather
+      // than continuing to accept a cached session until a cookie TTL elapses.
+      cookieCache: { enabled: false },
+      additionalFields: { dripDeviceId: { type: "string" as const, required: false, input: false, returned: false } },
+    },
+    advanced: {
+      useSecureCookies: new URL(baseURL).protocol === "https:",
+      defaultCookieAttributes: { httpOnly: true, sameSite: "lax" as const, path: "/" },
+      crossSubDomainCookies: { enabled: false },
+    },
     databaseHooks: deviceSessionHooks(database()),
     rateLimit: { enabled: true, storage: "database" as const, window: 60, max: 30 },
     plugins: [passkey({ rpID: new URL(baseURL).hostname, rpName: "Drip", origin }), passwordLogin(database())],

@@ -7,9 +7,10 @@ export type { CloudState } from "./types";
 import { migrateData } from "./maths";
 import { safeFetch } from "./worker-safety";
 import { cloudPayload, fromCloudPayload } from "./cloud-payload";
+import { dataFormatVersion } from "./data-format";
 
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
-export interface Envelope { app: "drip-cloud"; v: 1; iv: string; ct: string }
+export interface Envelope { app: "drip-cloud"; v: 1 | 2; iv: string; ct: string }
 const enc = new TextEncoder();
 const b64 = (bytes: Uint8Array) => {
   let out = "";
@@ -34,12 +35,13 @@ export const cloudKey = deriveCloudEncryptionKey;
 export async function seal(data: AppData, key: CryptoKey): Promise<Envelope> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const safe = cloudPayload(data);
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode("drip-cloud-v1") }, key, enc.encode(JSON.stringify(safe)));
-  return { app: "drip-cloud", v: 1, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
+  const v = dataFormatVersion(safe);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(`drip-cloud-v${v}`) }, key, enc.encode(JSON.stringify(safe)));
+  return { app: "drip-cloud", v, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
 }
 async function decode(envelope: Envelope, key: CryptoKey): Promise<AppData> {
-  if (envelope.app !== "drip-cloud" || envelope.v !== 1) throw new Error("Unsupported cloud copy.");
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(envelope.iv), additionalData: enc.encode("drip-cloud-v1") }, key, unb64(envelope.ct));
+  if (envelope.app !== "drip-cloud" || ![1, 2].includes(envelope.v)) throw new Error("Unsupported cloud copy. Update Drip before restoring it.");
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(envelope.iv), additionalData: enc.encode(`drip-cloud-v${envelope.v}`) }, key, unb64(envelope.ct));
   const data = JSON.parse(new TextDecoder().decode(plain));
   if (!isAppData(data) || !data.identity) throw new Error("Invalid cloud copy.");
   return data;
