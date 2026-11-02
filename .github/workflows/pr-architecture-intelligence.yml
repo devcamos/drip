@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   review:
+    # Skip the AI review on Dependabot PRs (no secrets there, and it adds noise).
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
     uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@v1
     with:
       rules-path: architecture-rules.json
