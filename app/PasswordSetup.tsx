@@ -9,8 +9,8 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
   const [password, setPassword] = useState(""); const [again, setAgain] = useState(""); const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [method, setMethod] = useState<"code" | "password" | "passkey">("code");
   const [hasPassword, setHasPassword] = useState(false); const [hasPasskey, setHasPasskey] = useState(false);
-  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) { setUsername(name); setHasPassword(true); setMethod("password"); } }).catch(() => {}); return () => { active = false; }; }, []);
-  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setHasPasskey(value); }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) { setUsername(name); setHasPassword(true); setMethod(current => current === "passkey" ? current : "password"); } }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) { setHasPasskey(value); if (value) setMethod("passkey"); } }).catch(() => {}); return () => { active = false; }; }, []);
   return <section className="panel" aria-label="Sign-in and password">
     <h2>Sign-in &amp; password</h2>
     <p className="muted">Set a new password without changing your accounts. Confirm with your current password, a configured unlock passkey, or a recovery code.</p>

@@ -192,3 +192,20 @@ it("requires the correct current password to prepare recovery codes, without exp
   await setItem("verifier", await codeVerifier((await import("../lib/crypto")).generateRecoveryCode()));
   await expect(passwordRecoveryRoot(password)).rejects.toThrow(/Account changed/);
 });
+it("changes an existing password so only the new one opens the account, offline and online", async () => {
+  request.mockImplementation(async () => Response.json({ saved: true }));
+  await setLoginPassword(fixtureCode, "tester", password, data);
+  const before = (await passwordUnlockContext()).envelope;
+  const replacement = "Blue waterfall 73!";
+  await setLoginPassword(fixtureCode, "tester", replacement, data);
+  const sent = JSON.parse(request.mock.calls.at(-1)![1].body);
+  expect(sent.proof).toBe(await passwordProof("tester", replacement));
+  expect((await passwordUnlockContext()).envelope?.ct).not.toBe(before?.ct);
+  await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "out" }); lockLocalVault();
+  await expect(signInPassword("tester", password)).rejects.toThrow(/incorrect/);
+  await signInPassword("tester", replacement); expect(await loadData()).toEqual(data);
+  vi.stubGlobal("navigator", { onLine: true });
+  await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "out2" }); lockLocalVault();
+  request.mockImplementation(async () => Response.json({ owner: "owner", envelope: sent.envelope }));
+  await signInPassword("tester", replacement); expect(await loadData()).toEqual(data);
+});
