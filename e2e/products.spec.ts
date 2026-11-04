@@ -1,7 +1,9 @@
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showCloudRecovery } from "./vault-helpers";
-import { enableCloudRecovery, withAuthRetry } from "./auth-helpers";
+import { enableCloudRecovery, withAuthRetry, installLocalCloudFixture } from "./auth-helpers";
+
+installLocalCloudFixture();
 import { mkdir } from "node:fs/promises";
 
 async function createCashAccount(page: Page, category = "cash-isa", provider = "MoneyFarm") {

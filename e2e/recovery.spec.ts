@@ -2,7 +2,9 @@ import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
-import { enableCloudRecovery, withAuthRetry, expectCloudSessionEnded } from "./auth-helpers";
+import { enableCloudRecovery, withAuthRetry, expectCloudSessionEnded, installLocalCloudFixture } from "./auth-helpers";
+
+installLocalCloudFixture();
 
 // Real cloud journeys share an auth bucket on this host. The mounted app retries
 // temporary session failures every 60 seconds; allow that unchanged recovery path.
@@ -247,7 +249,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 75_000 });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
-  await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  await expectCloudSessionEnded(page);
   await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Recover account", exact: true }).click(), page.getByText("Total balance"));
@@ -263,7 +265,7 @@ test("an online cloud authentication outage does not block local unlock or queue
   page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
-  await expect.poll(async () => (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+  await expectCloudSessionEnded(page);
   // The browser remains online; only cloud authentication is unavailable.
   let attempted = false;
   await page.route("**/api/auth/sign-in/email", route => {

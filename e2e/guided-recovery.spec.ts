@@ -1,7 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import { legacyAccount } from "./legacy-account-helpers";
-import { withAuthRetry, finishSignupRecovery, expectCloudSessionEnded } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery, expectCloudSessionEnded, installLocalCloudFixture } from "./auth-helpers";
+
+installLocalCloudFixture();
 
 async function authenticator(page: Page, context: BrowserContext) {
   const cdp = await context.newCDPSession(page);

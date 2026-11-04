@@ -2,17 +2,21 @@ import { expect, test, type Page, type Locator } from "@playwright/test";
 import { Pool } from "pg";
 import { localTestDatabase } from "../server/local-test-database";
 
-let limits: Pool | undefined;
-test.beforeEach(async () => {
-  if (process.env.DRIP_CLOUD_E2E !== "1") return;
-  const connectionString = localTestDatabase(process.env);
-  if (!connectionString) throw new Error("Cloud browser cases need the isolated local fixture.");
-  limits ??= new Pool({ connectionString });
-  // Independent test users share a loopback IP. Reset limiter state between
-  // scenarios, retaining the actual limiter and its assertions within each one.
-  await limits.query('TRUNCATE "rateLimit", drip_recovery_limits');
-});
-test.afterAll(async () => { await limits?.end(); limits = undefined; });
+export function installLocalCloudFixture() {
+  // Register explicitly in each spec's suite. Import-time hooks belong only to
+  // the first importer when Playwright reuses a worker and caches this module.
+  let limits: Pool | undefined;
+  test.beforeEach(async () => {
+    if (process.env.DRIP_CLOUD_E2E !== "1") return;
+    const connectionString = localTestDatabase(process.env);
+    if (!connectionString) throw new Error("Cloud browser cases need the isolated local fixture.");
+    limits ??= new Pool({ connectionString });
+    // Independent users share a loopback IP. Reset only between scenarios;
+    // the real native/custom limiters stay enabled within every scenario.
+    await limits.query('TRUNCATE "rateLimit", drip_recovery_limits');
+  });
+  test.afterAll(async () => { await limits?.end(); });
+}
 
 export async function expectCloudSessionEnded(page: Page) {
   // The login screen appears as soon as local keys are dropped. Remote signout

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import "./auth-helpers";
+import { installLocalCloudFixture } from "./auth-helpers";
 import type { Pool } from "@neondatabase/serverless";
 import { getAuth, database } from "../server/auth";
 import { withPasswordOwner } from "../server/password-transaction";
@@ -7,6 +7,8 @@ import { generateRecoveryCode } from "../lib/crypto";
 import { recoveryCredentials } from "../lib/cloud";
 import { passwordProof, wrapPasswordRoot } from "../lib/password-crypto";
 import { localTestDatabase } from "../server/local-test-database";
+
+installLocalCloudFixture();
 
 function signal() {
   let resolve!: () => void;
