@@ -1,0 +1,667 @@
+{
+  "version": 1,
+  "pyramidTarget": {
+    "unit": 70,
+    "integration": 20,
+    "browser": 10
+  },
+  "pyramids": [
+    {
+      "featureId": "calendar",
+      "unit": [
+        "tests/payment-calendar.test.ts"
+      ],
+      "integration": [
+        "tests/payment-calendar.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/payment-calendar.e2e.spec.ts"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "auth",
+      "name": "Gamertag signup, password login and session policies",
+      "sources": [
+        "app/AuthScreen.tsx",
+        "app/PasswordSetup.tsx",
+        "app/PasswordSignIn.tsx",
+        "app/SignupForm.tsx",
+        "app/SignupRecovery.tsx",
+        "app/api/auth/[...all]/route.ts",
+        "lib/password-crypto.ts",
+        "lib/password-login.ts",
+        "server/auth.ts",
+        "server/password-login.ts",
+        "server/password-transaction.ts"
+      ],
+      "tests": [
+        "tests/password-server.test.ts",
+        "tests/password-login.test.ts",
+        "tests/password-ui.test.tsx",
+        "tests/signup-form.test.tsx",
+        "tests/signup-recovery-ui.test.tsx",
+        "tests/signup-recovery-context.test.ts",
+        "tests/signup-renewal-race.test.tsx",
+        "tests/session-policy.test.ts",
+        "e2e/auth-screens.spec.ts",
+        "e2e/password-login.spec.ts",
+        "e2e/gamertag-signin.spec.ts",
+        "e2e/password-race.spec.ts",
+        "e2e/signup-errors.spec.ts",
+        "integration/account-http.integration.test.ts",
+        "tests/local-test-database.test.ts"
+      ]
+    },
+    {
+      "id": "recovery",
+      "name": "Original six recovery codes, reset and file recovery",
+      "sources": [
+        "app/CloudRecovery.tsx",
+        "app/RecoveryCodeInput.tsx",
+        "app/RecoveryCodes.tsx",
+        "app/RecoveryTask.tsx",
+        "app/api/recovery-codes/route.ts",
+        "lib/crypto.ts",
+        "lib/original-recovery-codes.ts",
+        "lib/recovery-codes.ts",
+        "lib/recovery-file.ts",
+        "lib/recovery-readiness.ts"
+      ],
+      "tests": [
+        "tests/recovery-api.test.ts",
+        "tests/crypto.test.ts",
+        "tests/recovery-codes.test.ts",
+        "tests/recovery-file.test.ts",
+        "tests/original-recovery-codes.test.ts",
+        "tests/recovery-codes-ui.test.tsx",
+        "tests/recovery-autofill.test.tsx",
+        "tests/recovery-input-ui.test.tsx",
+        "tests/recovery-code-readiness.test.ts",
+        "tests/recovery-readiness.test.ts",
+        "tests/recovery-task-ui.test.tsx",
+        "e2e/recovery.spec.ts",
+        "e2e/guided-recovery.spec.ts",
+        "e2e/original-recovery.spec.ts",
+        "integration/account-http.integration.test.ts"
+      ]
+    },
+    {
+      "id": "vault",
+      "name": "Encrypted local storage, account switching and locked-state safety",
+      "sources": [
+        "lib/account-switch.ts",
+        "lib/db.ts",
+        "lib/draft.ts",
+        "lib/local-vault.ts"
+      ],
+      "tests": [
+        "tests/db.test.ts",
+        "tests/local-vault.test.ts",
+        "tests/local-vault-crypto.test.ts",
+        "tests/storage-validation.test.ts",
+        "tests/signup-replacement.test.ts",
+        "tests/vault-ui.test.tsx",
+        "e2e/local-vault.spec.ts",
+        "e2e/save-confidence.spec.ts"
+      ]
+    },
+    {
+      "id": "cloud",
+      "name": "Encrypted cloud sync, conflicts, version compatibility and restored data",
+      "sources": [
+        "app/api/cloud/route.ts",
+        "app/api/cloud/status/route.ts",
+        "lib/cloud-payload.ts",
+        "lib/cloud.ts",
+        "lib/data-format.ts",
+        "server/cloud-store.ts"
+      ],
+      "tests": [
+        "tests/cloud-api.test.ts",
+        "tests/cloud.test.ts",
+        "tests/cloud-ui.test.tsx",
+        "tests/cloud-sync-ui.test.tsx",
+        "tests/investment-format-compatibility.test.ts",
+        "tests/upload-ack.test.ts",
+        "e2e/recovery.spec.ts",
+        "e2e/password-login.spec.ts",
+        "e2e/products.spec.ts",
+        "integration/account-http.integration.test.ts"
+      ]
+    },
+    {
+      "id": "devices",
+      "name": "Four-device admission, targeted revocation and signout races",
+      "sources": [
+        "app/DeviceManagement.tsx",
+        "app/DeviceSession.tsx",
+        "lib/device-management.ts",
+        "lib/device-policy.ts",
+        "lib/device-session.ts",
+        "server/device-sessions.ts",
+        "server/manage-devices.ts"
+      ],
+      "tests": [
+        "tests/device-sessions.test.ts",
+        "tests/device-sessions-http.test.ts",
+        "tests/device-session.test.ts",
+        "tests/device-session-ui.test.tsx",
+        "tests/device-management-client.test.ts",
+        "tests/device-management-ui.test.tsx",
+        "tests/device-management-race.test.tsx",
+        "e2e/device-management.spec.ts",
+        "e2e/four-device-signin.spec.ts",
+        "integration/device-management.test.ts"
+      ]
+    },
+    {
+      "id": "passkeys",
+      "name": "Passkey registration/unlock and recovery alternatives",
+      "sources": [
+        "app/PasskeyUnlock.tsx",
+        "lib/lock.ts",
+        "lib/passkey-crypto.ts",
+        "lib/passkey-unlock.ts"
+      ],
+      "tests": [
+        "tests/lock.test.ts",
+        "tests/passkey-ui.test.tsx",
+        "tests/passkey-unlock.test.ts",
+        "e2e/passkey-unlock.spec.ts"
+      ]
+    },
+    {
+      "id": "accounts",
+      "name": "Account editing, providers, categories and colours",
+      "sources": [
+        "app/AccountDetail.tsx",
+        "app/AccountForm.tsx",
+        "lib/account-colour.ts",
+        "lib/products.ts"
+      ],
+      "tests": [
+        "tests/account-options.test.tsx",
+        "tests/products-ui.test.tsx",
+        "tests/income.test.ts",
+        "e2e/account-options.spec.ts",
+        "e2e/account-wallet.spec.ts",
+        "e2e/products.spec.ts"
+      ]
+    },
+    {
+      "id": "calculations",
+      "name": "Balances, topups, withdrawals, rate changes and income arithmetic",
+      "sources": [
+        "lib/maths.ts",
+        "lib/types.ts"
+      ],
+      "tests": [
+        "tests/maths.test.ts",
+        "tests/maths-refactor.test.ts",
+        "tests/gaps.test.ts",
+        "tests/daily.test.ts",
+        "tests/topup.test.ts",
+        "tests/income.test.ts",
+        "tests/income-remove-ui.test.tsx",
+        "e2e/income-update.spec.ts",
+        "e2e/products.spec.ts",
+        "e2e/smoke.spec.ts"
+      ]
+    },
+    {
+      "id": "dividends",
+      "name": "Dividend portfolio and received-income totals",
+      "sources": [
+        "app/DividendPortfolio.tsx",
+        "app/IncomeSummary.tsx",
+        "lib/dividend-portfolio.ts"
+      ],
+      "tests": [
+        "tests/income.test.ts",
+        "tests/income-remove-ui.test.tsx",
+        "tests/stock-investment-ui.test.tsx",
+        "tests/stock-investment.test.ts",
+        "e2e/stock-investment.spec.ts",
+        "e2e/income-notifications.spec.ts"
+      ]
+    },
+    {
+      "id": "holdings",
+      "name": "Shares, acquisition cost, valuation and yield",
+      "sources": [
+        "app/StockInvestment.tsx",
+        "lib/stock-investment.ts"
+      ],
+      "tests": [
+        "tests/stock-investment.test.ts",
+        "tests/stock-investment-ui.test.tsx",
+        "e2e/stock-investment.spec.ts"
+      ]
+    },
+    {
+      "id": "fx",
+      "name": "Daily FX estimates and bounded upstream API failures",
+      "sources": [
+        "app/CurrencyEstimate.tsx",
+        "app/api/exchange-rates/route.ts",
+        "lib/exchange-rates.ts",
+        "server/exchange-rates.ts"
+      ],
+      "tests": [
+        "tests/exchange-rates.test.ts",
+        "tests/currency-estimate.test.tsx",
+        "e2e/exchange-rates.spec.ts"
+      ]
+    },
+    {
+      "id": "forecasts",
+      "name": "Trends, forecasts and deposit assumptions",
+      "sources": [
+        "app/Trends.tsx"
+      ],
+      "tests": [
+        "tests/trends.test.tsx",
+        "tests/trends-ui.test.tsx",
+        "tests/maths.test.ts",
+        "tests/gaps.test.ts",
+        "e2e/smoke.spec.ts"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "Expected payments, recurrence and reminders",
+      "sources": [
+        "app/PaymentCalendar.tsx",
+        "app/PaymentNotifications.tsx",
+        "app/useCalendarDay.ts",
+        "lib/payment-calendar.ts",
+        "lib/payment-reminders.ts"
+      ],
+      "tests": [
+        "tests/payment-calendar.test.ts",
+        "tests/payment-calendar.integration.test.tsx",
+        "tests/income-reminders.test.ts",
+        "tests/income-notifications-ui.test.tsx",
+        "e2e/payment-calendar.e2e.spec.ts",
+        "e2e/income-notifications.spec.ts"
+      ]
+    },
+    {
+      "id": "notifications",
+      "name": "Phone-reminder enrolment, scheduling, limits and dispatch",
+      "sources": [
+        "app/PhoneReminders.tsx",
+        "app/api/notifications/config/route.ts",
+        "app/api/notifications/dispatch/route.ts",
+        "app/api/notifications/subscription/route.ts",
+        "app/api/notifications/test/route.ts",
+        "lib/phone-reminders.ts",
+        "scripts/payment-notifications.sql",
+        "server/notifications/api.ts",
+        "server/notifications/config.ts",
+        "server/notifications/crypto.ts",
+        "server/notifications/dispatch.ts",
+        "server/notifications/model.ts",
+        "server/notifications/runtime.ts",
+        "server/notifications/store.ts"
+      ],
+      "tests": [
+        "tests/notifications-security.test.ts",
+        "tests/phone-reminders.test.ts",
+        "tests/income-notifications-ui.test.tsx",
+        "e2e/income-notifications.spec.ts",
+        "integration/notifications-postgres.test.ts",
+        "integration/notification-rate-limits.test.ts"
+      ]
+    },
+    {
+      "id": "pwa",
+      "name": "Install task, offline shell, safe worker updates and data retention",
+      "sources": [
+        "app/InstallTask.tsx",
+        "app/PwaStatus.tsx",
+        "app/sw-build.js/route.ts",
+        "lib/worker-safety.ts",
+        "public/apple-touch-icon.png",
+        "public/icon-192.png",
+        "public/icon-512.png",
+        "public/icon-maskable-512.png",
+        "public/manifest.webmanifest",
+        "public/sw.js"
+      ],
+      "tests": [
+        "tests/install-task.test.tsx",
+        "tests/pwa.test.tsx",
+        "tests/pwa-build.test.ts",
+        "tests/service-worker.test.ts",
+        "tests/worker-safety.test.ts",
+        "e2e/install-task.spec.ts",
+        "e2e/pwa-update.spec.ts",
+        "e2e/signin-update.spec.ts",
+        "e2e/pwa-current-update.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "prototype",
+      "name": "Holdings-card prototype and preview-only route",
+      "sources": [
+        "app/prototype/HoldingsPrototype.tsx",
+        "app/prototype/holdings.ts",
+        "app/prototype/page.tsx",
+        "app/prototype/prototype.module.css"
+      ],
+      "tests": [
+        "tests/holdings-prototype.test.tsx",
+        "tests/holdings-prototype-route.test.tsx",
+        "e2e/holdings-prototype.spec.ts"
+      ]
+    },
+    {
+      "id": "delivery",
+      "name": "Deployment configuration and database schema compatibility",
+      "sources": [
+        "next.config.mjs",
+        "scripts/deployment-config.d.mts",
+        "scripts/deployment-config.mjs",
+        "scripts/migrate.mjs",
+        "scripts/release-device-session-cap.sql",
+        "scripts/validate-deployment.mjs",
+        "server/database-types.ts",
+        "server/local-test-database.ts"
+      ],
+      "tests": [
+        "tests/deployment-preflight.test.ts",
+        "tests/database-types.test.ts",
+        "e2e/signin-update.spec.ts",
+        "tests/local-test-database.test.ts"
+      ]
+    },
+    {
+      "id": "shell",
+      "name": "App navigation, identity and screen orchestration",
+      "sources": [
+        "app/Drip.tsx",
+        "app/favicon.ico",
+        "app/globals.css",
+        "app/layout.tsx",
+        "app/page.tsx",
+        "lib/identity.ts",
+        "public/fonts/DM-Sans.ttf",
+        "public/fonts/OFL-DM-Sans.txt"
+      ],
+      "tests": [
+        "tests/ui.test.tsx",
+        "tests/identity.test.ts",
+        "tests/signup-form.test.tsx",
+        "e2e/smoke.spec.ts",
+        "e2e/auth-screens.spec.ts",
+        "e2e/gamertag-signin.spec.ts"
+      ]
+    },
+    {
+      "id": "governance",
+      "name": "Regression catalog, change evidence and test-control guards",
+      "sources": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/pr-architecture-intelligence.yml",
+        "package-lock.json",
+        "package.json",
+        "playwright.config.ts",
+        "playwright.income.config.ts",
+        "tools/regression/check.mjs",
+        "tools/regression/policy.d.mts",
+        "tools/regression/policy.mjs",
+        "tools/regression/report.mjs",
+        "tools/regression/run.mjs",
+        "vitest.calendar.config.mts",
+        "vitest.config.mts",
+        "vitest.integration.config.mts",
+        "tools/regression/cloud.mjs",
+        "tools/regression/prepare-cloud.mjs",
+        "playwright.cloud.config.ts"
+      ],
+      "tests": [
+        "tests/regression-policy.test.ts"
+      ]
+    }
+  ],
+  "layers": {
+    "unit": [
+      "tests/cloud-api.test.ts",
+      "tests/database-types.test.ts",
+      "tests/device-sessions.test.ts",
+      "tests/exchange-rates.test.ts",
+      "tests/gaps.test.ts",
+      "tests/identity.test.ts",
+      "tests/income-reminders.test.ts",
+      "tests/income.test.ts",
+      "tests/lock.test.ts",
+      "tests/maths-refactor.test.ts",
+      "tests/maths.test.ts",
+      "tests/payment-calendar.test.ts",
+      "tests/recovery-api.test.ts",
+      "tests/regression-policy.test.ts",
+      "tests/topup.test.ts",
+      "tests/local-test-database.test.ts"
+    ],
+    "integration": [
+      "tests/account-options.test.tsx",
+      "tests/cloud-sync-ui.test.tsx",
+      "tests/cloud-ui.test.tsx",
+      "tests/cloud.test.ts",
+      "tests/crypto.test.ts",
+      "tests/currency-estimate.test.tsx",
+      "tests/daily.test.ts",
+      "tests/db.test.ts",
+      "tests/deployment-preflight.test.ts",
+      "tests/device-management-client.test.ts",
+      "tests/device-management-race.test.tsx",
+      "tests/device-management-ui.test.tsx",
+      "tests/device-session-ui.test.tsx",
+      "tests/device-session.test.ts",
+      "tests/device-sessions-http.test.ts",
+      "tests/holdings-prototype-route.test.tsx",
+      "tests/holdings-prototype.test.tsx",
+      "tests/income-notifications-ui.test.tsx",
+      "tests/income-remove-ui.test.tsx",
+      "tests/install-task.test.tsx",
+      "tests/investment-format-compatibility.test.ts",
+      "tests/local-vault-crypto.test.ts",
+      "tests/local-vault.test.ts",
+      "tests/notifications-security.test.ts",
+      "tests/original-recovery-codes.test.ts",
+      "tests/passkey-ui.test.tsx",
+      "tests/passkey-unlock.test.ts",
+      "tests/password-login.test.ts",
+      "tests/password-server.test.ts",
+      "tests/password-ui.test.tsx",
+      "tests/payment-calendar.integration.test.tsx",
+      "tests/phone-reminders.test.ts",
+      "tests/products-ui.test.tsx",
+      "tests/pwa-build.test.ts",
+      "tests/pwa.test.tsx",
+      "tests/recovery-autofill.test.tsx",
+      "tests/recovery-code-readiness.test.ts",
+      "tests/recovery-codes-ui.test.tsx",
+      "tests/recovery-codes.test.ts",
+      "tests/recovery-file.test.ts",
+      "tests/recovery-input-ui.test.tsx",
+      "tests/recovery-readiness.test.ts",
+      "tests/recovery-task-ui.test.tsx",
+      "tests/service-worker.test.ts",
+      "tests/session-policy.test.ts",
+      "tests/signup-form.test.tsx",
+      "tests/signup-recovery-context.test.ts",
+      "tests/signup-recovery-ui.test.tsx",
+      "tests/signup-renewal-race.test.tsx",
+      "tests/signup-replacement.test.ts",
+      "tests/stock-investment-ui.test.tsx",
+      "tests/stock-investment.test.ts",
+      "tests/storage-validation.test.ts",
+      "tests/trends-ui.test.tsx",
+      "tests/trends.test.tsx",
+      "tests/ui.test.tsx",
+      "tests/upload-ack.test.ts",
+      "tests/vault-ui.test.tsx",
+      "tests/worker-safety.test.ts"
+    ],
+    "postgres": [
+      "integration/account-http.integration.test.ts",
+      "integration/device-management.test.ts",
+      "integration/notification-rate-limits.test.ts",
+      "integration/notifications-postgres.test.ts"
+    ],
+    "browser": [
+      "e2e/account-options.spec.ts",
+      "e2e/account-wallet.spec.ts",
+      "e2e/auth-screens.spec.ts",
+      "e2e/device-management.spec.ts",
+      "e2e/exchange-rates.spec.ts",
+      "e2e/four-device-signin.spec.ts",
+      "e2e/gamertag-signin.spec.ts",
+      "e2e/guided-recovery.spec.ts",
+      "e2e/holdings-prototype.spec.ts",
+      "e2e/income-notifications.spec.ts",
+      "e2e/income-update.spec.ts",
+      "e2e/install-task.spec.ts",
+      "e2e/local-vault.spec.ts",
+      "e2e/original-recovery.spec.ts",
+      "e2e/passkey-unlock.spec.ts",
+      "e2e/password-login.spec.ts",
+      "e2e/password-race.spec.ts",
+      "e2e/payment-calendar.e2e.spec.ts",
+      "e2e/products.spec.ts",
+      "e2e/pwa-current-update.e2e.spec.ts",
+      "e2e/pwa-update.spec.ts",
+      "e2e/recovery.spec.ts",
+      "e2e/save-confidence.spec.ts",
+      "e2e/signin-update.spec.ts",
+      "e2e/signup-errors.spec.ts",
+      "e2e/smoke.spec.ts",
+      "e2e/stock-investment.spec.ts"
+    ]
+  },
+  "conditional": [
+    {
+      "file": "e2e/four-device-signin.spec.ts",
+      "title": "four browsers restore the same account; a fifth is blocked; account switching preserves local data until consent",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/guided-recovery.spec.ts",
+      "title": "password setup creates a verified passkey, which resets a forgotten password and restores the same cloud data",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/income-update.spec.ts",
+      "title": "actual main worker3 upgrades to worker4 on a stable origin without changing encrypted accounts",
+      "method": "skip",
+      "reason": "Inherited conditional journey; requires coordinated old/new builds. Remains visible as unverified when not run; not counted as a passing test.",
+      "fixture": "previous-build"
+    },
+    {
+      "file": "e2e/password-login.spec.ts",
+      "title": "existing encrypted accounts gain ordinary password sign-in, offline unlock, fresh-device access and recovery reset",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/password-login.spec.ts",
+      "title": "signup saves the original recovery codes and offers the same set later with password confirmation",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/password-login.spec.ts",
+      "title": "another account cannot claim an existing login gamertag",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/password-login.spec.ts",
+      "title": "signed-out signup preserves a recoverable old account through cancellation, duplicate name and successful replacement",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/password-race.spec.ts",
+      "title": "database-coordinated reset rejects overlapping password logins and sees sessions created while waiting",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/products.spec.ts",
+      "title": "product and recorded income survive fresh-device encrypted cloud recovery",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/pwa-update.spec.ts",
+      "title": "saved bookmark updates from the old worker, refreshes imported build identity, and retains encrypted accounts offline",
+      "method": "skip",
+      "reason": "Inherited conditional journey; requires coordinated old/new builds. Remains visible as unverified when not run; not counted as a passing test.",
+      "fixture": "previous-build"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "cloud copy survives a fresh device, offline edits queue, and stale devices cannot overwrite it",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "cloud passkey verifies on the server, while new-device decryption still requires the code",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "downloaded set of six codes independently restores the same cloud account",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "offline sign-out keeps queued top-ups and online sign-out revokes the server session",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "an online cloud authentication outage does not block local unlock or queued top-ups",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/recovery.spec.ts",
+      "title": "signed-out users can restore rampage201 instead of reopening the current profile",
+      "method": "skip",
+      "reason": "Requires the isolated local cloud fixture. Mandatory in the cloud browser stage; local-only skips are replaced only by actual passing cloud results.",
+      "fixture": "local-cloud"
+    },
+    {
+      "file": "e2e/signin-update.spec.ts",
+      "title": "a saved password and encrypted records survive an old-to-new build update while signed out",
+      "method": "skip",
+      "reason": "Inherited conditional journey; requires coordinated old/new builds. Remains visible as unverified when not run; not counted as a passing test.",
+      "fixture": "previous-build"
+    }
+  ]
+}

@@ -119,7 +119,7 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   // passkey fails -> fallback to recovery code
   await cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
   await page.reload();
-  await unlock(page, code);
+  await unlock(page, code, "screen-lock");
   await expect(page.getByRole("heading", { name: /locked/ })).toBeVisible();
   await page.locator("input").fill("WRONG");
   await page.getByRole("button", { name: "Unlock with code" }).click();

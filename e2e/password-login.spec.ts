@@ -55,14 +55,8 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
   page.on("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await login(page, handle, "Wrong password 42!", true); await expect(page.getByText("Gamertag or password is incorrect.")).toBeVisible();
-  // The library's durable limiter must return usable seconds, not a bigint
-  // timestamp concatenated with its window. Keep the real limit enabled.
-  await login(page, handle, "Another wrong password 43!", true);
-  await login(page, handle, "Another wrong password 44!", true);
-  const limited = await page.request.post("/api/auth/sign-in/gamertag", { headers: { origin: "http://localhost:4321" }, data: { username: handle, proof: "A".repeat(43) } });
-  expect(limited.status()).toBe(429);
-  const retryAfter = Number(limited.headers()["retry-after"] ?? limited.headers()["x-retry-after"]);
-  expect(retryAfter).toBeGreaterThan(0); expect(retryAfter).toBeLessThanOrEqual(60);
+  // Rate-limit boundaries and Retry-After are real HTTP/Postgres contracts in
+  // account-http.integration.test.ts; keep this browser path about user access.
   await expect(page.getByTestId("header-tag")).toHaveCount(0);
   await login(page, handle.toUpperCase(), password); await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
@@ -76,7 +70,9 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     await page.getByRole("button", { name: "Sign out", exact: true }).click(); await showRecovery(page);
     await page.getByLabel("Recovery code", { exact: true }).fill(code); await page.getByRole("button", { name: "Recover account", exact: true }).click();
     await expect(page.getByTestId("header-tag")).toBeVisible(); await setPassword(page, handle, code, nextPassword);
-    await expect.poll(async () => (await other.request.get("http://localhost:4321/api/auth/get-session")).json()).toBeNull();
+    // A reset revokes the other server session while its browser remains open.
+    const revoked = await other.request.get("/api/auth/get-session");
+    expect(revoked.status()).toBe(200); expect(await revoked.json()).toBeNull();
     await other.reload(); await login(other, handle, password, true); await expect(other.getByText("Gamertag or password is incorrect.")).toBeVisible();
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
   } finally { await second.close(); }

@@ -2,7 +2,7 @@ import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
 
-import { enableCloudRecovery, withAuthRetry } from "./auth-helpers";
+import { enableCloudRecovery, withAuthRetry, expectCloudSessionEnded } from "./auth-helpers";
 
 // Real cloud journeys share an auth bucket on this host. The mounted app retries
 // temporary session failures every 60 seconds; allow that unchanged recovery path.
@@ -99,6 +99,7 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   await page.evaluate(() => new Promise<void>((resolve, reject) => { const r = indexedDB.deleteDatabase("drip"); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }));
   await page.reload();
   await showCloudRecovery(page);
+  await page.getByText("Have an older cloud sign-in passkey?", { exact: true }).click();
   await page.getByRole("button", { name: "Sign in with passkey" }).click();
   await expect(page.getByText(/Signed in. Enter your recovery code/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Restore cloud accounts" })).toBeDisabled();
@@ -123,6 +124,9 @@ test("downloaded set of six codes independently restores the same cloud account"
   await page.getByRole("button", { name: "Open original recovery codes" }).click();
   const list = page.getByRole("region", { name: "Recovery codes" }).getByRole("listitem");
   await expect(list).toHaveCount(6, { timeout: 30_000 });
+  const reveal = page.getByRole("button", { name: "Show recovery codes", exact: true });
+  await expect(reveal).toHaveAttribute("aria-expanded", "false");
+  await reveal.click();
   const codes = await list.allTextContents();
   expect(new Set(codes).size).toBe(6);
   const downloadEvent = page.waitForEvent("download");
@@ -136,13 +140,19 @@ test("downloaded set of six codes independently restores the same cloud account"
     const fresh = await browser.newContext();
     try {
       const returning = await fresh.newPage(); await returning.goto("http://localhost:4321");
-    await showCloudRecovery(returning);
+      await showCloudRecovery(returning);
       await returning.getByLabel("Recovery code", { exact: true }).fill(code);
       await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
       await expect(returning.getByText("£3,000.00").first()).toBeVisible();
       await returning.reload();
       await unlock(returning, code);
       await expect(returning.getByText("Total balance")).toBeVisible();
+      // Closing a browser does not revoke a session. Release each synthetic
+      // device so this six-code check preserves the real four-device cap.
+      returning.on("dialog", dialog => dialog.accept());
+      await returning.getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(returning.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
+      await expectCloudSessionEnded(returning);
     } finally { await fresh.close(); }
   }
   // Downloaded wrappers never expose the primary recovery code in the text file.

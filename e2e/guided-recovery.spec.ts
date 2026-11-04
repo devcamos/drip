@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import { legacyAccount } from "./legacy-account-helpers";
-import { withAuthRetry, finishSignupRecovery } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery, expectCloudSessionEnded } from "./auth-helpers";
 
 async function authenticator(page: Page, context: BrowserContext) {
   const cdp = await context.newCDPSession(page);
@@ -118,8 +118,10 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
     await withAuthRetry(other, () => other.getByRole("button", { name: "Sign in" }).click(), other.getByTestId("header-tag"));
     await expect(other.getByRole("region", { name: "Account cards" })).toContainText("£3,200.00");
     other.on("dialog", dialog => dialog.accept()); await other.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect.poll(async () => (await other.request.get(`${baseURL}/api/auth/get-session`)).json()).toBeNull();
+    await expect(other.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
+    await expectCloudSessionEnded(other);
   } finally { await fresh.close(); }
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect.poll(async () => (await page.request.get(`${baseURL}/api/auth/get-session`)).json()).toBeNull();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
+  await expectCloudSessionEnded(page);
 });
