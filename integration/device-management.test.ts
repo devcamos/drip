@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { Pool } from "pg";
+import { regressionDatabaseURL } from "../server/local-test-database";
 import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { passwordLogin } from "../server/password-login";
@@ -9,8 +10,7 @@ import { generateRecoveryCode } from "../lib/crypto";
 import { deviceName } from "../server/manage-devices";
 import type { Pool as NeonPool } from "@neondatabase/serverless";
 
-const url = new URL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
-if (!["127.0.0.1", "localhost"].includes(url.hostname) || url.pathname !== "/drip_notifications_test") throw new Error("Device integration tests require the isolated loopback test database.");
+const url = regressionDatabaseURL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
 const schema = `devices_${randomUUID().replaceAll("-", "")}`;
 const admin = new Pool({ connectionString: url.href });
 const pool = new Pool({ connectionString: url.href, options: `-c search_path=${schema}`, max: 6 });

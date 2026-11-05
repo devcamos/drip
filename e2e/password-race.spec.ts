@@ -1,10 +1,14 @@
 import { test, expect } from "@playwright/test";
+import { installLocalCloudFixture } from "./auth-helpers";
 import type { Pool } from "@neondatabase/serverless";
 import { getAuth, database } from "../server/auth";
 import { withPasswordOwner } from "../server/password-transaction";
 import { generateRecoveryCode } from "../lib/crypto";
 import { recoveryCredentials } from "../lib/cloud";
 import { passwordProof, wrapPasswordRoot } from "../lib/password-crypto";
+import { localTestDatabase } from "../server/local-test-database";
+
+installLocalCloudFixture();
 
 function signal() {
   let resolve!: () => void;
@@ -14,8 +18,7 @@ function signal() {
 test("database-coordinated reset rejects overlapping password logins and sees sessions created while waiting", async () => {
   test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database; ordinary CI runs deterministic server regressions.");
   test.setTimeout(180_000);
-  process.loadEnvFile(".env.local");
-  if (new URL(process.env.DATABASE_URL!).hostname !== "ep-spring-band-b8noxum4-pooler.c-14.us-east-1.aws.neon.tech" || process.env.BETTER_AUTH_URL !== "http://localhost:4321") throw new Error("Use the isolated Preview database and local auth origin for this test.");
+  if (!localTestDatabase(process.env)) throw new Error("Use the disposable local cloud fixture for the reset-race test.");
   const auth = getAuth(), db = database(), authContext = await auth.$context;
   const origin = process.env.BETTER_AUTH_URL;
   const root = generateRecoveryCode(), recovery = await recoveryCredentials(root);
@@ -90,8 +93,10 @@ test("database-coordinated reset rejects overlapping password logins and sees se
     background.push(waiter);
     await waiting.promise;
     expect(entered).toBe(false);
-    // This uses the third pool connection; the lock must permit its FK check.
-    const candidate = await createSession(owner!);
+    // A pending password candidate is inserted before admission. Insert that
+    // real row on the third connection: calling the ordinary adapter here also
+    // runs its admission hook and would wait on the lock this fixture holds.
+    const candidate = (await db.query('INSERT INTO "session" (id, token, "userId", "expiresAt", "createdAt", "updatedAt") VALUES ($1,$2,$3,now()+interval \'7 days\',now(),now()) RETURNING id', [crypto.randomUUID(), crypto.randomUUID(), owner])).rows[0];
     unlock.resolve();
     await holder;
     expect(await waiter).toBe(1);

@@ -35,8 +35,10 @@ new stored field, background job or new phone subscription is required; the
 existing phone-reminder schedule remains unchanged.
 
 Verification: `tests/payment-calendar.test.ts`,
-`tests/payment-calendar-ui.test.tsx`, `e2e/payment-calendar.spec.ts`.
-The browser test exercises the real local application/encryption, date/frequency
-editing, future schedule recalculation, unchanged received income and encrypted
-reload. [Screenshots](screenshots/payment-calendar/README.md) use synthetic
+`tests/payment-calendar.integration.test.tsx`, `e2e/payment-calendar.e2e.spec.ts`.
+The [feature test pyramid](testing/payment-calendar-pyramid.md) separates
+14 isolated unit, 4 real repository/component integration and 2 critical browser
+cases (70/20/10). Browser tests exercise the real local application/encryption,
+date/frequency editing, future schedule recalculation, unchanged received income
+and encrypted reload. [Screenshots](screenshots/payment-calendar/README.md) use synthetic
 accounts, without API-response mocks or real customer credentials.

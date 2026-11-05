@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { Pool } from "pg";
+import { regressionDatabaseURL } from "../server/local-test-database";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { ReminderStore } from "../server/notifications/store";
 import { reminderApi } from "../server/notifications/api";
 import { pushFixture } from "../tests/notification-fixtures";
 
-const url = new URL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
-if (!["127.0.0.1", "localhost"].includes(url.hostname) || url.pathname !== "/drip_notifications_test") throw new Error("Rate-limit tests require the isolated loopback test database.");
+const url = regressionDatabaseURL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
 const schema = `push_limits_${randomUUID().replaceAll("-", "")}`;
 const admin = new Pool({ connectionString: url.href });
 const pool = new Pool({ connectionString: url.href, options: `-c search_path=${schema}` });

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { Pool } from "pg";
+import { regressionDatabaseURL } from "../server/local-test-database";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { ReminderStore } from "../server/notifications/store";
@@ -7,8 +8,7 @@ import { dispatchReminders } from "../server/notifications/dispatch";
 import { pushFixture } from "../tests/notification-fixtures";
 
 // Fail closed: this suite may mutate only its own schema in an ephemeral local DB.
-const url = new URL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
-if (!["127.0.0.1", "localhost"].includes(url.hostname) || url.pathname !== "/drip_notifications_test") throw new Error("Integration tests require the isolated loopback test database.");
+const url = regressionDatabaseURL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
 const schema = `reminders_${randomUUID().replaceAll("-", "")}`;
 const admin = new Pool({ connectionString: url.href });
 const pool = new Pool({ connectionString: url.href, options: `-c search_path=${schema}` });
