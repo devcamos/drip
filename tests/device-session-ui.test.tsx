@@ -25,8 +25,10 @@ describe("visible sign-out and code return", () => {
     expect(screen.queryByLabelText("Recovery code")).toBeNull();
     expect(screen.queryByRole("button", { name: "Use another account" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
-    expect(await screen.findByRole("button", { name: "Unlock with passkey" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Recovery code")).toBeInTheDocument();
+    const passkey = await screen.findByRole("button", { name: "Unlock with passkey" });
+    const code = screen.getByLabelText("Recovery code");
+    // The saved unlock passkey is offered before the last-resort recovery code.
+    expect(passkey.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("form", { name: "Password sign-in" })).toBeNull();
   });
   it.each(["signedOut", "locked"] as const)("offers Sign up from %s, supports the route and returns without replacing data", async mode => {

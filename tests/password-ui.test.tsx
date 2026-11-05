@@ -117,3 +117,36 @@ it("resets with a fresh saved-passkey confirmation and leaves the password uncha
   expect(await screen.findByText(/Password saved/)).toBeInTheDocument();
   expect(actions.setLoginPassword).toHaveBeenCalledWith("passkey-verified-root", "tester", "New password 456!", expect.any(Object));
 });
+
+it("defaults a forgotten-password reset to the saved unlock passkey when one is configured", async () => {
+  passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+  render(<PasswordSetup data={emptyData()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toHaveAttribute("aria-pressed", "true"));
+  await waitFor(() => expect(actions.passwordUsername).toHaveBeenCalled());
+  expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Current password" })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.queryByLabelText("Current password", { selector: "input" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("New password"), { target: { value: "New password 456!" } });
+  fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "New password 456!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save password" }));
+  expect(await screen.findByText(/Password saved/)).toBeInTheDocument();
+  expect(actions.passwordRecoveryRoot).not.toHaveBeenCalled();
+  expect(actions.setLoginPassword).toHaveBeenCalledWith("passkey-verified-root", "tester", "New password 456!", expect.any(Object));
+});
+
+it("keeps the passkey default when the saved password lookup finishes later", async () => {
+  let finish!: (name: string) => void;
+  actions.passwordUsername.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+  render(<PasswordSetup data={emptyData()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toHaveAttribute("aria-pressed", "true"));
+  finish("tester");
+  await screen.findByRole("button", { name: "Current password" });
+  expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("defaults to the current password when no unlock passkey is configured", async () => {
+  render(<PasswordSetup data={emptyData()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Current password" })).toHaveAttribute("aria-pressed", "true"));
+  expect(screen.queryByRole("button", { name: "Saved unlock passkey" })).toBeNull();
+});
