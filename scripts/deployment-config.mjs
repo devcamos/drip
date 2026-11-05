@@ -23,6 +23,7 @@ function originProblems(value, expected) {
 }
 export function deploymentProblems(env) {
   const problems = [];
+  if (env.DRIP_CLOUD_E2E === "1") problems.push("Local cloud-test mode must never be enabled on a Vercel deployment.");
   for (const key of ["DATABASE_URL", "BETTER_AUTH_SECRET"]) if (!env[key]?.trim()) problems.push(`${key} is missing.`);
   const authURL = authBaseURL(env);
   if (!authURL) problems.push("BETTER_AUTH_URL is missing.");

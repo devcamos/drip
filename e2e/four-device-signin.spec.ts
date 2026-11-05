@@ -1,6 +1,8 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import { withAuthRetry, finishSignupRecovery } from "./auth-helpers";
+import { withAuthRetry, finishSignupRecovery, expectCloudSessionEnded, installLocalCloudFixture } from "./auth-helpers";
+
+installLocalCloudFixture();
 
 const password = "Synthetic meadow 42!";
 const tag = () => "dv_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
@@ -72,6 +74,7 @@ test("four browsers restore the same account; a fifth is blocked; account switch
     page.on("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+    await expectCloudSessionEnded(page);
     await login(c, name, c.getByTestId("header-tag"));
     await expect(c.getByRole("region", { name: "Account cards", exact: true })).toContainText("£3,000.00");
 
@@ -96,14 +99,11 @@ test("four browsers restore the same account; a fifth is blocked; account switch
     await b.getByRole("button", { name: "Save", exact: true }).click();
     await expect(b.locator(".bal")).toHaveText("£3,200.00");
     b.on("dialog", dialog => dialog.accept()); await b.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(b.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
     await second.setOffline(false);
-    await expect(b.getByText(/Cloud session sign-out is not yet confirmed/)).toHaveCount(0, { timeout: 30_000 });
-    // The status text can disappear before the accepted revocation is persisted.
-    // Snapshot only after that legitimate metadata write has finished.
-    await expect.poll(() => b.evaluate(async () => {
-      const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open("drip"); r.onsuccess = () => resolve(r.result); });
-      return new Promise<boolean | undefined>(resolve => { const t = db.transaction("kv"); const r = t.objectStore("kv").get("deviceSession"); t.oncomplete = () => { db.close(); resolve(r.result?.remotePending); }; });
-    }), { timeout: 30_000 }).toBe(false);
+    // Require signedOut AND the persisted remote acknowledgement. Checking
+    // remotePending alone can match the old signed-in state before local commit.
+    await expectCloudSessionEnded(b);
     const dirty = await savedRecords(b);
     await login(b, otherName, b.getByRole("region", { name: "Switch saved account" }));
     await expect(b.getByText(/aren.t synced/)).toBeVisible();

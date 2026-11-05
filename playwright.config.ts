@@ -3,6 +3,7 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: { baseURL: "http://localhost:4321", acceptDownloads: true, trace: "retain-on-failure" },
   projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"],

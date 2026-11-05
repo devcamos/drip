@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 
 for (const [label, width, height] of [["mobile", 390, 844], ["desktop", 1280, 900]] as const) {
-  test(`holdings prototype: ${label} stack, expansion, edits and gradient choices`, async ({ page, context }) => {
+  test(`holdings prototype: ${label} stack, expansion, edits and gradient choices`, async ({ page, context }, testInfo) => {
     await page.setViewportSize({ width, height });
     const errors: string[] = [];
     const apiRequests: string[] = [];
@@ -11,7 +11,8 @@ for (const [label, width, height] of [["mobile", 390, 844], ["desktop", 1280, 90
     await page.goto("/prototype");
     await page.evaluate(() => document.fonts.ready);
     const capture = async (state: string) => {
-      await page.screenshot({ path: path.join("docs/screenshots/holdings-prototype", `${label}-${state}.png`), fullPage: state === "stack" || (label === "desktop" && state === "expanded"), animations: "disabled", scale: "css" });
+      const file = `${label}-${state}.png`;
+      await page.screenshot({ path: process.env.DRIP_PROTOTYPE_CAPTURE ? path.join(process.env.DRIP_PROTOTYPE_CAPTURE, file) : testInfo.outputPath(file), fullPage: state === "stack" || (label === "desktop" && state === "expanded"), animations: "disabled", scale: "css" });
     };
     const noOverflow = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole("heading", { name: "Your accounts." })).toBeVisible();

@@ -8,12 +8,21 @@
     "validate:deployment": "node scripts/validate-deployment.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage",
+    "test": "vitest run --project unit --project integration --coverage",
+    "test:unit": "vitest run --project unit",
+    "test:components": "vitest run --project integration",
+    "test:policy": "node tools/regression/check.mjs",
+    "test:regression": "node tools/regression/run.mjs",
+    "test:cloud-browser": "node tools/regression/cloud.mjs",
     "e2e": "playwright test",
     "audit": "npm audit --audit-level=high",
     "postinstall": "node tools/depcruise/link-bin.mjs",
     "depcruise": "depcruise app lib server --output-type err",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "test:calendar:unit": "vitest run --config vitest.calendar.config.mts --project calendar-unit",
+    "test:calendar:integration": "vitest run --config vitest.calendar.config.mts --project calendar-integration",
+    "test:calendar:e2e": "playwright test e2e/payment-calendar.e2e.spec.ts",
+    "test:calendar": "npm run test:calendar:unit && npm run test:calendar:integration && npm run test:calendar:e2e"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.14",
@@ -29,6 +38,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@babel/parser": "8.0.10",
     "@playwright/test": "^1.64.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -45,6 +55,7 @@
     "fake-indexeddb": "^6.2.7",
     "jsdom": "^30.1.3",
     "typescript": "^7.0",
+    "vite": "8.3.5",
     "vitest": "^5.0.5"
   },
   "overrides": {

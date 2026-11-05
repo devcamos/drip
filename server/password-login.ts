@@ -21,7 +21,7 @@ async function allowed(db: Pool, name: string, headers: Headers, secret: string)
     ('login:global', date_trunc('minute', now()), 1), ($1, date_trunc('minute', now()), 1), ($2, date_trunc('minute', now()), 1)
     ON CONFLICT (key) DO UPDATE SET hits = CASE WHEN drip_recovery_limits.bucket = date_trunc('minute', now()) THEN drip_recovery_limits.hits + 1 ELSE 1 END,
     bucket = date_trunc('minute', now()) RETURNING key, hits`, [`login:name:${digest(name)}`, `login:ip:${digest(ip)}`]);
-  if (rows.some(row => row.hits > (row.key === "login:global" ? 300 : 20))) throw new APIError("TOO_MANY_REQUESTS", { message: "Too many sign-in attempts. Try again in a minute." });
+  if (rows.some(row => row.hits > (row.key === "login:global" ? 300 : 20))) throw new APIError("TOO_MANY_REQUESTS", { message: "Too many sign-in attempts. Try again in a minute." }, { "Retry-After": "60" });
 }
 
 /** An additional Better Auth factor for the existing user, not a second account.

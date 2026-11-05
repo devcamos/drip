@@ -14,21 +14,23 @@ jobs:
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
       - name: Security audit (fails on high or critical)
         run: npm audit --audit-level=high
-      - run: npm run typecheck
-      - name: Unit + component tests with coverage (global ≥85%, lib ≥90/85)
-        run: npm test
-      - name: Payment notification Postgres integration
-        run: npm run test:integration
+      - run: npx playwright install --with-deps chromium
+      - name: All-feature regression evidence, coverage, real Postgres, build and browser tests
+        run: npm run test:regression
         env:
           DRIP_TEST_DATABASE_URL: postgresql://drip_test@127.0.0.1:5432/drip_notifications_test
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+          REGRESSION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       - uses: actions/upload-artifact@v7
-        if: failure()
-        with: { name: playwright-report, path: test-results }
+        if: always()
+        with:
+          name: regression-evidence
+          path: |
+            regression-results
+            coverage
+            test-results

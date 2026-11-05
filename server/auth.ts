@@ -1,12 +1,14 @@
 import { betterAuth } from "better-auth";
 import { passkey } from "@better-auth/passkey";
 import { Pool, neonConfig } from "@neondatabase/serverless";
+import { Pool as LocalPostgresPool } from "pg";
 import WebSocket from "ws";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { passwordLogin } from "./password-login";
 import { databaseTypes } from "./database-types";
 import { deviceSessionHooks } from "./device-sessions";
 import { authBaseURL } from "../scripts/deployment-config.mjs";
+import { localTestDatabase } from "./local-test-database";
 
 neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
   ? class extends WebSocket { constructor(address: string, protocols?: string | string[]) { super(address, protocols, { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY!) }); } }
@@ -17,7 +19,13 @@ let instance: ReturnType<typeof createAuth> | undefined;
 let pool: Pool | undefined;
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error("Cloud recovery is not configured.");
-  pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 3, types: databaseTypes });
+  if (!pool) {
+    const local = localTestDatabase(process.env);
+    // Both drivers expose the same pg pool/query/transaction API. This guarded
+    // test transport exercises actual Next HTTP routes without hosted secrets.
+    pool = local ? new LocalPostgresPool({ connectionString: local, max: 3, types: databaseTypes }) as unknown as Pool
+      : new Pool({ connectionString: process.env.DATABASE_URL, max: 3, types: databaseTypes });
+  }
   return pool;
 }
 export function authOptions() {
