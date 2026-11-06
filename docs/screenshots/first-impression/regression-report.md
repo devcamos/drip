@@ -1,4 +1,4 @@
-Source: `032e4f4450c9fbd98b22f780fcdaae8b99c6c784`, complete local `npm run test:regression`, 6 November 2026. Optimized app, real disposable Postgres/HTTP and Chromium. This report does not turn fixtures into hosted-provider evidence; see [stock verification](stock-prices.md#verification).
+Source: `7b9aa66356a0e7d62ecd33e0359fb9963789e082`, complete local `npm run test:regression`, 6 November 2026. Optimized app, real disposable Postgres/HTTP and Chromium. Feature rows can reuse cases; only the layer totals represent unique cases. See the separate [real-provider verification](stock-prices.md#verification).
 
 # Drip regression report
 

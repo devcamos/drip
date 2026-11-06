@@ -33,7 +33,7 @@ Main comparisons use 390×844 mobile and 1440×1000 desktop. The prototype was a
 
 ## Verification
 
-The combined prototype passed the complete `npm run test:regression` on source `032e4f4`: **783 unique cases** (180 unit, 506 component/storage integration, 33 real Postgres/HTTP and 64 browser). Coverage: **97.54% lines, 92.34% branches, 94.01% functions, 94.55% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [real-provider verification](stock-prices.md#verification).
+The combined prototype passed the complete `npm run test:regression` on source `7b9aa66`: **783 unique cases** (180 unit, 506 component/storage integration, 33 real Postgres/HTTP and 64 browser). Coverage: **97.54% lines, 92.34% branches, 94.01% functions, 94.55% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [real-provider verification](stock-prices.md#verification).
 
 | Behaviour | Expected and observed | Where / evidence |
 | --- | --- | --- |
