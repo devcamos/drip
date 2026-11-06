@@ -28,7 +28,7 @@ test("sample sign-in and recovery stay separate and never submit credentials", a
   expect(screen.queryByLabelText("Password", { exact: true })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /Back to demo sign-in/ }));
   await user.click(screen.getByRole("button", { name: "Enter demo" }));
-  expect(screen.getByRole("region", { name: "Total balance" })).toHaveTextContent("£7,500.00");
+  expect(screen.getByRole("region", { name: "Money overview" })).toHaveTextContent("£7,500.00");
   expect(screen.getByRole("region", { name: "Estimated income" })).toHaveTextContent("Estimated monthly average");
   expect(screen.getByRole("region", { name: "Received income" })).toHaveTextContent("£0.00");
   expect(fetch).not.toHaveBeenCalled();
@@ -38,11 +38,11 @@ test("first use leads with one add action and the cash choice opens matching sam
   const user = userEvent.setup();
   render(<WelcomePrototype />);
   await user.click(screen.getByRole("button", { name: /Preview a new account/ }));
-  const first = screen.getByRole("region", { name: "First account design" });
+  const first = screen.getByRole("region", { name: "No accounts yet design" });
   expect(within(first).getByRole("heading", { name: /Your money,.*taking shape/ })).toBeVisible();
   expect(within(first).queryByText(/£0|0\.00%/)).not.toBeInTheDocument();
-  await user.click(within(first).getByRole("button", { name: /Add your first account/ }));
-  const dialog = screen.getByRole("dialog", { name: "What’s earning for you?" });
+  await user.click(within(first).getByRole("button", { name: /Add an account/ }));
+  const dialog = screen.getByRole("dialog", { name: "What would you like to track?" });
   await user.click(within(dialog).getByRole("button", { name: /Cash savings/ }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   const cash = screen.getByRole("button", { name: /Zopa.*£5,000/ });
@@ -56,7 +56,7 @@ test("first use leads with one add action and the cash choice opens matching sam
 test("dividend example exposes recorded holding statistics and closes the previous card", async () => {
   const user = userEvent.setup();
   render(<WelcomePrototype />);
-  await mode(user, "With accounts");
+  await mode(user, "Your accounts");
   const cash = screen.getByRole("button", { name: /Zopa.*£5,000/ });
   await user.click(cash);
   await user.click(screen.getByRole("button", { name: "Add an example account" }));
@@ -75,7 +75,7 @@ test("dividend example exposes recorded holding statistics and closes the previo
 test("monthly and annual estimates remain separate from received income and dated payments", async () => {
   const user = userEvent.setup();
   render(<WelcomePrototype />);
-  await mode(user, "With accounts");
+  await mode(user, "Your accounts");
   const estimate = screen.getByRole("region", { name: "Estimated income" });
   expect(estimate).toHaveTextContent("£28.33");
   expect(estimate).toHaveTextContent("Annual estimates ÷ 12");
@@ -93,13 +93,13 @@ test("optional install details dismiss and reset without changing existing local
   localStorage.setItem(key, "retained");
   const setItem = vi.spyOn(Storage.prototype, "setItem");
   render(<WelcomePrototype />);
-  await mode(user, "With accounts");
+  await mode(user, "Your accounts");
   await user.click(screen.getByText("Make yourself at home"));
   expect(screen.getByText(/This preview doesn’t install the app/)).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Not now" }));
   expect(screen.getByText("Install reminder hidden in this preview.")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Reset demo" }));
-  await mode(user, "With accounts");
+  await mode(user, "Your accounts");
   expect(screen.getByText("Make yourself at home")).toBeVisible();
   expect(screen.getByRole("button", { name: /Realty Income.*£2,500/ })).toHaveAttribute("aria-expanded", "false");
   expect(localStorage.getItem(key)).toBe("retained");
@@ -110,12 +110,12 @@ test("optional install details dismiss and reset without changing existing local
 test("closing or cancelling the account chooser preserves the current first-use screen", async () => {
   const user = userEvent.setup();
   render(<WelcomePrototype />);
-  await mode(user, "First account");
-  await user.click(screen.getByRole("button", { name: /Add your first account/ }));
+  await mode(user, "No accounts yet");
+  await user.click(screen.getByRole("button", { name: /Add an account/ }));
   await user.click(screen.getByRole("button", { name: "Close account chooser" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: /Add your first account/ }));
+  await user.click(screen.getByRole("button", { name: /Add an account/ }));
   fireEvent(screen.getByRole("dialog"), new Event("cancel", { bubbles: false }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("region", { name: "First account design" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "No accounts yet design" })).toBeVisible();
 });

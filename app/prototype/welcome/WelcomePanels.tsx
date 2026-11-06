@@ -12,13 +12,13 @@ export function Brand() {
 }
 
 export function CardFan() {
-  return <div className={s.fan} aria-hidden="true"><div className={s.fanOrbit} /><div className={s.fanBack}><span /><i /></div><div className={s.fanMiddle}><span /><i /></div><div className={s.fanFront}><span className={s.fanDrop}><svg viewBox="0 0 32 40" fill="none"><path d="M16 3C13 9 5 17 5 24a11 11 0 0 0 22 0c0-7-8-15-11-21Z" fill="currentColor" /><path d="M10 25a6 6 0 0 0 6 6" stroke="#fff9ee" strokeWidth="2" strokeLinecap="round" /></svg></span><span className={s.fanLines}><i /><i /></span><b>Room to grow.</b><small>Your next little earner</small></div><span className={s.fanSpark}><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M16 3v26M3 16h26M7 7l18 18M7 25 25 7" /></svg></span></div>;
+  return <div className={s.fan} aria-hidden="true"><div className={s.fanOrbit} /><div className={s.fanBack}><span /><i /></div><div className={s.fanMiddle}><span /><i /></div><div className={s.fanFront}><span className={s.fanDrop}><svg viewBox="0 0 32 40" fill="none"><path d="M16 3C13 9 5 17 5 24a11 11 0 0 0 22 0c0-7-8-15-11-21Z" fill="currentColor" /><path d="M10 25a6 6 0 0 0 6 6" stroke="#fff9ee" strokeWidth="2" strokeLinecap="round" /></svg></span><span className={s.fanLines}><i /><i /></span><b>A clearer picture.</b><small>One account at a time</small></div><span className={s.fanSpark}><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M16 3v26M3 16h26M7 7l18 18M7 25 25 7" /></svg></span></div>;
 }
 
 export function SignInPreview({ onEnter, onNew }: { onEnter: () => void; onNew: () => void }) {
   const [recovery, setRecovery] = useState(false);
   return <section className={s.signinLayout} aria-label="Sign-in design">
-    <div className={s.intro}><p className={s.eyebrow}>SMALL DROPS. A CLEARER PICTURE.</p><h1>Your money.<br /><span className={s.desktopSentence}> A little more<br /></span> <em>in focus.</em></h1><p className={s.introText}>Your savings, investments and the income they earn. All in one place.</p><div className={s.signinFan}><CardFan /></div><p className={s.introFoot}>Made for the way your money grows.</p></div>
+    <div className={s.intro}><p className={s.eyebrow}>SMALL DROPS. A CLEARER PICTURE.</p><h1>Your money.<br /><span className={s.desktopSentence}> A little more<br /></span> <em>in focus.</em></h1><p className={s.introText}>Savings, investments and credit cards. One clearer picture.</p><div className={s.signinFan}><CardFan /></div><p className={s.introFoot}>Made for a clearer view of your money.</p></div>
     <div className={s.signinCard}>
       <span className={s.surfaceIcon} aria-hidden="true">↗</span>
       <p className={s.eyebrow}>YOUR LITTLE CORNER OF FINANCE</p>
@@ -37,10 +37,10 @@ export function SignInPreview({ onEnter, onNew }: { onEnter: () => void; onNew: 
 }
 
 export function FirstAccountPreview({ onAdd, onExample }: { onAdd: () => void; onExample: () => void }) {
-  return <section className={s.firstLayout} aria-label="First account design">
-    <div className={s.firstCopy}><p className={s.eyebrow}>A FRESH START</p><h1>Your money,<br /> <em>taking shape.</em></h1><p>Start with one account. Add its balance and rate to see the income it could earn.</p><button className={s.primary} onClick={onAdd}>Add your first account <span aria-hidden="true">+</span></button><button className={s.exampleLink} onClick={onExample}>Take a look with sample accounts <Arrow /></button></div>
+  return <section className={s.firstLayout} aria-label="No accounts yet design">
+    <div className={s.firstCopy}><p className={s.eyebrow}>NO ACCOUNTS YET</p><h1>Your money,<br /> <em>taking shape.</em></h1><p>Your account list is empty. Add savings, an investment or a credit card to start seeing the picture.</p><button className={s.primary} onClick={onAdd}>Add an account <span aria-hidden="true">+</span></button><button className={s.exampleLink} onClick={onExample}>Take a look with sample accounts <Arrow /></button></div>
     <CardFan />
-    <div className={s.firstSteps}><div><span>01</span><p><b>Bring your balances</b><small>Use the figures from your provider.</small></p></div><div><span>02</span><p><b>See the income</b><small>Keep estimates and received payments clear.</small></p></div><div><span>03</span><p><b>Make it yours</b><small>A colour and a place for every account.</small></p></div></div>
+    <div className={s.firstSteps}><div><span>01</span><p><b>Bring your balances</b><small>Use the figures from your provider.</small></p></div><div><span>02</span><p><b>Income and repayments</b><small>Keep what you earn and what you owe separate.</small></p></div><div><span>03</span><p><b>Make it yours</b><small>A colour and a place for every account.</small></p></div></div>
   </section>;
 }
 

@@ -8,7 +8,7 @@ test("entry prototype supports the first-account journey without auth requests o
   const picker = page.getByRole("group", { name: "Preview screen" });
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const name of ["Sign in", "First account", "With accounts"]) {
+    for (const name of ["Sign in", "No accounts yet", "Your accounts"]) {
       const control = picker.getByRole("button", { name, exact: true });
       await control.click();
       expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -16,8 +16,8 @@ test("entry prototype supports the first-account journey without auth requests o
     }
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await picker.getByRole("button", { name: "First account", exact: true }).click();
-  const add = page.getByRole("button", { name: /Add your first account/ });
+  await picker.getByRole("button", { name: "No accounts yet", exact: true }).click();
+  const add = page.getByRole("button", { name: /Add an account/ });
   await add.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
