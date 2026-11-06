@@ -23,26 +23,34 @@ export function stockInstrument(id: string): StockInstrument | null {
 export function stockChartDescriptor(id: string, range: string) {
   const instrument = stockInstrument(id);
   if (!instrument || !chartRanges.some(item => item.id === range)) return null;
-  // This provider-origin frame URL is emitted by TradingView's official iframe
-  // loader. It is not a raw-data API; verify the embed contract when upgrading.
+  // Use TradingView's stock overview: it renders even when third-party Web Locks
+  // are denied. The advanced trading terminal required that optional API.
+  // Source: official embed-widget-symbol-overview.js. Verify this display-only
+  // embed contract in a secure Preview when upgrading; it is not a price API.
   const options = {
-    symbol: instrument.symbol,
-    interval: "D",
-    range: range === "1Y" ? "12M" : range,
-    timezone: "Europe/London",
-    theme: "light",
-    style: "3",
+    symbols: [[instrument.name, `${instrument.symbol}|1D`]],
+    dateRanges: [range === "1Y" ? "12m|1D" : `${range.toLowerCase()}|1D`],
     locale: "en",
-    allow_symbol_change: false,
-    hide_side_toolbar: true,
-    hide_top_toolbar: false,
-    save_image: false,
-    calendar: false,
-    autosize: true,
-    support_host: "https://www.tradingview.com",
+    chartOnly: false,
+    colorTheme: "light",
+    isTransparent: false,
+    showVolume: false,
+    showMA: false,
+    hideDateRanges: true,
+    hideMarketStatus: false,
+    hideSymbolLogo: false,
+    scalePosition: "right",
+    scaleMode: "Normal",
+    noTimeScale: false,
+    width: "100%",
+    height: "100%",
+    chartType: "area",
+    lineWidth: 2,
+    valuesTracking: "1",
+    changeMode: "price-and-percent",
   };
   return {
-    iframeUrl: `https://www.tradingview-widget.com/embed-widget/advanced-chart/?locale=en#${encodeURIComponent(JSON.stringify(options))}`,
+    iframeUrl: `https://www.tradingview-widget.com/embed-widget/symbol-overview/?locale=en#${encodeURIComponent(JSON.stringify(options))}`,
     externalUrl: `https://www.tradingview.com/symbols/${instrument.symbol.replace(":", "-")}/`,
     symbol: instrument.symbol,
     currency: instrument.currency,

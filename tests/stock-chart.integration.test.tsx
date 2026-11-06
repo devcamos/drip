@@ -35,7 +35,8 @@ test("only explicit chart loading connects the correct listing and range; record
   const url = new URL(frame.getAttribute("src")!);
   const config = JSON.parse(decodeURIComponent(url.hash.slice(1)));
   expect(url.origin).toBe("https://www.tradingview-widget.com");
-  expect(config).toMatchObject({ symbol: "NYSE:O", range: "12M", allow_symbol_change: false });
+  expect(url.pathname).toBe("/embed-widget/symbol-overview/");
+  expect(config).toMatchObject({ symbols: [["Realty Income", "NYSE:O|1D"]], dateRanges: ["12m|1D"] });
   expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
   expect(frame).toHaveAttribute("sandbox", "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
   expect(dialog.querySelector("script")).toBeNull();
@@ -43,6 +44,10 @@ test("only explicit chart loading connects the correct listing and range; record
   expect(screen.getByRole("region", { name: "Estimated income" })).toHaveTextContent("£28.33");
   expect(screen.getByRole("region", { name: "Received income" })).toHaveTextContent("£0.00");
   expect(writes).not.toHaveBeenCalled();
+  await user.click(within(ranges).getByRole("button", { name: "3 months" }));
+  const nextFrame = within(dialog).getByTitle("Realty Income delayed share-price chart");
+  expect(nextFrame).not.toBe(frame);
+  expect(JSON.parse(decodeURIComponent(new URL(nextFrame.getAttribute("src")!).hash.slice(1))).dateRanges).toEqual(["3m|1D"]);
   await user.click(within(dialog).getByRole("button", { name: "Hide chart" }));
   expect(dialog.querySelector("iframe")).toBeNull();
 });

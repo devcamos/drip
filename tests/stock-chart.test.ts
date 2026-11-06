@@ -24,17 +24,16 @@ test("the chart identity stays with its selected public listing and quote curren
     expect(descriptor.label).toBe(instrument.name);
     expect(descriptor.symbol).toBe(instrument.symbol);
     expect(descriptor.currency).toBe("USD");
-    expect(options.symbol).toBe(instrument.symbol);
-    expect(options.allow_symbol_change).toBe(false);
+    expect(options.symbols).toEqual([[instrument.name, `${instrument.symbol}|1D`]]);
   }
 });
 
 test("supported month and year ranges use daily bars and the provider's twelve-month year syntax", () => {
   expect(chartRanges.map(range => range.label)).toEqual(["1 month", "3 months", "1 year"]);
-  for (const [range, expected] of [["1M", "1M"], ["3M", "3M"], ["1Y", "12M"]]) {
+  for (const [range, expected] of [["1M", "1m|1D"], ["3M", "3m|1D"], ["1Y", "12m|1D"]]) {
     const options = JSON.parse(decodeURIComponent(new URL(stockChartDescriptor("realty-income", range)!.iframeUrl).hash.slice(1)));
-    expect(options.range).toBe(expected);
-    expect(options.interval).toBe("D");
+    expect(options.dateRanges).toEqual([expected]);
+    expect(options.hideDateRanges).toBe(true);
   }
 });
 
@@ -44,18 +43,19 @@ test("unsupported intervals and injected configuration fail closed before constr
   }
 });
 
-test("the provider boundary is fixed HTTPS and serializes only the public chart configuration", () => {
+test("the provider boundary selects the storage-compatible overview and serializes only public chart configuration", () => {
   const url = new URL(stockChartDescriptor("realty-income", "3M")!.iframeUrl);
   expect(url.origin).toBe("https://www.tradingview-widget.com");
-  expect(url.pathname).toBe("/embed-widget/advanced-chart/");
+  expect(url.pathname).toBe("/embed-widget/symbol-overview/");
   expect([...url.searchParams]).toEqual([["locale", "en"]]);
   expect(url.username + url.password).toBe("");
   const options = JSON.parse(decodeURIComponent(url.hash.slice(1)));
   expect(Object.keys(options).sort()).toEqual([
-    "symbol", "interval", "range", "timezone", "theme", "style", "locale", "allow_symbol_change",
-    "hide_side_toolbar", "hide_top_toolbar", "save_image", "calendar", "autosize", "support_host",
+    "symbols", "dateRanges", "locale", "chartOnly", "colorTheme", "isTransparent", "showVolume", "showMA",
+    "hideDateRanges", "hideMarketStatus", "hideSymbolLogo", "scalePosition", "scaleMode", "noTimeScale",
+    "width", "height", "chartType", "lineWidth", "valuesTracking", "changeMode",
   ].sort());
-  expect(options.support_host).toBe("https://www.tradingview.com");
+  expect(options.chartOnly).toBe(false);
 });
 
 test("fallback and attribution link to the same listing without account or holding query parameters", () => {
