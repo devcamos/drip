@@ -38,8 +38,15 @@ test("a returning user can plan a repayment, dismiss the editor with a keyboard 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole("button", { name: "Save changes", exact: true })).toBeInViewport({ ratio: 1 });
     const dueDate = page.getByLabel("Payment due date", { exact: true });
-    await dueDate.click();
+    // The native mobile date picker handles its own first Escape. The other
+    // journey fills the date; here verify its hit target after scrolling, then
+    // exercise the editor's keyboard dismissal without opening browser chrome.
+    await dueDate.evaluate(input => input.scrollIntoView({ block: "center" }));
     await expect(dueDate).toBeInViewport({ ratio: 1 });
+    expect(await dueDate.evaluate(input => {
+      const box = input.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === input;
+    })).toBe(true);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(edit).toBeFocused();
