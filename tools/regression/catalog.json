@@ -345,17 +345,24 @@
     },
     {
       "id": "prototype",
-      "name": "Holdings-card prototype and preview-only route",
+      "name": "Design prototypes and Preview-only routes",
       "sources": [
         "app/prototype/HoldingsPrototype.tsx",
         "app/prototype/holdings.ts",
         "app/prototype/page.tsx",
-        "app/prototype/prototype.module.css"
+        "app/prototype/prototype.module.css",
+        "app/prototype/welcome/AccountPreview.tsx",
+        "app/prototype/welcome/WelcomePanels.tsx",
+        "app/prototype/welcome/WelcomePrototype.tsx",
+        "app/prototype/welcome/page.tsx",
+        "app/prototype/welcome/welcome.module.css"
       ],
       "tests": [
         "tests/holdings-prototype.test.tsx",
         "tests/holdings-prototype-route.test.tsx",
-        "e2e/holdings-prototype.spec.ts"
+        "e2e/holdings-prototype.spec.ts",
+        "tests/welcome-prototype.integration.test.tsx",
+        "e2e/welcome-prototype.e2e.spec.ts"
       ]
     },
     {
@@ -505,7 +512,8 @@
       "tests/ui.test.tsx",
       "tests/upload-ack.test.ts",
       "tests/vault-ui.test.tsx",
-      "tests/worker-safety.test.ts"
+      "tests/worker-safety.test.ts",
+      "tests/welcome-prototype.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -540,7 +548,8 @@
       "e2e/signin-update.spec.ts",
       "e2e/signup-errors.spec.ts",
       "e2e/smoke.spec.ts",
-      "e2e/stock-investment.spec.ts"
+      "e2e/stock-investment.spec.ts",
+      "e2e/welcome-prototype.e2e.spec.ts"
     ]
   },
   "conditional": [
