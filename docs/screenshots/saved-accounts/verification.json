@@ -1,0 +1,413 @@
+{
+  "origin": "http://127.0.0.1:4321",
+  "sourceCommit": "d9ecc78f836c3002ff0bf63c9c5e4225d4f70f9a",
+  "buildId": "local-05253657-de55-4dd7-a90e-6d74fffd58c0",
+  "scope": "Actual optimized saved app with synthetic records, real encrypted IndexedDB/WebCrypto, transport chart fixture and FX0.75. Forms separately exercised by regression. No customer data or physical-iOS/provider-data claim.",
+  "results": [
+    {
+      "state": "sign-in",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "sign-in-desktop.png"
+    },
+    {
+      "state": "sign-up",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "sign-up-desktop.png"
+    },
+    {
+      "state": "empty-accounts",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "empty-accounts-desktop.png"
+    },
+    {
+      "state": "saved-accounts",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "saved-accounts-desktop.png"
+    },
+    {
+      "state": "profile-settings",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-desktop.png"
+    },
+    {
+      "state": "saved-stock-value",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "saved-stock-value-desktop.png"
+    },
+    {
+      "state": "credit-card",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "credit-card-desktop.png"
+    },
+    {
+      "state": "edit-credit-card",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "edit-credit-card-desktop.png"
+    },
+    {
+      "state": "sign-in",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "sign-in-mobile.png"
+    },
+    {
+      "state": "sign-up",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "sign-up-mobile.png"
+    },
+    {
+      "state": "empty-accounts",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "empty-accounts-mobile.png"
+    },
+    {
+      "state": "saved-accounts",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "saved-accounts-mobile.png"
+    },
+    {
+      "state": "profile-settings",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-mobile.png"
+    },
+    {
+      "state": "saved-stock-value",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "saved-stock-value-mobile.png"
+    },
+    {
+      "state": "credit-card",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "credit-card-mobile.png"
+    },
+    {
+      "state": "edit-credit-card",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "edit-credit-card-mobile.png"
+    },
+    {
+      "state": "sign-in",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "sign-in-narrow.png"
+    },
+    {
+      "state": "sign-up",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "sign-up-narrow.png"
+    },
+    {
+      "state": "empty-accounts",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "empty-accounts-narrow.png"
+    },
+    {
+      "state": "saved-accounts",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "saved-accounts-narrow.png"
+    },
+    {
+      "state": "profile-settings",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-narrow.png"
+    },
+    {
+      "state": "saved-stock-value",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "saved-stock-value-narrow.png"
+    },
+    {
+      "state": "credit-card",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "credit-card-narrow.png"
+    },
+    {
+      "state": "edit-credit-card",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "edit-credit-card-narrow.png"
+    },
+    {
+      "state": "stock-overview",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "stock-overview-desktop.png"
+    },
+    {
+      "state": "stock-overview",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "stock-overview-mobile.png"
+    },
+    {
+      "state": "stock-overview",
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "overflow": false,
+      "screenshot": "stock-overview-narrow.png"
+    }
+  ],
+  "errors": [],
+  "captureBaseCommit": "2a014946eb296acbe71bc0ff696b48e2fee05a3c",
+  "sourceProvenance": "The unchanged application source used by the successful complete regression build was frozen as this code commit. Git diff HEAD -- app lib server is empty; build identity is recorded separately.",
+  "sourceHashes": {
+    "app/AccountChooser.module.css": "d104bd8465ea1cb44e03df8e97e011d47b3e272c5e3e299f5b00057c0d65687d",
+    "app/AccountChooser.tsx": "5bda4a8b132a2160550959bdc03124a49404610d249cce22156fa878afb734e4",
+    "app/AccountDetail.tsx": "9b6654b1b2f247dd068da70b7e6258974886a3a478533bd29cbe98f9c6eeb81e",
+    "app/AccountForm.tsx": "9105b0d2c7fcdc164d930c9420ad507bedd859f29f5291687cb9bb5c222048a2",
+    "app/AuthScreen.tsx": "17494e875f6486bf05d72f2fab77254e6bce416005185a86a38c77c96252676e",
+    "app/AuthWelcome.module.css": "cdd699a631fe237dee734382f8d2f7031efe96c9185039f9698f6f0de81daeb6",
+    "app/CloudRecovery.tsx": "22f9de9b340aa5e257e92942bbe90b903ce61b3aec7dc080badb549312dae097",
+    "app/CreditCardDetail.tsx": "2cef980df1b12f24af75999c3cb25dd24782da74d38958f04877988293419796",
+    "app/CreditCardForm.tsx": "bd378732e6bf6ed24348db31701f78645226b8976d2114b38c399643b4d8ff1a",
+    "app/CurrencyEstimate.tsx": "91a8af38fef10f2c641c51e6ca27bb724b80f1c80551446cf3b84a5c91510be0",
+    "app/DeviceManagement.tsx": "fd34b04ee77f6f3300cb1424350d76d2e0311c061122f6482e8e5f59261df47b",
+    "app/DeviceSession.tsx": "6658d4b81e633a3d74e290199ab0796a417e2eec6a62167b45c878197508a914",
+    "app/DividendPortfolio.tsx": "8ad4786309335d34ca94b85ee71e3a270d2b261f8271dee7fa1359f893a314e0",
+    "app/Drip.tsx": "b3f89854a20547f3a47b55d874d8ea145954e5149f972430425370162abba4cf",
+    "app/IncomeSummary.tsx": "082b2108e81c429af8a2c0e5a58f3d561ee36ba03626d34976e84e456af8220d",
+    "app/InstallTask.tsx": "218501451c1e05d093ee2a60f056e93f33551fe7ee9d3b454ea50540cc1a4795",
+    "app/PasskeyUnlock.tsx": "447512932d62171003812ebe5b47a94d30f65162ae06084c17362791a27b7bbf",
+    "app/PasswordSetup.tsx": "cd769ed34fc8b9402e5daa8c938ebfa2f32b4f6058862b2e15aef5773fe4c2ab",
+    "app/PasswordSignIn.tsx": "e3a0a748a6b922c98afb1a217ea320c961fb8a8265e4f9344ccdf8e1a9129588",
+    "app/PaymentCalendar.tsx": "7b03badd21a356c6d7d68fd0ab3cc9affd8af7e865da1698ede031ad43975338",
+    "app/PaymentNotifications.tsx": "7e4c47fb44c3799675c0a6641107d48492dfc9ce0e01d10cb2fdb6137918e1ae",
+    "app/PhoneReminders.tsx": "5a67990540dc31b0c318ec92a568a752e9f72e8b98b069749caa083795d569e6",
+    "app/PwaStatus.tsx": "faa6a2921f525ff554756b010d6fb633e83a00f5bd26a038a93edf02011ecc78",
+    "app/RecoveryCodeInput.tsx": "657e87311b73bc31c18ff14a723656c12977794b637272c47e83a812b1aeb12a",
+    "app/RecoveryCodes.tsx": "ae905300b53066e3f527ae6f0a8833b88e5e2de1a455ba517743e27b556565be",
+    "app/RecoveryTask.tsx": "974d545855f8748ab125d8ed48052bb686b5103cd6b8d01e0733036c385f7ee4",
+    "app/SignupForm.tsx": "8f70fc295d156c6db1670595adb0ed36ff25020ca651c4ab79f32f7c11981cdb",
+    "app/SignupRecovery.tsx": "e1f5edd187f1121ff7b6bdf0660a02d9ebfdb094d82025001e3268857c00d82a",
+    "app/StockInvestment.tsx": "54c198f391568ae87d8aefc0b4858377899d92612c888105338888a6b63ab40c",
+    "app/Trends.tsx": "f88439a5be9fb5871e01b5e6d2a2e312513f5c21191ee14fab86aa9fb102d928",
+    "app/accounts/AccountsHome.tsx": "e8a22d717d2a761697f222c8c9558720096ec0492a594b76b0a3a0b6a8b86856",
+    "app/accounts/AppAccountHeader.tsx": "d15503c837d1ceaceaac50902afd482d356f9b97497897b2ea9e363b2376d953",
+    "app/accounts/ProfileSettings.tsx": "7da7f41fcc4e7376e0d10ccd7322d323f1dda72f64705fe21658c8456ed28909",
+    "app/accounts/accounts.module.css": "6ab9a1059b4a4a73313b5a62b41826e008dcb4b647ee2ad8b39bed03cc99695d",
+    "app/accounts/presentation.ts": "1e4d92318e1acf4b5dfaf3b83a5ebf6dcb1f85a09475ca1ff1b391c1f1f2df0c",
+    "app/api/auth/[...all]/route.ts": "47bedc30fb968798f8d5450bb6f57d31fbd9c2f7f91806944ed941a546378c3f",
+    "app/api/cloud/route.ts": "453ba6e404a3dd68c7ece78a9f5af3b5be7d0e341b0aada5237ba37b1346534b",
+    "app/api/cloud/status/route.ts": "01dd88cb9f3afb6d283569296fff10331858e9f979252e4296372b74a1807935",
+    "app/api/exchange-rates/route.ts": "9c8ff1718fdf512400f46127cbd6776baf7dd5776d29d3fd925d4e5082908172",
+    "app/api/notifications/config/route.ts": "0e4d105da733e1dc0de08ba7045d5eca47c2a1a012b3b533bad9ad5d55818667",
+    "app/api/notifications/dispatch/route.ts": "2616c320786563236efd781f311a4114bff95e4099275df2debf8aa0eb3ac97d",
+    "app/api/notifications/subscription/route.ts": "86d742ef6c550ef66aae78a7ac3409b77d6b84632c420de35b00ef467cf5719b",
+    "app/api/notifications/test/route.ts": "263f31486580de5c24acb07b55aec3362e172c5f5b5edf28daa9653107f2f2a5",
+    "app/api/recovery-codes/route.ts": "15e893b6ae7d5bc17f80e846407661f0363260ff81a909725730b38e9e63f5fe",
+    "app/favicon.ico": "7f428bb7e90f724da6acf3c6cfa3078e00c5db1799ef50fb9d87d2573c2667b4",
+    "app/globals.css": "16ca8641768432abae7c1e867933b6b8c696571c7a6c4017ea55580f1e37f766",
+    "app/layout.tsx": "ff2839c76368c0737eb7ac4bf3769a90c0c68d155c56aae5c3abbc372d191b9d",
+    "app/page.tsx": "7482cafdeaf1b85b2cc70f89beb1a3f05dc37fedba20cc0f94afc05fa2a063f3",
+    "app/prototype/HoldingsPrototype.tsx": "61c382922593ffb3bdcfd1479ad396c1e8cad0c11a9deee7d67ab60b24bf0b48",
+    "app/prototype/feedback/FeedbackArchitecture.tsx": "05f7592bb60b74ca247e31e2fc00a63324bdaa74f24a3a920011c47b68ccb468",
+    "app/prototype/feedback/FeedbackDialog.tsx": "89b10d8e213f2f8285b6eb9f47789b5404cc7e49aff57e36d44aac95fb916289",
+    "app/prototype/feedback/FeedbackExperience.tsx": "9ca727c37beaf9f455a0320809ff6d66b40b509b75d642392237177c31117df2",
+    "app/prototype/feedback/FeedbackPrototype.tsx": "e61fe1a5884efcbf4b564a2f106c41c30d0d3406c54ef186b83b4e99b76f3a72",
+    "app/prototype/feedback/feedback-model.ts": "a17c71cec3c47de6db0be4f6d14798069f47c5b02b694c65a16a65533cf950f9",
+    "app/prototype/feedback/feedback.module.css": "c1fff1cb3e06bcf37ba952297d4e0e7db4f8274b121795c0faaaa8ac51cfe6ed",
+    "app/prototype/feedback/page.tsx": "e0050859beed53f9c2b52d400793b6ddab75236402ae568267521324cbcae181",
+    "app/prototype/holdings.ts": "d832bbdc2faa2ec3ae04df54b6058a536128c4e366ee7f36a662db6a4fd2713c",
+    "app/prototype/page.tsx": "35ab6165e7c868775a25d97f88e84d6f90d0aca07d2f835ecbd0d8e6069547b5",
+    "app/prototype/prototype.module.css": "5af8fbe1ccb1e8762300c29af4a689a6ce5c586028f098ec31a353890f5a3df6",
+    "app/prototype/welcome/AccountPreview.tsx": "85d2715953fa052895bee8dfaec1f04045357ef073006c6cf890b6571c78047a",
+    "app/prototype/welcome/CreditCardPreview.tsx": "ca069d99a28723fd34392973934460a8f3a25a6df2e1e3c7e5bcaa46c9f58252",
+    "app/prototype/welcome/ProfilePreview.tsx": "00d8318542e600f69db0372ea2ad28a77e5553a43a81156311687bde0d89c1b1",
+    "app/prototype/welcome/StockPricePreview.tsx": "b9034b72916e3f5bd13550aa528a805d4c94d4448b55b762c005a3a6cbd64057",
+    "app/prototype/welcome/StockValuePreview.tsx": "1cb82ec21b94fc6ec59251221101e79510ca9d8e369b764739c3b25be4dfb262",
+    "app/prototype/welcome/WelcomePanels.tsx": "800787afc340c71779722e39a84f3701a50509cd8426304fbabe0d8f9c12108d",
+    "app/prototype/welcome/WelcomePrototype.tsx": "27c81c4e3ebae0731723a11a36e81fc72024e7a68a3b8c1cceb417316ca096d8",
+    "app/prototype/welcome/credit-card.ts": "686dc4423496f8c177d8406bd06ea6592609835fd8068157962c90ae1d1ea5ef",
+    "app/prototype/welcome/demo-accounts.ts": "2e263e6ec8ab40f5534d5e62f0402026ea73133c352156e5913caddede447811",
+    "app/prototype/welcome/page.tsx": "fe5b61bc14acdb6612fa606c1c54384cda5b2c9283c978e480207c7312ac4af6",
+    "app/prototype/welcome/stock-chart.ts": "9c56f27b94c05eea7d84d5d20a1f83940f68cdecbc22dd354aa1bcb03cbea45d",
+    "app/prototype/welcome/stock-price.module.css": "cd73f6b2a3ab0e71fa05ed96bf0389ba684dd894f069ae4b0babe32e420b5644",
+    "app/prototype/welcome/stock-valuation.ts": "5ad21af25476a79db5d421341f2bc85f04c67a1c0616f1c4e725e9c90fefa97d",
+    "app/prototype/welcome/welcome.module.css": "5e9dc697a429f7d7b7434b91aff196e25a32cb7dc47ab0fae38487108a759b34",
+    "app/stocks/StockPrice.tsx": "961c840728d90c3aff702bdbe35addadd70c46cc0f311ffdc816717fb8ba2f0a",
+    "app/stocks/stock-price.module.css": "cd73f6b2a3ab0e71fa05ed96bf0389ba684dd894f069ae4b0babe32e420b5644",
+    "app/sw-build.js/route.ts": "547e90ff6483fbf33630507029c2a70c14db754a4b3a992ec811a2318bdfa19a",
+    "app/useCalendarDay.ts": "387fc49da77980ab20cb6776166685608edf9a7abcd6ac6fe627777449d19b57",
+    "lib/account-colour.ts": "62ca9a7be557f66a1f2f37ac095f1f2370307a5e449f2bc61edf4689812e3b27",
+    "lib/account-switch.ts": "cd42cbc8530b132b94ff8f896881de3b856f4a44cf72e9685543909507cedcd2",
+    "lib/cloud-payload.ts": "66f590cdea31996585446b194a8ee4ec0ce604d8a1e78f56d9fd75bd35420901",
+    "lib/cloud.ts": "418abcffb1f1767370747159aab4b601d388b8b48261acf7f10cf7a9ead0cfae",
+    "lib/credit-card.ts": "220c42e40360fe0e953b8e3c4897c2e0ed3e23c031fd245dbbaeb807a6fd9ee4",
+    "lib/crypto.ts": "7cc588ee153ba96dab8d0ad748926385e7ba3eeb14d125894c45f2428423c4d4",
+    "lib/data-format.ts": "05e76b0e4b7a1b63c26530f1fe2cdd4183cd0544f8d2fef3344032a33512bf9b",
+    "lib/db.ts": "e98e10973c02846017cd5eca4c9a7d837513b3fc1f4aed83b170890e9f597166",
+    "lib/device-management.ts": "e934e1ed7314b476ef0534b7d6bd137ec2b284087f685eb61572d5d07f1ce597",
+    "lib/device-policy.ts": "207a3235cbbbf804eafcb45806acff970edab6fdbff9766b8613ae57d49a0073",
+    "lib/device-session.ts": "241564c8cd3b288586187d33b3dd87117346c00e6178a1931da459bdd51342fa",
+    "lib/dividend-portfolio.ts": "568e9713dc4267ce18d09bf59c18b3d0d09d770e053ea773d9eb69d0c8b65cf0",
+    "lib/draft.ts": "b6be5b01cee7f13d3d3f378871c38975e6b934265ba06dcb974b64bb48fbfbf8",
+    "lib/exchange-rates.ts": "62b357d5dcc763c7dfaf52fead95348f0e1a5f119125a1d8141b4e73cc932eae",
+    "lib/identity.ts": "cd395d89dba3cc1ffd15162495728858f3b4bf9bdc342a03142e054ae1c8ea38",
+    "lib/local-vault.ts": "43a310ec2e6f5fb2e3cce9b065705fd2af0e4dcf0949c45331aa0fa1ab583dcd",
+    "lib/lock.ts": "288df7ef356badd8742de02aaeeb37da18796cbbab189885e41fc8bd7b1a8e89",
+    "lib/market-valuation.ts": "c981a1509834df4576e746a65525ff5b2cbc2ac73a0a3fa178db2eadfcfffc6e",
+    "lib/maths.ts": "df2a52e68c400312e4168b2a6d6d840df22a2aaa606807d570ae22962db27cb4",
+    "lib/original-recovery-codes.ts": "9ae881443b33a04909ea027534f93ebd2c31a2dcbdd1586292f9afdd9dba9681",
+    "lib/passkey-crypto.ts": "b345dd8280c18e744dc7497de02c348b8ea2a4d241ae585674e316e67f96fe73",
+    "lib/passkey-unlock.ts": "f7789cf252575b2a31a2713d57e241151a88bca94945a58055a661ccf0125151",
+    "lib/password-crypto.ts": "62bb79a4c068b8de7408c9c57d7f06fb4c130aa97b0fe2a8c68b93895ed02236",
+    "lib/password-login.ts": "c4d61bb351e9eb53a603a0f5cb55046ce3e86f956fe26809bd3f373ddeab1579",
+    "lib/payment-calendar.ts": "cc31342212b22ff9080237c679ac96dc31b4415e03032742857091d7c0039a74",
+    "lib/payment-reminders.ts": "931d425209cc6d83b4d5f749b8775072d2a264966edd581cb0cfc961e32c86c5",
+    "lib/phone-reminders.ts": "1f5a090f2293784a24bf8e54be65192e8ab33e7817766a3f539c9f34cc2b0792",
+    "lib/products.ts": "94ecc76e1baaf7e4109d6781bca0951e62142e1b2e9b73d157d4262780cb5726",
+    "lib/profile-preferences.ts": "e31b8366e95a4860d7bea638f4738ac1ec280cd0053b1fefe153f31371d44c34",
+    "lib/recovery-codes.ts": "abbe945453215ca948c3efd5363b3d4196997c24f32cab41d72dc8c9f9c95f92",
+    "lib/recovery-file.ts": "5cf126d8e2e470ba571dd26c98faded876414470fb20758c8bd44ec814296e1d",
+    "lib/recovery-readiness.ts": "1763e03eaa1749413834d787e9507c11914421b19063db62b4ad062e05ccb5aa",
+    "lib/stock-chart.ts": "947848678312b8e2b0ac907f986899799239798b913823ab359b1775254673c8",
+    "lib/stock-investment.ts": "81c29522d4350ba8950a7a5ab21ab48bea331330e3494bd3c52a522ca107139b",
+    "lib/types.ts": "3d342b15dc0e451c3d4d9c9c6e7ca301233530a18e07ceca4cf0fc9f47521d76",
+    "lib/worker-safety.ts": "b56f4a95f9b886dc448c2c28bc0e8c5f28f87947d1a8ccd2fcc3a1791d3ebcd2",
+    "server/auth.ts": "60aa0d7c680eeea0d92b951f5e8738c50cefada93c0cedcec465c3654fcd6605",
+    "server/cloud-store.ts": "058d4ce12dca99f46645d90dcb26c53b06dab1147ccb3af5b57598c9901221af",
+    "server/database-types.ts": "4d9e1ec02ff749b86c65e16364b160c2d65654d7c1e94463589f91498c0f0f09",
+    "server/device-sessions.ts": "a01a1f14d2b37ea8db4736c312a2c9bc08ee67a78cb17e0efe307859b02cbe7c",
+    "server/exchange-rates.ts": "8e341b7a776b2537c1315f31564df15f498bf49737e6a0c68dc40cea56b38d31",
+    "server/local-test-database.ts": "8c391ddf95b916e398fe055afdb6cc326bd3932aef895c4f2f7359cefbc56b3d",
+    "server/manage-devices.ts": "b6d35641e1d085605f4809cc8b9e2749de92d818cd2dfcf080b9d52890f4c106",
+    "server/notifications/api.ts": "332bff07e1a16fc1f4e8a79eb0250ef9b03ae02654d2ef44734814fed758349b",
+    "server/notifications/config.ts": "ad47755e9b25f2515ac6d5ae4fa960167a697ab6e84188677640271905a07136",
+    "server/notifications/crypto.ts": "0d075baf43041ea0c525b35bc7a6c1ceb2600a127c40dfd824616f59555bdfcc",
+    "server/notifications/dispatch.ts": "9468b2c9d2c78d08cb47eecd4b0d2e7d60dbd19a8a4196253c27120653012cf3",
+    "server/notifications/model.ts": "a6d7a46f22c43b8c3372dad0bc320011904a9d40224564cad226680bd0f59081",
+    "server/notifications/runtime.ts": "550596ea81c7e2d35783e281844f92b84808ed84cc21e30c86c8447fe944900c",
+    "server/notifications/store.ts": "3d80e0e4e65968d7f9d2a1b76aa6c3fc1c084b6423d37ae17f5fbc4018b921e3",
+    "server/password-login.ts": "fce1f29f3257ff4a42e6a47913c3d291c8b279c57eff52f2e1995418fc1c23df",
+    "server/password-transaction.ts": "fbd0811956539d24b7c298e17a4e95fbb5e3ce7951a0f68cbc872efeab1b4664"
+  },
+  "focusedFieldAboveFixedNavigation": true
+}
