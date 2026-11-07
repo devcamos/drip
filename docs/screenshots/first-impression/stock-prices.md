@@ -4,6 +4,8 @@ The goal is to let someone explore a recorded dividend stock's price history bef
 
 At `/prototype/welcome`, choose **Your accounts → Realty Income**. The chart loads with the card. Choose **1M**, **3M** or **1Y** to change the range. Enter a USD price and choose **Update demo value** to try a GBP holding estimate; chart quotes are not imported automatically. **Hide chart** removes the frame; **Back to accounts** returns to the holding. **Open chart on TradingView** is available if an embedded chart cannot load.
 
+Latest refinement: **+ → Stocks & funds** adds another sample holding, starting with Digital Realty. Each holding opens its own instrument's chart and retains its own statistics/entered-price scenario. See [multiple accounts and profile settings](profile-settings.md) for current evidence. The provider decision and earlier Realty Income captures below remain applicable historical evidence, not a new verification of current prices for every listing.
+
 ## Choice and reasons
 
 **Use TradingView's free Symbol Overview for this shared Preview.** It provides a quote and price history without the advanced terminal's cross-tab coordination dependency. It needs no API key and is offered for website embedding. Keep its branding/attribution and link intact. This is a display integration, not a raw-price API or an automatic portfolio-valuation feed.

@@ -6,6 +6,8 @@ Use **Sign in**, **No accounts yet** and **Your accounts** above the product can
 
 The [feedback proposal](feedback.md) adds C4 context/container diagrams and a sample feedback journey, using the Bible Compass pattern. Give feedback is available before sign-in. No feedback is submitted or stored.
 
+The [profile and multiple-account walkthrough](profile-settings.md) explains the latest change: **dg** now opens Profile & settings, and **+** can add more sample holdings and credit cards. Their prices, statements, payment plans and counts remain independent. These additions stay in prototype memory; saved debt and real profile/security wiring are not enabled here.
+
 The sign-in fields are read-only samples. Account and credit-card edits use component state: they do not authenticate, connect financial accounts, change saved records or persist edits. Money, credit-card debt and net position are shown separately; plans and estimates stay distinct from received income. Recorded figures and payment dates are illustrative. Opening a stock card loads the separate [share-price view](stock-prices.md). The [price/value preview](stock-valuation.md) applies a user-entered USD price with dated FX to the sample overview; dividend income stays separate.
 
 ## Screenshots
@@ -18,7 +20,7 @@ Captured from running optimized builds, using DM Sans and synthetic recorded dat
 | No accounts yet | [Current](before-empty-mobile.png) | [Prototype](after-empty-mobile.png) | [Current](before-empty-desktop.png) | [Prototype](after-empty-desktop.png) |
 | Your accounts | [Current](before-accounts-mobile.png) | [Prototype](after-accounts-mobile.png) | [Current](before-accounts-desktop.png) | [Prototype](after-accounts-desktop.png) |
 
-The initial comparison above records the earlier prototype. Current refinements: upright Accounts [mobile](feedback-accounts-mobile.png)/[desktop](feedback-accounts-desktop.png), stock results without calculation workings [mobile](feedback-stock-results-mobile.png)/[desktop](feedback-stock-results-desktop.png), and [feedback/C4 views](feedback.md#screenshots).
+The initial comparison above records the earlier prototype. Current refinements: [profile settings and multiple accounts](profile-settings.md#screenshots), upright Accounts [mobile](feedback-accounts-mobile.png)/[desktop](feedback-accounts-desktop.png), stock results without calculation workings [mobile](feedback-stock-results-mobile.png)/[desktop](feedback-stock-results-desktop.png), and [feedback/C4 views](feedback.md#screenshots).
 
 Additional states: expanded card [mobile](after-expanded-mobile.png)/[desktop](after-expanded-desktop.png), account chooser [mobile](after-chooser-mobile.png)/[desktop](after-chooser-desktop.png), and install details [mobile](after-install-mobile.png)/[desktop](after-install-desktop.png). Chooser captures show the viewport; other captures show the full page.
 

@@ -4,6 +4,8 @@
 
 At `/prototype/welcome`, select **Your accounts**, open **Barclaycard**, then choose **Edit credit card**. The example captures an amount owed, APR, statement minimum, optional planned payment and statement due date. Minimums are entered from the provider’s statement for that due cycle; different providers can calculate them differently.
 
+Latest refinement: **+ → Credit card** now adds another independent sample card. Each keeps its own statement, APR and repayment plan; the overview adds every debt balance. See [multiple accounts and profile settings](profile-settings.md) for the current walkthrough and evidence. The screenshots below record the earlier single-card design.
+
 The sample reconciles £7,500 of savings/investments, £1,200 owed and a £6,300 net position. Its asset income remains £340 estimated annually, or £28.33 average monthly. Changing a plan does not reduce a recorded balance, record received income or schedule a payment. Only changing the recorded amount owed changes the debt/net figures.
 
 The fields accept a 0% APR and an unset plan. Amount mismatches remain visible with review notes; no values are silently clamped. APR alone is not used to promise exact interest charges or a payoff date. Changes use memory-only sample state and Reset demo restores the starting figures.
