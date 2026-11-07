@@ -4,6 +4,8 @@ Open `/prototype/welcome` on a Preview or local deployment. The route returns 40
 
 Use **Sign in**, **No accounts yet** and **Your accounts** above the product canvas to compare the entry states. The empty state simply means no financial accounts have been added. Try the sample chooser, card expansion, credit-card editor, monthly/yearly estimate and optional Home Screen reminder. **Reset demo** restores the initial sample state. See the [credit-card walkthrough](credit-cards.md).
 
+The [feedback proposal](feedback.md) adds C4 context/container diagrams and a sample feedback journey, using the Bible Compass pattern. Give feedback is available before sign-in. No feedback is submitted or stored.
+
 The sign-in fields are read-only samples. Account and credit-card edits use component state: they do not authenticate, connect financial accounts, change saved records or persist edits. Money, credit-card debt and net position are shown separately; plans and estimates stay distinct from received income. Recorded figures and payment dates are illustrative. Opening a stock card loads the separate [share-price view](stock-prices.md). The [price/value preview](stock-valuation.md) applies a user-entered USD price with dated FX to the sample overview; dividend income stays separate.
 
 ## Screenshots
@@ -15,6 +17,8 @@ Captured from running optimized builds, using DM Sans and synthetic recorded dat
 | Sign in | [Current](before-signin-mobile.png) | [Prototype](after-signin-mobile.png) | [Current](before-signin-desktop.png) | [Prototype](after-signin-desktop.png) |
 | No accounts yet | [Current](before-empty-mobile.png) | [Prototype](after-empty-mobile.png) | [Current](before-empty-desktop.png) | [Prototype](after-empty-desktop.png) |
 | Your accounts | [Current](before-accounts-mobile.png) | [Prototype](after-accounts-mobile.png) | [Current](before-accounts-desktop.png) | [Prototype](after-accounts-desktop.png) |
+
+The initial comparison above records the earlier prototype. Current refinements: upright Accounts [mobile](feedback-accounts-mobile.png)/[desktop](feedback-accounts-desktop.png), stock results without calculation workings [mobile](feedback-stock-results-mobile.png)/[desktop](feedback-stock-results-desktop.png), and [feedback/C4 views](feedback.md#screenshots).
 
 Additional states: expanded card [mobile](after-expanded-mobile.png)/[desktop](after-expanded-desktop.png), account chooser [mobile](after-chooser-mobile.png)/[desktop](after-chooser-desktop.png), and install details [mobile](after-install-mobile.png)/[desktop](after-install-desktop.png). Chooser captures show the viewport; other captures show the full page.
 
@@ -33,7 +37,7 @@ Main comparisons use 390×844 mobile and 1440×1000 desktop. The prototype was a
 
 ## Verification
 
-The combined prototype passed the complete `npm run test:regression` on source `9c7c2e3`: **794 unique cases** (188 unit, 508 component/storage integration, 33 real Postgres/HTTP and 65 browser). Coverage: **97.54% lines, 92.36% branches, 93.97% functions, 94.60% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [current price/value verification](stock-valuation.md#verification).
+The combined prototype passed the complete `npm run test:regression` on source `d79e879`: **804 unique cases** (195 unit, 510 component/storage integration, 33 real Postgres/HTTP and 66 browser). Coverage: **97.56% lines, 92.59% branches, 93.91% functions, 94.65% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [current price/value verification](stock-valuation.md#verification).
 
 | Behaviour | Expected and observed | Where / evidence |
 | --- | --- | --- |
@@ -49,5 +53,6 @@ Three inherited historical old-build PWA journeys remain conditional, not passes
 
 1. Open `/prototype/welcome` in Preview. Compare **No accounts yet** with **Your accounts**; edit Barclaycard's minimum and plan, then use **Reset demo**.
 2. Open Realty Income for the chart; enter a current USD price and choose Update demo value. Review the changed card/totals, then Use recorded value. [Walkthrough and remaining automatic-quote setup](stock-valuation.md).
-3. Give feedback on information priority, card depth and payment-plan wording. The screenshot comparison section remains the visual reference.
-4. Apply the agreed design to saved accounts in a later implementation. This prototype does not authorize a Production rollout or change persisted account formats.
+3. Open the [feedback/C4 proposal](feedback.md) using Feedback design, or try Give feedback from any entry state. Discuss the proposed store, private inbox and retry flow before connecting services.
+4. Give feedback on information priority, card depth and payment-plan wording. The screenshot comparison section remains the visual reference.
+5. Apply the agreed design to saved accounts in a later implementation. This prototype does not authorize a Production rollout or change persisted account formats.

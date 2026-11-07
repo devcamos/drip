@@ -1,5 +1,7 @@
 # Stock-card chart and value preview
 
+The screenshots below record the original9c7 valuation introduction. Current refinements keep the formulas in domain code and display results only; cards are upright. See the [updated UI and feedback discussion](feedback.md#screenshots).
+
 Open **Your accounts → Realty Income** at [`/prototype/welcome`](https://drip-git-prototype-first-impression-devonte-amos-projects.vercel.app/prototype/welcome). The delayed TradingView chart opens with the card. Try **1M**, **3M** and **1Y**. On a phone, scroll within the detail view to the holding figures.
 
 Enter **Current price per share (USD)** and choose **Update demo value**. Drip gets a dated Frankfurter exchange rate, calculates the holding's estimated GBP value and applies it to the sample card, Money and net position. **Use recorded value** restores £2,500. **Reset demo** clears the temporary scenario.

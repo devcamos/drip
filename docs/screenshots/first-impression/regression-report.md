@@ -1,4 +1,4 @@
-Source: `9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d`, complete local `npm run test:regression`, 7 November 2026. Optimized app, real disposable Postgres/HTTP and Chromium. Feature rows can reuse cases; only the layer totals represent unique cases. The new valuation suite is 7/2/1 (70/20/10). See the separate [real-provider verification](stock-valuation.md#verification).
+Source: `d79e879aca5eb2096efb91f876640d73b7e6f13d`, complete local `npm run test:regression`, 7 November2026. Optimized app, real disposable Postgres/HTTP and Chromium. Feature rows may reuse cases; layer totals are unique. Feedback prototype7/2/1 is70/20/10. See [feedback verification](feedback.md#verification).
 
 # Drip regression report
 
@@ -6,10 +6,10 @@ Counts are executed test cases. Conditional/skipped journeys are unverified, not
 
 | Layer | Passed | Failed | Conditional |
 | --- | ---: | ---: | ---: |
-| unit | 188 | 0 | 0 |
-| integration | 508 | 0 | 0 |
+| unit | 195 | 0 | 0 |
+| integration | 510 | 0 | 0 |
 | postgres | 33 | 0 | 0 |
-| browser | 65 | 0 | 3 |
+| browser | 66 | 0 | 3 |
 
 | Feature | Result | Passed | Conditional |
 | --- | --- | ---: | ---: |
@@ -35,6 +35,7 @@ Counts are executed test cases. Conditional/skipped journeys are unverified, not
 | Credit-card debt prototype and statement repayment planning | PASS | 20 | 0 |
 | Dividend-card chart auto-loading, ranges and recorded holding separation | PASS | 10 | 0 |
 | User-entered share-price valuation with dated FX and unchanged dividend income | PASS | 10 | 0 |
+| Feedback experience and proposed C4 delivery architecture | PASS | 19 | 0 |
 
 ## Conditional journeys
 
