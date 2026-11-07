@@ -2,7 +2,7 @@ import type { Identity } from "./identity";
 export interface CloudState { userId: string; key: CryptoKey; version: number; dirty: boolean; lastSyncAt: string | null; identityId: string; generation: string; revision: number }
 export type Frequency = "daily" | "monthly" | "quarterly" | "annually";
 export type RateType = "interest" | "dividend";
-export type ProductCategory = "cash-isa" | "cash-lisa" | "easy-access" | "regular-saver" | "current-account" | "stocks-funds" | "other";
+export type ProductCategory = "cash-isa" | "cash-lisa" | "easy-access" | "regular-saver" | "current-account" | "stocks-funds" | "credit-card" | "other";
 export type TaxWrapper = "none" | "cash-isa" | "lifetime-isa" | "stocks-shares-isa";
 export type IncomeType = RateType | "bonus";
 export interface PendingBonus { amount: number; expectedDate: string }
@@ -17,12 +17,25 @@ export interface StockInvestment {
   originalPrice?: { currency: "USD" | "EUR"; averagePrice: number }; // display only; no live FX
 }
 
+/** Statement figures only. A planned payment never changes the recorded debt. */
+export interface CreditCardTerms { apr: number; minimumPayment: number; plannedPayment?: number }
+/** An explicitly applied estimate retains the provider balance used for income. */
+export interface MarketValuation {
+  priceUSD: number;
+  fxRate: number;
+  fxDate: string;
+  appliedAt: string;
+  recordedBalance: number;
+}
+
 export interface Account {
   id: string;
   provider: string;      // e.g. "Zopa"
   label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   holdingName?: string; // stock/fund identity: portable with the encrypted financial record
   investment?: StockInvestment; // optional on dividend holdings; older records remain valid
+  creditCard?: CreditCardTerms; // required only for productCategory credit-card; balance is positive amount owed
+  marketValuation?: MarketValuation; // optional persisted market estimate; never changes recorded income assumptions
   balance: number;       // GBP
   ratePct: number;       // annual %, e.g. 7
   rateType: RateType;

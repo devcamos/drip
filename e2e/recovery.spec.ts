@@ -1,3 +1,4 @@
+import { addCashAccount, signOutFromProfile } from "./saved-navigation";
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showRecovery, showCloudRecovery } from "./vault-helpers";
@@ -12,7 +13,7 @@ test.describe.configure({ timeout: 180_000 });
 
 async function setup(page: Page, handle = "recoverytest", nickname = "") {
   const code = await legacyAccount(page, handle);
-  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await addCashAccount(page);
   if (nickname) await page.getByLabel("Nickname", { exact: true }).fill(nickname);
   await page.getByLabel("Balance", { exact: true }).fill("3000");
   await page.getByLabel("Rate", { exact: true }).fill("7");
@@ -29,7 +30,7 @@ test("offline reload keeps accounts and never caches private APIs", async ({ pag
   await context.setOffline(true);
   await page.reload();
   await unlock(page, code);
-  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await expect(page.getByText(/Offline — Drip/)).toBeVisible();
   const urls = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async key => (await (await caches.open(key)).keys()).map(req => new URL(req.url).pathname)))).flat());
@@ -49,13 +50,13 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
     await returning.goto("http://localhost:4321");
     await showCloudRecovery(returning);
     await returning.getByLabel("Recovery code", { exact: true }).fill(code);
-    await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
+    await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByRole("region", { name: "Money overview", exact: true }));
     await expect(returning.getByText("£3,000.00").first()).toBeVisible();
     await expect(returning.getByText("PRIVATE_LOCAL_NICKNAME")).toHaveCount(0);
 
     await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
-    await expect(page.getByText("PRIVATE_LOCAL_NICKNAME")).toBeVisible();
-    await page.getByRole("button", { name: /Zopa/ }).click();
+    await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Open PRIVATE_LOCAL_NICKNAME/ })).toBeVisible();
+    await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
     await page.context().setOffline(true);
     await page.getByRole("button", { name: "Top up", exact: true }).click();
     await page.getByLabel("amount", { exact: true }).fill("200");
@@ -64,7 +65,7 @@ test("cloud copy survives a fresh device, offline edits queue, and stale devices
     await page.context().setOffline(false);
     await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 75_000 });
 
-    await returning.getByRole("button", { name: /Zopa/ }).click();
+    await returning.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
     await returning.getByRole("button", { name: "Top up", exact: true }).click();
     await returning.getByLabel("amount", { exact: true }).fill("50");
     await returning.getByRole("button", { name: "Save", exact: true }).click();
@@ -107,11 +108,11 @@ test("cloud passkey verifies on the server, while new-device decryption still re
   await expect(page.getByRole("button", { name: "Restore cloud accounts" })).toBeDisabled();
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Restore cloud accounts" }).click();
-  await expect(page.getByText("Total balance")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("region", { name: "Money overview", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await page.reload();
   await unlock(page, code);
-  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
 });
 
 test("downloaded set of six codes independently restores the same cloud account", async ({ page, browser }) => {
@@ -144,15 +145,15 @@ test("downloaded set of six codes independently restores the same cloud account"
       const returning = await fresh.newPage(); await returning.goto("http://localhost:4321");
       await showCloudRecovery(returning);
       await returning.getByLabel("Recovery code", { exact: true }).fill(code);
-      await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByText("Total balance"));
+      await withAuthRetry(returning, () => returning.getByRole("button", { name: "Restore cloud accounts" }).click(), returning.getByRole("region", { name: "Money overview", exact: true }));
       await expect(returning.getByText("£3,000.00").first()).toBeVisible();
       await returning.reload();
       await unlock(returning, code);
-      await expect(returning.getByText("Total balance")).toBeVisible();
+      await expect(returning.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
       // Closing a browser does not revoke a session. Release each synthetic
       // device so this six-code check preserves the real four-device cap.
       returning.on("dialog", dialog => dialog.accept());
-      await returning.getByRole("button", { name: "Sign out", exact: true }).click();
+      await signOutFromProfile(returning);
       await expect(returning.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
       await expectCloudSessionEnded(returning);
     } finally { await fresh.close(); }
@@ -191,9 +192,9 @@ test("sign-out survives reload, locks other tabs and preserves local-only accoun
   const code = await setup(page);
   const other = await context.newPage(); await other.goto("/");
   await unlock(other, code);
-  await expect(other.getByText("Total balance")).toBeVisible();
+  await expect(other.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await page.reload();
@@ -206,11 +207,11 @@ test("sign-out survives reload, locks other tabs and preserves local-only accoun
   await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Recover account", exact: true }).click();
-  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
   await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await unlock(other, code);
-  await expect(other.getByText("Total balance")).toBeVisible(); await other.close();
+  await expect(other.getByRole("region", { name: "Money overview", exact: true })).toBeVisible(); await other.close();
 });
 
 test("offline sign-out keeps queued top-ups and online sign-out revokes the server session", async ({ page, context }) => {
@@ -221,7 +222,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await page.getByLabel("Your saved recovery code").fill(code);
   await enableCloudRecovery(page);
   await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
-  await page.getByRole("button", { name: /Zopa/ }).click();
+  await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
   await context.setOffline(true);
   await page.getByRole("button", { name: "Top up", exact: true }).click();
   await page.getByLabel("amount", { exact: true }).fill("200");
@@ -236,7 +237,7 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await expect(page.getByText(/Cloud disconnected on this device/)).toHaveCount(0);
   let warned = false;
   page.on("dialog", async dialog => { warned ||= dialog.message().includes("unsynced changes"); await dialog.accept(); });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   expect(warned).toBe(true);
   await expect(page.getByText(/not yet confirmed/)).toBeVisible();
@@ -247,12 +248,12 @@ test("offline sign-out keeps queued top-ups and online sign-out revokes the serv
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
   await context.setOffline(false);
   await expect(page.getByText("Encrypted cloud copy saved.")).toBeVisible({ timeout: 75_000 });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expectCloudSessionEnded(page);
   await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Recover account", exact: true }).click(), page.getByText("Total balance"));
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Recover account", exact: true }).click(), page.getByRole("region", { name: "Money overview", exact: true }));
   await expect(page.getByText("£3,200.00").first()).toBeVisible();
 });
 
@@ -263,7 +264,7 @@ test("an online cloud authentication outage does not block local unlock or queue
   await page.getByLabel("Your saved recovery code").fill(code);
   await enableCloudRecovery(page);
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await expectCloudSessionEnded(page);
   // The browser remains online; only cloud authentication is unavailable.
@@ -275,10 +276,10 @@ test("an online cloud authentication outage does not block local unlock or queue
   await showRecovery(page);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Recover account", exact: true }).click();
-  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Money overview", exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.onLine)).toBe(true);
   await expect.poll(() => attempted).toBe(true);
-  await page.getByRole("button", { name: /Zopa/ }).click();
+  await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
   await page.getByRole("button", { name: "Top up", exact: true }).click();
   await page.getByLabel("amount", { exact: true }).fill("200");
   await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -307,12 +308,12 @@ test("signed-out users can restore rampage201 instead of reopening the current p
   } finally { await original.close(); }
   await setup(page, "newprofile");
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Recover a different account", exact: true }).click();
   await page.getByLabel("Other account recovery code", { exact: true }).fill(recovery!);
-  await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByText("Total balance"));
-  await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
+  await withAuthRetry(page, () => page.getByRole("button", { name: "Restore cloud accounts" }).click(), page.getByRole("region", { name: "Money overview", exact: true }));
+  await expect(page.getByTestId("header-tag")).toHaveText("rampage201");
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
-  await page.reload(); await unlock(page, recovery!); await expect(page.getByTestId("header-tag").locator("b")).toHaveText("rampage201");
+  await page.reload(); await unlock(page, recovery!); await expect(page.getByTestId("header-tag")).toHaveText("rampage201");
 });

@@ -1,3 +1,4 @@
+import { addCashAccount, showAccountDetails } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -9,7 +10,7 @@ async function capture(page: Page, state: string) {
   for (const [device, width] of [["mobile", 390], ["desktop", 1280]] as const) {
     await page.setViewportSize({ width, height: 1000 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    if (state === "accounts") await page.locator(".stack").evaluate(el => el.scrollIntoView({ block: "start" }));
+    if (state === "accounts") await page.getByRole("region", { name: "Account cards", exact: true }).evaluate(el => el.scrollIntoView({ block: "start" }));
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await page.screenshot({ path: `docs/screenshots/account-options/${state}-${device}.png`, scale: "css" });
   }
@@ -19,27 +20,27 @@ async function capture(page: Page, state: string) {
 test("colours, Lloyds and stock identities survive edits, reload and encrypted file recovery", async ({ page, browser }) => {
   test.setTimeout(120_000);
   const code = await legacyAccount(page, "portfolio_demo");
-  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await addCashAccount(page);
   await page.getByLabel("Provider", { exact: true }).selectOption("Lloyds Bank");
   await expect(page.getByLabel("Product category", { exact: true })).toHaveValue("easy-access");
   await page.getByLabel("Balance", { exact: true }).fill("2500");
   await page.getByLabel("Rate", { exact: true }).fill("3.25");
   await page.getByLabel("Custom account colour", { exact: true }).fill("#ffffff");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(page.locator(".bal")).toHaveText("£2,500.00");
   await expect(page.locator(".card")).toHaveCSS("color", "rgb(0, 0, 0)");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByLabel("Nickname", { exact: true }).fill("Rainy day");
   await expect(page.getByLabel("Custom account colour", { exact: true })).toHaveValue("#ffffff");
   await capture(page, "lloyds-edit");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(page.getByRole("heading", { name: "Edit account" })).toHaveCount(0);
   await page.reload(); await unlock(page, code);
   await page.getByRole("button", { name: /Lloyds Bank/ }).click();
   await expect(page.locator(".card")).toHaveCSS("color", "rgb(0, 0, 0)");
   await expect(page.getByText("Rainy day", { exact: true })).toBeVisible();
 
-  await page.getByRole("navigation").getByRole("button", { name: "Add", exact: true }).click();
+  await addCashAccount(page, true);
   await page.getByLabel("Product category", { exact: true }).selectOption("stocks-funds");
   await page.getByLabel("Provider", { exact: true }).selectOption("Trading212");
   const picker = page.getByLabel("Stock / fund", { exact: true });
@@ -53,13 +54,13 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
   await page.getByLabel("Paid", { exact: true }).selectOption("monthly");
   await page.getByRole("button", { name: "Plum account colour" }).click();
   await capture(page, "stock-form");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(page.locator(".holding")).toHaveText("Realty Income");
   await expect(page.locator(".bal")).toHaveText("£1,200.00");
   await expect(page.getByRole("region", { name: "Income predictions", exact: true }).getByText("5.75%", { exact: true })).toBeVisible();
   await capture(page, "stock-detail");
 
-  await page.getByRole("navigation").getByRole("button", { name: "Add", exact: true }).click();
+  await addCashAccount(page, true);
   await page.getByLabel("Product category", { exact: true }).selectOption("stocks-funds");
   await page.getByLabel("Provider", { exact: true }).selectOption("Trading212");
   await page.getByLabel("Stock / fund", { exact: true }).selectOption("custom");
@@ -74,7 +75,7 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await capture(page, "custom-stock-form");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(page.locator(".holding")).toHaveText("Custom investment trust");
   await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
   await capture(page, "accounts");
@@ -97,6 +98,7 @@ test("colours, Lloyds and stock identities survive edits, reload and encrypted f
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code);
     await restored.getByRole("button", { name: "Restore", exact: true }).click();
     await restored.getByRole("button", { name: /Realty Income/ }).click();
+  await showAccountDetails(restored);
     await expect(restored.locator(".holding")).toHaveText("Realty Income");
     await expect(restored.getByRole("region", { name: "Income predictions", exact: true }).getByText("5.75%", { exact: true })).toBeVisible();
     await restored.getByRole("button", { name: "Edit", exact: true }).click();

@@ -1,3 +1,4 @@
+import { showAccountDetails } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -32,17 +33,18 @@ test("daily currency estimates preserve saved balance, purchase cost and income 
     return route.fulfill({ json: { base: "USD", quote: "GBP", rate: 0.75, date, source: "Frankfurter" } });
   });
   const code = await legacyAccount(page, "currency_demo", [stock]);
+  const summary = page.getByRole("region", { name: "Your investment", exact: true });
   const open = async () => {
     await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
+  await showAccountDetails(page);
     await page.getByText("Convert a share price to GBP", { exact: true }).click();
   };
   await open(); expect(calls).toBe(0);
-  await page.getByLabel("Current price per share (USD)").fill("60");
+  await summary.getByLabel("Current price per share (USD)").fill("60");
   await page.getByRole("button", { name: "Convert to GBP", exact: true }).click();
   await expect(page.getByLabel("Converted holding estimate")).toContainText("£1,226.59");
   await expect(page.getByLabel("Converted holding estimate")).toContainText("Estimated value in GBP");
-  await expect(page.getByText(`Frankfurter · Rate dated ${date} · 1 USD = 0.75000 GBP`)).toBeVisible();
-  const summary = page.getByRole("region", { name: "Your investment", exact: true });
+  await expect(page.getByText(`Frankfurter · Rate dated ${date} · USD to GBP`)).toBeVisible();
   await expect(summary).toContainText("£1,155.28"); await expect(summary).toContainText("US$60.41 (£44.99)"); await expect(summary).toContainText("5.7%");
   await expect(page.getByTestId("income-history")).toContainText("£5.50");
   await capture(page, "daily-conversion");
@@ -53,9 +55,9 @@ test("daily currency estimates preserve saved balance, purchase cost and income 
   await capture(page, "last-loaded-rate");
   await page.reload(); await unlock(page, code); await open();
   await expect(summary).toContainText("£1,155.28"); await expect(summary).toContainText("US$60.41 (£44.99)");
-  await expect(page.getByLabel("Current price per share (USD)")).toHaveValue("");
+  await expect(summary.getByLabel("Current price per share (USD)")).toHaveValue("");
   await expect(page.getByLabel("Converted holding estimate")).toHaveCount(0);
-  await page.getByLabel("Current price per share (USD)").fill("60");
+  await summary.getByLabel("Current price per share (USD)").fill("60");
   await page.getByRole("button", { name: "Convert to GBP", exact: true }).click();
   await expect(summary.getByRole("alert")).toContainText("Your saved balance is unchanged");
   await expect(page.getByLabel("Converted holding estimate")).toHaveCount(0);

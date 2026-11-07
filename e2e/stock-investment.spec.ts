@@ -1,3 +1,4 @@
+import { showAccountDetails } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -23,6 +24,7 @@ test("saves fractional shares and foreign prices, preserves them after encrypted
   // fixture. This test does not mock APIs or claim hosted cloud verification.
   const code = await legacyAccount(page, "dividend_demo", [stock]);
   await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
+  await showAccountDetails(page);
   const summary = page.getByRole("region", { name: "Your investment", exact: true });
   await summary.getByRole("button", { name: "Add details", exact: true }).click();
   await page.getByLabel("Track shares and average price").check();
@@ -32,15 +34,16 @@ test("saves fractional shares and foreign prices, preserves them after encrypted
   await page.getByLabel("Original price currency", { exact: true }).selectOption("USD");
   await page.getByLabel("Average purchase price per share (USD)", { exact: true }).fill("60.41");
   await capture(page, "edit-investment", "Investment details (optional)");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(summary).toContainText("-£71.04 (-5.79%)");
   await expect(summary).toContainText("27.25750597");await expect(summary).toContainText("US$60.41 (£44.99)");
   await expect(summary).toContainText("5.7%");await capture(page, "investment-detail");
   await page.reload();await unlock(page, code);await expect(page.getByTestId("header-tag")).toContainText("dividend_demo");
   await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
+  await showAccountDetails(page);
   await expect(summary).toContainText("27.25750597");await expect(summary).toContainText("US$60.41 (£44.99)");
   await page.getByRole("button", { name: "Update balance", exact: true }).click();
-  await page.getByLabel("amount", { exact: true }).fill("1400");await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByLabel("amount", { exact: true }).fill("1400");await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(summary).toContainText("+£173.68 (14.16%)");
   await expect(page.getByTestId("income-history")).toContainText("£5.50");
   await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();
@@ -57,12 +60,13 @@ test("saves fractional shares and foreign prices, preserves them after encrypted
     await restored.getByRole("button", { name: "Restore a backup", exact: true }).click();await restored.getByLabel("Backup file", { exact: true }).setInputFiles((await backup.path())!);
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code);await restored.getByRole("button", { name: "Restore", exact: true }).click();
     await restored.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
+  await showAccountDetails(restored);
     const restoredStats = restored.getByRole("region", { name: "Your investment", exact: true });
     await expect(restoredStats).toContainText("27.25750597");await expect(restoredStats).toContainText("US$60.41 (£44.99)");await expect(restoredStats).toContainText("£1,400.00");
     await expect(restored.getByTestId("income-history")).toContainText("£5.50");
   } finally { await fresh.close();await backup.delete(); }
-  await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();await card.click();await summary.getByRole("button", { name: "Edit details", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();await card.click();await showAccountDetails(page);await summary.getByRole("button", { name: "Edit details", exact: true }).click();
   await expect(page.getByLabel("Number of shares", { exact: true })).toHaveValue("27.25750597");
-  await page.getByLabel("Track shares and average price").uncheck();await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByLabel("Track shares and average price").uncheck();await page.getByRole("button", { name: "Save", exact: true }).click(); await showAccountDetails(page);
   await expect(summary.getByRole("button", { name: "Add details", exact: true })).toBeVisible();await expect(summary).toContainText("£1,400.00");
 });

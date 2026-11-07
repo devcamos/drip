@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CloudReturn } from "./CloudRecovery";
 import { readCloudState } from "@/lib/cloud";
 import { finishDeviceSignOut, readDeviceSession, resumeDevice, signOutDevice, unlockDevice } from "@/lib/device-session";
@@ -13,18 +13,22 @@ import { emptyData } from "@/lib/db";
 import { RecoveryCodeInput, RecoveryHelp } from "./RecoveryCodeInput";
 import { PwaStatus } from "./PwaStatus";
 
-export function SignOutButton() {
+export function SignOutButton({ disabled = false }: Readonly<{ disabled?: boolean }> = {}) {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
+  const saving = useRef(disabled);
+  useEffect(() => { saving.current = disabled; }, [disabled]);
   async function run() {
+    if (saving.current) return;
     setBusy(true); setMessage("");
     try {
       const state = await readCloudState();
+      if (saving.current) { setMessage("Finish saving your changes before signing out."); return; }
       const pending = state?.dirty ? "You have unsynced changes. They will stay on this device and can sync after you sign back in. " : "";
       if (!confirm(`${pending}Sign out of Drip? Your local accounts are kept. Sign back in with your gamertag and password.`)) return;
       await signOutDevice();
     } catch (e) { setMessage((e as Error).message); } finally { setBusy(false); }
   }
-  return <><button className="btn ghost small" disabled={busy} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{message && <output className="err">{message}</output>}</>;
+  return <><button className="btn ghost small" disabled={busy || disabled} onClick={run}>{busy ? "Signing out…" : "Sign out"}</button>{disabled ? <p className="muted" role="status">Finish saving your changes before signing out.</p> : null}{message && <output className="err">{message}</output>}</>;
 }
 
 type SignedOutProps = Readonly<{ data?: AppData; verifier?: { salt: string; hash: string }; onSignedIn: () => void | Promise<void>; mode?: "signedOut" | "locked" | "migration" }>;
@@ -77,7 +81,7 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
   }, []);
   const copy = signedOutCopy(mode, recovering, signingUp);
   const submitText = busy ? "Unlocking…" : copy.action;
-  return <AuthLayout title={cloudRecovery ? "Recover another account" : copy.title}
+  return <AuthLayout title={cloudRecovery ? "Recover another account" : copy.title} welcome={signingIn || signingUp}
     description={copy.description}>
     <PwaStatus />
     {signingIn && <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />}

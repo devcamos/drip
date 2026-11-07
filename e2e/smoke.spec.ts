@@ -1,3 +1,4 @@
+import { addCashAccount } from "./saved-navigation";
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
@@ -8,7 +9,7 @@ test.describe.configure({ mode: "serial" });
 const onboard = legacyAccount;
 
 async function addZopa(page: Page) {
-  await page.getByRole("navigation").getByRole("button", { name: "Add" }).click();
+  await addCashAccount(page, true);
   await page.getByLabel("Provider", { exact: true }).selectOption("Zopa");
   await page.getByPlaceholder("e.g. Rainy day pot").fill("Rainy day pot");
   await page.getByPlaceholder("3000").fill("3000");
@@ -36,7 +37,7 @@ test("signup asks for a gamertag and matching password without recovery", async 
 test("add account, top up, withdraw, Trends, backup export and import", async ({ page }) => {
   page.on("dialog", (d) => d.accept());
   const code = await onboard(page);
-  const tag = (await page.getByTestId("header-tag").locator("b").textContent());
+  const tag = (await page.getByTestId("header-tag").textContent());
   expect(tag).toBe("devo");
   await addZopa(page);
   await expect(page.getByText("£3,000.00").first()).toBeVisible();
@@ -93,7 +94,7 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
   await expect(p2.getByText(/Wrong recovery code/)).toBeVisible();
   await codeInput.fill(code);
   await p2.getByRole("button", { name: "Restore", exact: true }).click();
-  await expect(p2.getByText("Rainy day pot")).toBeVisible();
+  await expect(p2.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Open Rainy day pot/ })).toBeVisible();
   await expect(p2.getByTestId("header-tag")).toContainText(tag!); // gamertag restored from backup
   await expect(p2.getByText("£3,300.00").first()).toBeVisible();
   await fresh.close();
@@ -114,7 +115,7 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   // Reopening first needs the recovery code to unwrap the local key.
   await page.reload();
   await unlock(page, code);
-  await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
 
   // passkey fails -> fallback to recovery code
   await cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
@@ -126,7 +127,7 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await expect(page.getByText("That isn't your recovery code.")).toBeVisible();
   await page.locator("input").fill(code);
   await page.getByRole("button", { name: "Unlock with code" }).click();
-  await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
 });
 
 test("app-lock passkey uses the gamertag as its user name and the account id as user id", async ({ page }) => {
@@ -135,7 +136,7 @@ test("app-lock passkey uses the gamertag as its user name and the account id as 
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   await onboard(page);
-  const tag = await page.getByTestId("header-tag").locator("b").textContent();
+  const tag = await page.getByTestId("header-tag").textContent();
   await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByText("Advanced: file backups & app lock").click();
   await page.getByRole("button", { name: "Turn on app lock" }).click();
@@ -160,7 +161,7 @@ test("unsent signup names and passwords do not survive a fresh page", async ({ p
 
 test("daily-interest account has no payout date and skips upcoming payouts", async ({ page }) => {
   await onboard(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Add" }).click();
+  await addCashAccount(page, true);
   await page.getByLabel("Provider").selectOption("MoneyFarm");
   await page.getByLabel("Balance").fill("10000");
   await page.getByLabel("Rate").fill("3.65");
@@ -169,8 +170,8 @@ test("daily-interest account has no payout date and skips upcoming payouts", asy
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Per day (est.)")).toBeVisible();
   await page.getByRole("button", { name: "← Accounts" }).click();
-  await expect(page.getByText(/Daily payments/)).toBeVisible();
-  await expect(page.getByText("Upcoming estimated payments")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Moneyfarm/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Next expected payment", exact: true })).toHaveCount(0);
 });
 
 test("PWA assets: manifest icons incl. maskable, apple-touch-icon 180, favicon, iOS meta", async ({ page, request }) => {

@@ -1,5 +1,7 @@
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "./types";
 import { validInvestment } from "./stock-investment";
+import { isCreditAccount, validCreditAmount, validCreditCardTerms } from "./credit-card";
+import { validMarketValuation } from "./market-valuation";
 
 export const PROVIDERS: Record<string, string> = {
   Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
@@ -15,6 +17,7 @@ export const PRODUCTS: Record<ProductCategory, ProductDefaults> = {
   "regular-saver": { label: "Regular saver", rateType: "interest", frequency: "annually", taxWrapper: "none", reinvestIncome: true },
   "current-account": { label: "Current account", rateType: "interest", frequency: "monthly", taxWrapper: "none", reinvestIncome: true },
   "stocks-funds": { label: "Stocks / funds", rateType: "dividend", frequency: "quarterly", taxWrapper: "none", reinvestIncome: false },
+  "credit-card": { label: "Credit card", rateType: "interest", frequency: "monthly", taxWrapper: "none", reinvestIncome: false },
   other: { label: "Other / unclassified", rateType: "interest", frequency: "monthly", taxWrapper: "none", reinvestIncome: true },
 };
 export function productLabel(account: Pick<Account, "productCategory" | "taxWrapper" | "rateType">) {
@@ -27,7 +30,15 @@ export function validDate(value: unknown): value is string {
 }
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
+  if (isCreditAccount(account)) return typeof account.provider === "string" && account.provider.trim().length > 0 && account.provider.length <= 100 &&
+    validCreditAmount(account.balance) && validCreditCardTerms(account.creditCard) && account.rateType === "interest" && account.ratePct === 0 &&
+    account.frequency === "monthly" && validDate(account.nextPayoutDate) && Array.isArray(account.payouts) && account.payouts.length === 0 &&
+    account.investment === undefined && account.holdingName === undefined && account.bonus === undefined && account.marketValuation === undefined &&
+    (account.taxWrapper === undefined || account.taxWrapper === "none") && (account.reinvestIncome === undefined || account.reinvestIncome === false) &&
+    (account.rateHistory === undefined || (Array.isArray(account.rateHistory) && account.rateHistory.every(period => period && period.ratePct === 0)));
   return (account.productCategory === undefined || Object.hasOwn(PRODUCTS, account.productCategory)) &&
+    account.creditCard === undefined &&
+    (account.marketValuation === undefined || validMarketValuation(account.marketValuation, account)) &&
     (account.investment === undefined || (account.rateType === "dividend" && validInvestment(account.investment))) &&
     (account.holdingName === undefined || (account.productCategory === "stocks-funds" && typeof account.holdingName === "string" && account.holdingName.trim().length > 0 && account.holdingName.length <= 100)) &&
     (account.taxWrapper === undefined || ["none", "cash-isa", "lifetime-isa", "stocks-shares-isa"].includes(account.taxWrapper)) &&

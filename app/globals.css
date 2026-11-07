@@ -206,3 +206,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
 .payment-month .payment-date { gap:4px; }
 .calendar-assumptions { font-size:12px; margin-bottom:0; }
 @media (max-width:359px) { .investment-stats dd { font-size:16px; } .investment-stats dt { font-size:13px; } }
+
+/* The approved Accounts canvas uses the full desktop width; forms stay narrow. */
+main.accounts-page { max-width:1120px; padding-left:28px; padding-right:28px; }
+@media (max-width:640px) { main.accounts-page { padding-left:18px; padding-right:18px; } }

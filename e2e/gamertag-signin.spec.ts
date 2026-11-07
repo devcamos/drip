@@ -1,3 +1,4 @@
+import { signOutFromProfile } from "./saved-navigation";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
@@ -70,12 +71,12 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
   await login.getByLabel("Gamertag", { exact: true }).fill(username.toUpperCase());
   await login.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText(username);
-  await expect(page.getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
+  await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
   await capture(page, "accounts");
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Recover your account" })).toBeVisible();
   await expect(page.getByRole("form", { name: "Password sign-in", exact: true })).toHaveCount(0);
@@ -84,7 +85,7 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
   await context.setOffline(true); await page.reload();
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
+  await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
 });
 
 test("old account-switch bookmarks use the same sign-in page", async ({ page }) => {

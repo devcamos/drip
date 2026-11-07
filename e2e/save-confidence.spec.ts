@@ -1,3 +1,4 @@
+import { addCashAccount } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -28,7 +29,7 @@ async function capture(page: Page, state: string, region: string) {
 
 test("failed projection and income-removal writes retain values and retry safely", async ({ page }) => {
   await legacyAccount(page, "save_demo");
-  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await addCashAccount(page);
   await page.getByLabel("Provider", { exact: true }).selectOption("Zopa");
   await page.getByLabel("Balance", { exact: true }).fill("3000");
   await page.getByLabel("Rate", { exact: true }).fill("4");
@@ -50,7 +51,7 @@ test("failed projection and income-removal writes retain values and retry safely
   await expect(page.getByRole("form", { name: "Projection assumptions" })).toHaveCount(0);
   await expect(page.getByText("£3,000.00 today · £200.00 planned monthly top-up")).toBeVisible();
   await page.getByRole("navigation").getByRole("button", { name: "Accounts", exact: true }).click();
-  await page.getByRole("button", { name: /Zopa/ }).click();
+  await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
   await page.getByText("View payments", { exact: true }).click();
   page.on("dialog", d => d.accept());
   await failNextDataWrite(page);

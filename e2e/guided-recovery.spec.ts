@@ -1,3 +1,4 @@
+import { addCashAccount, signOutFromProfile } from "./saved-navigation";
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -32,7 +33,7 @@ test("forgotten credentials guidance and local file import recover actual encryp
   await expect(page.getByRole("button", { name: "Set up recovery", exact: true })).toBeVisible();
   await capture(page, "recovery-setup-task");
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry cloud sign-out", exact: true })).toHaveCount(0, { timeout: 15_000 });
   await page.getByText("I can’t find my password or recovery codes", { exact: true }).click();
@@ -52,7 +53,7 @@ test("forgotten-password screen offers the configured encrypted unlock passkey",
   await page.getByRole("button", { name: "Set up passkey unlock", exact: true }).click();
   await expect(page.getByText(/Passkey saved and verified/)).toBeVisible();
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Use your saved unlock passkey" })).toBeVisible();
   await capture(page, "passkey-recovery");
@@ -79,7 +80,7 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await page.getByLabel("Confirm new account password", { exact: true }).fill(oldPassword);
   await withAuthRetry(page, () => page.getByRole("button", { name: "Create account", exact: true }).click(), page.getByRole("heading", { name: "Save your recovery codes" }));
   await finishSignupRecovery(page);
-  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await addCashAccount(page);
   await page.getByLabel("Balance", { exact: true }).fill("3200"); await page.getByLabel("Rate", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText(/^(Cloud copy is up to date\.|Encrypted cloud copy saved\.)$/)).toBeVisible({ timeout: 75_000 });
@@ -88,7 +89,7 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   await page.getByRole("button", { name: "Set up passkey unlock", exact: true }).click();
   await expect(page.getByText(/Passkey saved and verified/)).toBeVisible();
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
@@ -106,7 +107,7 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
   const download = await downloadEvent; expect(download.suggestedFilename()).toBe("drip-recovery-codes.txt");
   await codes.getByRole("button", { name: "I’ve saved my recovery codes" }).click();
   await expect(codes.getByText(/Recovery setup complete/)).toBeVisible();
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   const login = page.getByRole("form", { name: "Password sign-in", exact: true });
   await login.getByLabel("Gamertag").fill(handle); await login.getByLabel("Password", { exact: true }).fill(oldPassword);
   await withAuthRetry(page, () => login.getByRole("button", { name: "Sign in" }).click(), login.getByText("Gamertag or password is incorrect."));
@@ -119,11 +120,11 @@ test("password setup creates a verified passkey, which resets a forgotten passwo
     await other.getByLabel("Gamertag").fill(handle); await other.getByLabel("Password", { exact: true }).fill(newPassword);
     await withAuthRetry(other, () => other.getByRole("button", { name: "Sign in" }).click(), other.getByTestId("header-tag"));
     await expect(other.getByRole("region", { name: "Account cards" })).toContainText("£3,200.00");
-    other.on("dialog", dialog => dialog.accept()); await other.getByRole("button", { name: "Sign out", exact: true }).click();
+    other.on("dialog", dialog => dialog.accept()); await signOutFromProfile(other);
     await expect(other.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
     await expectCloudSessionEnded(other);
   } finally { await fresh.close(); }
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
   await expectCloudSessionEnded(page);
 });

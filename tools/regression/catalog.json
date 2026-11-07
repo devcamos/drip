@@ -77,6 +77,19 @@
       "browser": [
         "e2e/profile-wallet.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "saved-experience",
+      "unit": [
+        "tests/saved-experience.test.ts"
+      ],
+      "integration": [
+        "tests/saved-experience.integration.test.tsx",
+        "integration/saved-experience-http.integration.test.ts"
+      ],
+      "browser": [
+        "e2e/saved-experience.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -94,7 +107,8 @@
         "lib/password-login.ts",
         "server/auth.ts",
         "server/password-login.ts",
-        "server/password-transaction.ts"
+        "server/password-transaction.ts",
+        "app/AuthWelcome.module.css"
       ],
       "tests": [
         "tests/password-server.test.ts",
@@ -111,7 +125,9 @@
         "e2e/password-race.spec.ts",
         "e2e/signup-errors.spec.ts",
         "integration/account-http.integration.test.ts",
-        "tests/local-test-database.test.ts"
+        "tests/local-test-database.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -164,7 +180,8 @@
         "tests/signup-replacement.test.ts",
         "tests/vault-ui.test.tsx",
         "e2e/local-vault.spec.ts",
-        "e2e/save-confidence.spec.ts"
+        "e2e/save-confidence.spec.ts",
+        "tests/saved-experience.integration.test.tsx"
       ]
     },
     {
@@ -188,7 +205,10 @@
         "e2e/recovery.spec.ts",
         "e2e/password-login.spec.ts",
         "e2e/products.spec.ts",
-        "integration/account-http.integration.test.ts"
+        "integration/account-http.integration.test.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "integration/saved-experience-http.integration.test.ts"
       ]
     },
     {
@@ -213,7 +233,9 @@
         "tests/device-management-race.test.tsx",
         "e2e/device-management.spec.ts",
         "e2e/four-device-signin.spec.ts",
-        "integration/device-management.test.ts"
+        "integration/device-management.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -247,7 +269,10 @@
         "tests/income.test.ts",
         "e2e/account-options.spec.ts",
         "e2e/account-wallet.spec.ts",
-        "e2e/products.spec.ts"
+        "e2e/products.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -267,7 +292,9 @@
         "tests/income-remove-ui.test.tsx",
         "e2e/income-update.spec.ts",
         "e2e/products.spec.ts",
-        "e2e/smoke.spec.ts"
+        "e2e/smoke.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx"
       ]
     },
     {
@@ -284,7 +311,10 @@
         "tests/stock-investment-ui.test.tsx",
         "tests/stock-investment.test.ts",
         "e2e/stock-investment.spec.ts",
-        "e2e/income-notifications.spec.ts"
+        "e2e/income-notifications.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -297,7 +327,10 @@
       "tests": [
         "tests/stock-investment.test.ts",
         "tests/stock-investment-ui.test.tsx",
-        "e2e/stock-investment.spec.ts"
+        "e2e/stock-investment.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -312,7 +345,10 @@
       "tests": [
         "tests/exchange-rates.test.ts",
         "tests/currency-estimate.test.tsx",
-        "e2e/exchange-rates.spec.ts"
+        "e2e/exchange-rates.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -326,7 +362,9 @@
         "tests/trends-ui.test.tsx",
         "tests/maths.test.ts",
         "tests/gaps.test.ts",
-        "e2e/smoke.spec.ts"
+        "e2e/smoke.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx"
       ]
     },
     {
@@ -345,7 +383,9 @@
         "tests/income-reminders.test.ts",
         "tests/income-notifications-ui.test.tsx",
         "e2e/payment-calendar.e2e.spec.ts",
-        "e2e/income-notifications.spec.ts"
+        "e2e/income-notifications.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx"
       ]
     },
     {
@@ -400,7 +440,9 @@
         "e2e/install-task.spec.ts",
         "e2e/pwa-update.spec.ts",
         "e2e/signin-update.spec.ts",
-        "e2e/pwa-current-update.e2e.spec.ts"
+        "e2e/pwa-current-update.e2e.spec.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -472,7 +514,9 @@
         "tests/signup-form.test.tsx",
         "e2e/smoke.spec.ts",
         "e2e/auth-screens.spec.ts",
-        "e2e/gamertag-signin.spec.ts"
+        "e2e/gamertag-signin.spec.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
       ]
     },
     {
@@ -578,6 +622,33 @@
         "tests/profile-wallet.integration.test.tsx",
         "e2e/profile-wallet.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "saved-experience",
+      "name": "Saved accounts, credit-card debts, profile preferences and explicit holding valuation",
+      "sources": [
+        "app/AccountChooser.tsx",
+        "app/AccountChooser.module.css",
+        "app/CreditCardForm.tsx",
+        "app/CreditCardDetail.tsx",
+        "app/accounts/AccountsHome.tsx",
+        "app/accounts/AppAccountHeader.tsx",
+        "app/accounts/ProfileSettings.tsx",
+        "app/accounts/presentation.ts",
+        "app/accounts/accounts.module.css",
+        "app/stocks/StockPrice.tsx",
+        "app/stocks/stock-price.module.css",
+        "lib/credit-card.ts",
+        "lib/market-valuation.ts",
+        "lib/profile-preferences.ts",
+        "lib/stock-chart.ts"
+      ],
+      "tests": [
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "integration/saved-experience-http.integration.test.ts",
+        "e2e/saved-experience.e2e.spec.ts"
+      ]
     }
   ],
   "layers": {
@@ -602,7 +673,8 @@
       "tests/stock-chart.test.ts",
       "tests/stock-valuation.test.ts",
       "tests/feedback-prototype.test.ts",
-      "tests/profile-wallet.test.ts"
+      "tests/profile-wallet.test.ts",
+      "tests/saved-experience.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -669,13 +741,15 @@
       "tests/stock-chart.integration.test.tsx",
       "tests/stock-valuation.integration.test.tsx",
       "tests/feedback-prototype.integration.test.tsx",
-      "tests/profile-wallet.integration.test.tsx"
+      "tests/profile-wallet.integration.test.tsx",
+      "tests/saved-experience.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
       "integration/device-management.test.ts",
       "integration/notification-rate-limits.test.ts",
-      "integration/notifications-postgres.test.ts"
+      "integration/notifications-postgres.test.ts",
+      "integration/saved-experience-http.integration.test.ts"
     ],
     "browser": [
       "e2e/account-options.spec.ts",
@@ -710,7 +784,8 @@
       "e2e/stock-chart.e2e.spec.ts",
       "e2e/stock-valuation.e2e.spec.ts",
       "e2e/feedback-prototype.e2e.spec.ts",
-      "e2e/profile-wallet.e2e.spec.ts"
+      "e2e/profile-wallet.e2e.spec.ts",
+      "e2e/saved-experience.e2e.spec.ts"
     ]
   },
   "conditional": [

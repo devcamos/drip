@@ -71,7 +71,7 @@ it("keeps old whole-portfolio Trading 212 accounts editable without requiring an
 
 it("shows the holding identity on the coloured account card", () => {
   render(<AccountDetail a={old} onBack={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onChange={vi.fn()} />);
-  expect(screen.getByText("Realty Income")).toBeInTheDocument(); expect(screen.getByText("Trading 212")).toBeInTheDocument();
+  expect(screen.getByText("Realty Income", { selector: ".holding" })).toBeInTheDocument(); expect(screen.getByText("Trading 212")).toBeInTheDocument();
   expect(document.querySelector(".card")).toHaveStyle({ color: "#000000" });
 });
 

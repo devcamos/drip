@@ -6,6 +6,9 @@ import { accountCardStyle } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { IncomeSummary } from "./IncomeSummary";
 import { StockInvestmentSummary } from "./StockInvestment";
+import { isCreditAccount } from "@/lib/credit-card";
+import { CreditCardDetail } from "./CreditCardDetail";
+import { StockPrice } from "./stocks/StockPrice";
 const today = () => M.ymd(new Date());
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
@@ -14,7 +17,7 @@ const eventStyle = {
   topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
   set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
 };
-type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
+type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
 
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
@@ -35,7 +38,10 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
       setBusy(true); setError("");
       try {
-        if (await onChange(x => balanceChange[mode](x, n, date)) === false) setError("Balance change could not be saved. Your entry is kept; retry.");
+        if (await onChange(x => {
+          if (mode === "withdraw" && n > x.balance) throw Object.assign(new Error("Balance changed"), { name: "StaleAccountEdit" });
+          return balanceChange[mode](x, n, date);
+        }) === false) setError("Balance change could not be saved. Your entry is kept; check the message above before retrying.");
         else setMode(null);
       }
       catch { setError("Could not save the balance. Keep Drip open and retry."); }
@@ -72,7 +78,10 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
         if (!confirm("Remove this recorded payment? Your balance will stay unchanged.")) return;
         setBusy(true); setMessage("");
         try {
-          const saved = await onChange(x => ({ ...x, payouts: x.payouts.filter((_, index) => index !== p.index) }));
+          const saved = await onChange(x => {
+            if (JSON.stringify(x.payouts) !== JSON.stringify(a.payouts)) throw Object.assign(new Error("Income history changed"), { name: "StaleAccountEdit" });
+            return { ...x, payouts: x.payouts.filter((_, index) => index !== p.index) };
+          });
           setMessage(saved === false ? "Payment removal could not be saved. Keep Drip open and retry." : "Payment removed. Your balance is unchanged.");
         }
         catch { setMessage("Payment removal could not be saved. Keep Drip open and retry."); }
@@ -99,6 +108,7 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
 }
 
 export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) {
+  if (isCreditAccount(a)) return <CreditCardDetail account={a} onBack={onBack} onEdit={onEdit} onDelete={onDelete} />;
   const events = (a.events ?? []).filter(e => e.type !== "interest").toSorted((x, y) => y.date.localeCompare(x.date));
   const legacy = M.interestHistory(a.events, "month");
   const forecast = M.projection([a], 12).at(-1)!;
@@ -109,14 +119,14 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
       {a.holdingName && <div className="holding">{a.holdingName}</div>}
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
-    <p className="muted">Your entered balance. Predictions and recorded income never change it automatically.</p>
-    {a.rateType === "dividend" && <StockInvestmentSummary account={a} onEdit={onEdit} />}
+    <p className="muted">{a.marketValuation ? "Your saved market estimate. Dividend predictions retain your recorded income assumptions." : "Your entered balance. Predictions and recorded income never change it automatically."}</p>
+    {a.rateType === "dividend" && <><StockPrice key={a.id} account={a} onChange={onChange} onEdit={onEdit} onBack={onBack} /><StockInvestmentSummary account={a} onEdit={onEdit} /></>}
     <BalanceActions a={a} onChange={onChange} />
     <IncomeSummary accounts={[a]} />
     <section className="panel" aria-label="Income predictions"><h2 style={{ marginTop: 0 }}>Predictions</h2>
       <div className="grid">
         <div className="stat"><div className="muted">{a.rateType === "dividend" ? "Expected dividend yield" : "Standard interest rate"}</div><div className="v">{a.ratePct}%</div></div>
-        <div className="stat"><div className="muted">Estimated per month</div><div className="v">{M.gbp(M.monthlyIncome(a.balance, a.ratePct))}</div></div>
+        <div className="stat"><div className="muted">Estimated per month</div><div className="v">{M.gbp(M.accountMonthlyIncome(a))}</div></div>
         <div className="stat"><div className="muted">{a.frequency === "daily" ? "Per day (est.)" : "Estimated next payment"}</div><div className="v">{M.gbp(M.payoutAmount(a))}</div><div className="muted">{a.frequency === "daily" ? "Daily interest / income" : fmtDate(M.nextPayout(a.nextPayoutDate, a.frequency, today()))}</div></div>
         <div className="stat"><div className="muted">Predicted income over 1 year</div><div className="v">{M.gbp(forecast.income)}</div></div>
       </div>

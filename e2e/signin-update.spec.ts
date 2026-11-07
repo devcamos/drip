@@ -1,3 +1,4 @@
+import { signOutFromProfile } from "./saved-navigation";
 import { expect, test } from "@playwright/test";
 import { createServer, request } from "node:http";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
@@ -46,10 +47,10 @@ test("a saved password and encrypted records survive an old-to-new build update 
     await context.setOffline(true);
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in with password" }).click();
-    await expect(page.getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
+    await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
     await context.setOffline(false);
     page.on("dialog", dialog => dialog.accept());
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await signOutFromProfile(page);
     await expect(page.getByRole("heading", { name: "Drip is signed out" })).toBeVisible();
     const before = await savedRecords(page);
     upstreamPort = 4345;
@@ -76,7 +77,7 @@ test("a saved password and encrypted records survive an old-to-new build update 
     expect(await savedRecords(page)).toBe(before);
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
+    await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
     expect(await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async name =>
       (await (await caches.open(name)).keys()).map(r => new URL(r.url).pathname)))).flat().some(path => path.startsWith("/api/")))).toBe(false);
   } finally {

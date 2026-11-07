@@ -51,6 +51,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
   }
   return <>
     <h1>Trends</h1>
+    <p className="muted">Savings and investments only. Credit-card debt and repayments are shown separately in Accounts.</p>
     <p className="muted">{heading}</p>
     <div className="big">{M.gbp(future ? final.balance : total)}</div>
     <p className="muted">{future ? `${M.gbp(total)} today · ${M.gbp(assumptions.monthlyDeposit)} planned monthly top-up` : "Based on recorded monthly balances"}</p>

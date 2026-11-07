@@ -78,6 +78,23 @@ describe("visible sign-out and code return", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText("Could not lock device.")).toBeInTheDocument();
   });
+  it("blocks sign-out during accepted edits and rechecks a pending cloud read before locking", async () => {
+    let resolve!: (value: undefined) => void;
+    const view = render(<SignOutButton disabled />);
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(actions.readCloudState).not.toHaveBeenCalled();
+    view.rerender(<SignOutButton />);
+    actions.readCloudState.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(actions.readCloudState).toHaveBeenCalledOnce());
+    view.rerender(<SignOutButton disabled />);
+    await act(async () => { resolve(undefined); });
+    expect(actions.signOutDevice).not.toHaveBeenCalled();
+    view.rerender(<SignOutButton />); actions.readCloudState.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(actions.signOutDevice).toHaveBeenCalledOnce());
+  });
   it("requires a recovery code and only reopens retained accounts after successful verification", async () => {
     const resumed = vi.fn(); const data = emptyData(); const verifier = { salt: "s", hash: "h" };
     render(<SignedOut data={data} verifier={verifier} onSignedIn={resumed} />);

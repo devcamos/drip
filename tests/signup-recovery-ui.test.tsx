@@ -38,7 +38,7 @@ async function openFile() {
 it("accepts a saved screenshot without another password or download and clears the checkpoint only after successful confirmation", async () => {
   render(<Drip />); await openFile();
   expect(screen.queryByRole("button", { name: "Use a recovery code instead" })).toBeNull();
-  expect(screen.queryByText(/No accounts yet/)).toBeNull();
+  expect(screen.queryByRole("region", { name: "Your accounts are empty" })).toBeNull();
   const next = screen.getByRole("button", { name: "Continue to Accounts" });
   expect(next).toBeDisabled();
   expect(screen.getAllByRole("listitem")).toHaveLength(6);
@@ -49,7 +49,7 @@ it("accepts a saved screenshot without another password or download and clears t
   await screen.findByText(/Could not save your confirmation/);
   expect(await db.getItem("signupRecoveryRequired")).toBeDefined();
   fireEvent.click(next);
-  await screen.findByText(/No accounts yet/);
+  await screen.findByRole("region", { name: "Your accounts are empty" });
   expect(await db.getItem("signupRecoveryRequired")).toBeUndefined();
   expect((await rawStore()).recoveryCodesSaved.vaultId).toBe(vaultId);
   expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ it("offers a download and requires the same explicit saved-copy acknowledgement"
   expect(screen.getByRole("button", { name: "Continue to Accounts" })).toBeDisabled();
   fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
   fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
-  await screen.findByText(/No accounts yet/);
+  await screen.findByRole("region", { name: "Your accounts are empty" });
   expect(originals).toHaveBeenCalledOnce();
 });
 
@@ -79,7 +79,7 @@ it("hides codes on blur and lets a failed download fall back to a saved screensh
   await screen.findByText(/Could not download the file/);
   fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
   fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
-  await screen.findByText(/No accounts yet/);
+  await screen.findByRole("region", { name: "Your accounts are empty" });
 });
 
 it.each(["blur", "background-return"] as const)("keeps a delayed code response hidden after %s until explicitly shown", async event => {
@@ -130,7 +130,7 @@ it("renews an expired cloud session after offline unlock before retrying the ori
   expect(cloud.connect).toHaveBeenCalledWith(fixtureCode, expect.objectContaining({ identity: expect.objectContaining({ handle: "demo" }) }), false, undefined, "offline-resume");
   fireEvent.click(screen.getByRole("checkbox", { name: /I’ve saved a screenshot/ }));
   fireEvent.click(screen.getByRole("button", { name: "Continue to Accounts" }));
-  await screen.findByText(/No accounts yet/);
+  await screen.findByRole("region", { name: "Your accounts are empty" });
 });
 
 it("rejects a renewal for another owner before opening the recovery codes", async () => {
@@ -149,7 +149,7 @@ it("resumes the required step after remount and keeps it visible on recovery-ser
   await screen.findByRole("heading", { name: "Save your recovery codes" });
   await screen.findByText(/Could not open your recovery codes/);
   expect(await db.getItem("signupRecoveryRequired")).toEqual({ vaultId });
-  expect(screen.queryByText(/No accounts yet/)).toBeNull();
+  expect(screen.queryByRole("region", { name: "Your accounts are empty" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   await openFile();
   expect(screen.getAllByRole("listitem")).toHaveLength(6);

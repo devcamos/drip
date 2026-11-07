@@ -1,3 +1,4 @@
+import { showAccountDetails } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -64,6 +65,7 @@ test("overlapping account wallet scrolls to every card without obscuring its con
   await expect.poll(() => wallet.evaluate(el => el.scrollTop)).toBeGreaterThan(100);
   await touch.detach();
   await last.tap();
+  await showAccountDetails(page);
   await expect(page.locator(".holding")).toHaveText("Air Products and Chemicals");
   await expect(page.locator(".bal")).toHaveText("£2,750.00");
   await page.getByRole("button", { name: "← Accounts", exact: true }).click();

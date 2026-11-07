@@ -1,0 +1,76 @@
+{
+  "source": "2a014946eb296acbe71bc0ff696b48e2fee05a3c",
+  "scope": "Exact transitive lib module closure of the pre-debt DB/cloud/backup clients; imports remain frozen relative modules. External auth is isolated only by test transport.",
+  "files": [
+    {
+      "source": "lib/cloud.ts",
+      "fixture": "cloud.ts",
+      "sha256": "2984258efe9c8e6616359896cabb3f8e867c855f624a9b77a21ac4a1f62e041f"
+    },
+    {
+      "source": "lib/cloud-payload.ts",
+      "fixture": "cloud-payload.ts",
+      "sha256": "96b51fb30828db1cb2df334c85793d0be8264d03ab44ee14997709dcad71cf95"
+    },
+    {
+      "source": "lib/crypto.ts",
+      "fixture": "crypto.ts",
+      "sha256": "e687430c046fdf3a76cdada577c3f4bfe8ae573a01c49d32270c54245e6fa2e9"
+    },
+    {
+      "source": "lib/data-format.ts",
+      "fixture": "data-format.ts",
+      "sha256": "bf8c8fad074fbb0facb4640c339edf6d19f9eb25b50a8a6d8c84a45159e9ae3f"
+    },
+    {
+      "source": "lib/db.ts",
+      "fixture": "db.ts",
+      "sha256": "0058fe46e74bfade5c25f859734f0eb8df7c86f1a4e5118de1172c611392dccb"
+    },
+    {
+      "source": "lib/identity.ts",
+      "fixture": "identity.ts",
+      "sha256": "cd395d89dba3cc1ffd15162495728858f3b4bf9bdc342a03142e054ae1c8ea38"
+    },
+    {
+      "source": "lib/local-vault.ts",
+      "fixture": "local-vault.ts",
+      "sha256": "43a310ec2e6f5fb2e3cce9b065705fd2af0e4dcf0949c45331aa0fa1ab583dcd"
+    },
+    {
+      "source": "lib/maths.ts",
+      "fixture": "maths.ts",
+      "sha256": "dd33ca78fc03df083080d84aa1168f590cb6d353fae235b0d4bd4efec2b0a2ad"
+    },
+    {
+      "source": "lib/passkey-crypto.ts",
+      "fixture": "passkey-crypto.ts",
+      "sha256": "b345dd8280c18e744dc7497de02c348b8ea2a4d241ae585674e316e67f96fe73"
+    },
+    {
+      "source": "lib/password-crypto.ts",
+      "fixture": "password-crypto.ts",
+      "sha256": "62bb79a4c068b8de7408c9c57d7f06fb4c130aa97b0fe2a8c68b93895ed02236"
+    },
+    {
+      "source": "lib/products.ts",
+      "fixture": "products.ts",
+      "sha256": "28a2495868255aedcf53c2f701ff1441a301f303fbc81e95b118b50ba28fb60d"
+    },
+    {
+      "source": "lib/stock-investment.ts",
+      "fixture": "stock-investment.ts",
+      "sha256": "81c29522d4350ba8950a7a5ab21ab48bea331330e3494bd3c52a522ca107139b"
+    },
+    {
+      "source": "lib/types.ts",
+      "fixture": "types.ts",
+      "sha256": "3b5945585b4b1026fe92c119b8030a02507df7ba3237f9ccd895298fe52583e4"
+    },
+    {
+      "source": "lib/worker-safety.ts",
+      "fixture": "worker-safety.ts",
+      "sha256": "b56f4a95f9b886dc448c2c28bc0e8c5f28f87947d1a8ccd2fcc3a1791d3ebcd2"
+    }
+  ]
+}

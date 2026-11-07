@@ -23,9 +23,15 @@ function checkBinding(value: Stored, expected: VaultBinding) {
 let unlocked: { keys: LocalKeys; generation?: string; signupRoot?: string } | undefined;
 let epoch = 0;
 let writes: Promise<unknown> = Promise.resolve();
-let lastWrite: Promise<void> = Promise.resolve();
+let lastWrite: Promise<unknown> = Promise.resolve();
 let closing = false;
 export class VaultLockedError extends Error { constructor() { super("Unlock Drip with your recovery code first."); } }
+export class RecordConflictError extends Error {
+  constructor() { super("Local data changed while preparing the replacement. Your current copy is kept; review it and retry."); this.name = "RecordConflictError"; }
+}
+export class MutationBindingError extends Error {
+  constructor() { super("Your saved account changed while editing. Its current copy is kept; unlock and try again."); this.name = "MutationBindingError"; }
+}
 export function lockLocalVault(force = false) { if (unlocked || force) { unlocked = undefined; epoch++; } }
 export async function prepareLocalSignOut() { closing = true; try { await lastWrite; } catch (error) { closing = false; throw error; } }
 export function cancelLocalSignOut() { closing = false; }
@@ -33,8 +39,9 @@ export async function clearOnboardingDraft() { await tx("readwrite", s => s.dele
 
 function open(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
-    // Version 2 also prevents legacy v1 clients from overwriting encrypted records.
-    const r = indexedDB.open(DB, 2);
+    // Keep the existing store/ciphertext, but fence clients that cannot preserve
+    // credit cards and market metadata before their first cloud upload.
+    const r = indexedDB.open(DB, 3);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
     r.onerror = () => rej(new Error("Could not open local storage.", { cause: r.error }));
@@ -236,7 +243,7 @@ async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectS
       // Replacing a vault must not discard an edit or sync result committed while
       // asynchronous key derivation/encryption was running, including in other tabs.
       if ((!before.vault || options.records) && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud))) {
-        failure = new Error("Local data changed while preparing the replacement. Your current copy is kept; review it and retry."); t.abort(); return;
+        failure = new RecordConflictError(); t.abort(); return;
       }
       try { write(s, cloud.result); }
       catch (error) { failure = error instanceof Error ? error : new Error("Local storage write failed."); t.abort(); }
@@ -261,6 +268,51 @@ export function saveData(data: AppData): Promise<void> {
     if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-data-saved"));
   });
   lastWrite = save; writes = save.catch(() => {}); return save;
+}
+
+/** Derive normal edits from the canonical encrypted copy, not a tab's stale
+ * React snapshot. A pure edit may retry once if only records/receipts moved. */
+export function mutateData(edit: (current: AppData) => AppData): Promise<AppData> {
+  if (closing) return Promise.reject(new Error("Sign-out is in progress. Unlock Drip before editing."));
+  const stamp = epoch;
+  const mutation = writes.then(async () => {
+    let binding: { vaultId: string; generation?: string; identityId?: string } | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (stamp !== epoch) throw new VaultLockedError();
+      if (attempt > 0 && closing) throw new MutationBindingError();
+      const before = await stored();
+      const local = current(before);
+      const value = before.data ? await decryptLocal<AppData>(before.data as LocalEnvelope, local.keys) : emptyData();
+      if (stamp !== epoch) throw new VaultLockedError();
+      if (!isAppData(value)) throw new Error("Invalid local data. Your stored copy has not changed.");
+      if (binding && (binding.vaultId !== local.keys.header.id || binding.generation !== before.gate?.generation || binding.identityId !== value.identity?.id)) throw new MutationBindingError();
+      binding ??= { vaultId: local.keys.header.id, generation: before.gate?.generation, identityId: value.identity?.id };
+      const canonical = migrateData(value, new Date().toISOString().slice(0, 10));
+      if (!isAppData(canonical)) throw new Error("Invalid local data. Your stored copy has not changed.");
+      const next = edit(canonical);
+      if (!isAppData(next)) throw new Error("These changes contain invalid amounts. Your saved data is unchanged.");
+      const encrypted = await encryptLocal(next, local.keys);
+      try {
+        await guardedWrite(before, stamp, (store, cloud) => {
+          store.put(encrypted, KEY);
+          if (cloud) store.put({ ...cloud, dirty: true, revision: cloud.revision + 1 }, "cloudState");
+        }, { records: true });
+      } catch (error) {
+        if (!(error instanceof RecordConflictError) || attempt !== 0) throw error;
+        if (closing || stamp !== epoch) throw new MutationBindingError();
+        const latest = await stored();
+        const fresh = current(latest);
+        if (fresh.keys.header.id !== binding.vaultId || latest.gate?.generation !== binding.generation) throw new MutationBindingError();
+        continue;
+      }
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("drip-data-saved"));
+      return next;
+    }
+    throw new RecordConflictError();
+  });
+  lastWrite = mutation;
+  writes = mutation.catch(() => {});
+  return mutation;
 }
 type UploadState = CloudState & { vaultId: string };
 export async function cloudSnapshot(): Promise<{ data: AppData; state: UploadState | undefined; signedOut: boolean }> {

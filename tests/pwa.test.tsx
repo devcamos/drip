@@ -5,15 +5,30 @@ import { applyWorkerUpdate, PwaStatus } from "../app/PwaStatus";
 afterEach(() => { delete (navigator as any).serviceWorker; vi.useRealTimers(); });
 
 it("keeps the existing worker until the user accepts a ready update", async () => {
-  const worker = { postMessage: vi.fn() };
+  const reload = vi.fn(); vi.stubGlobal("location", { reload });
+  const worker = { state: "installed", postMessage: vi.fn() };
   const registration = Object.assign(new EventTarget(), { waiting: worker, update: vi.fn().mockResolvedValue(undefined) });
   const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: {} });
   Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
-  const view = render(<PwaStatus />);
+  const view = render(<PwaStatus allowReload={false} />);
   expect(await screen.findByText(/Drip update ready/)).toBeInTheDocument();
   expect(worker.postMessage).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Reload update" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Reload update" }));
+  expect(worker.postMessage).not.toHaveBeenCalled();
+  view.rerender(<PwaStatus allowReload />);
   fireEvent.click(screen.getByRole("button", { name: "Reload update" }));
   expect(worker.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+  // Activation can arrive after the user has opened an editor. Recheck the
+  // latest permission instead of honouring the earlier Home-screen click.
+  view.rerender(<PwaStatus allowReload={false} />);
+  worker.state = "activated";
+  await act(async () => { sw.dispatchEvent(new Event("controllerchange")); });
+  expect(reload).not.toHaveBeenCalled();
+  view.rerender(<PwaStatus allowReload />);
+  expect(reload).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Reload update" }));
+  expect(reload).toHaveBeenCalledOnce();
   view.unmount();
 });
 

@@ -1,6 +1,7 @@
 import type { Account, Frequency } from "./types";
 import { addMonths, payoutAmount, ymd } from "./maths";
 import { validDate } from "./products";
+import { isCreditAccount } from "./credit-card";
 
 export type PaymentPlan = { anchor: string; frequency: Frequency; skipDate?: string };
 export type ReminderSchedule = { timeZone: string; plans: PaymentPlan[] };
@@ -44,7 +45,7 @@ export function loggedToday(account: Account, day: string) {
 
 /** Only dates/frequencies leave the encrypted vault: no identities, names or figures. */
 export function reminderSchedule(accounts: Account[], day: string, timeZone: string): ReminderSchedule {
-  const plans = accounts.filter(account => account.balance > 0 && account.ratePct > 0).map(account => ({
+  const plans = accounts.filter(account => !isCreditAccount(account) && account.balance > 0 && account.ratePct > 0).map(account => ({
     ...accountPlan(account, day),
     ...(loggedToday(account, day) ? { skipDate: day } : {}),
   })).filter(plan => validDate(plan.anchor));
@@ -52,7 +53,7 @@ export function reminderSchedule(accounts: Account[], day: string, timeZone: str
 }
 
 export function paymentReminders(accounts: Account[], day: string) {
-  return accounts.filter(account => account.balance > 0 && account.ratePct > 0 && validDate(accountPlan(account, day).anchor)).map(account => ({
+  return accounts.filter(account => !isCreditAccount(account) && account.balance > 0 && account.ratePct > 0 && validDate(accountPlan(account, day).anchor)).map(account => ({
     account,
     date: nextPayment(accountPlan(account, day), day),
     amount: payoutAmount(account),

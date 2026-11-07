@@ -1,3 +1,4 @@
+import { signOutFromProfile } from "./saved-navigation";
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect } from "@playwright/test";
 
@@ -9,7 +10,7 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
     hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true,
   } });
   const code = await legacyAccount(page, "passkeytester");
-  await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
   await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Recovery code to set up passkey unlock").fill(code);
   await page.getByRole("button", { name: "Set up passkey unlock" }).click();
@@ -40,7 +41,7 @@ test("saved PRF passkey reopens encrypted accounts offline and after sign-out; r
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();
   await expect(page.getByTestId("header-tag")).toContainText("passkeytester");
   page.on("dialog", dialog => dialog.accept());
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   await page.getByRole("button", { name: "Forgot password?", exact: true }).click();
   await page.getByRole("button", { name: "Unlock with passkey", exact: true }).click();

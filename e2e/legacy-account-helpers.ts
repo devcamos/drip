@@ -23,6 +23,6 @@ export async function legacyAccount(page: Page, handle = "devo", accounts: Accou
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Encrypt local data", exact: true }).click();
   if (accounts.length) await expect(page.getByRole("region", { name: "Account cards", exact: true })).toBeVisible();
-  else await expect(page.getByText("No accounts yet")).toBeVisible();
+  else await expect(page.getByText(/Your account list is empty/)).toBeVisible();
   return code;
 }

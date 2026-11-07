@@ -35,7 +35,7 @@ export function CurrencyEstimate({ currency, shares }: Readonly<{ currency: FxCu
     <label htmlFor={id}>Current price per share ({currency})</label>
     <input id={id} inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. 60.00" />
     <button type="button" className="btn ghost" disabled={busy || !convertedHolding(price, shares, 1)} onClick={convert}>{busy ? "Getting daily rate…" : rate ? "Refresh conversion" : "Convert to GBP"}</button>
-    {usable && <p className="muted">Frankfurter · Rate dated {usable.date} · 1 {currency} = {usable.rate.toFixed(5)} GBP</p>}
+    {usable && <p className="muted">Frankfurter · Rate dated {usable.date} · {currency} to GBP</p>}
     {rate && !usable && <p role="status">This exchange rate is too old. Refresh it to calculate an estimate.</p>}
     {estimate && <output className="currency-result" aria-label="Converted holding estimate"><span>Estimated value in GBP</span><strong>{gbp(estimate.valueGBP)}</strong><span>{formatShares(shares)} shares · ≈ {sharePrice.format(estimate.perShareGBP)} per share</span></output>}
     {error && <p className="err" role="alert">{error}{usable && " Showing the previously loaded, dated rate."}</p>}

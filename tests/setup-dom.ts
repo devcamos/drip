@@ -19,3 +19,10 @@ afterEach(async () => {
 if (typeof window !== "undefined") {
   window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, onchange: null, addListener() {}, removeListener() {}, dispatchEvent: () => false })) as any;
 }
+
+// jsdom has no native top-layer implementation; preserve dialog open/close
+// semantics for component tests. Browser tests exercise real focus/inertness.
+if (typeof HTMLDialogElement !== "undefined") {
+  HTMLDialogElement.prototype.showModal ??= function () { this.open = true; };
+  HTMLDialogElement.prototype.close ??= function () { this.open = false; };
+}
