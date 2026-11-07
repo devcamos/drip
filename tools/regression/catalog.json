@@ -41,6 +41,18 @@
       "browser": [
         "e2e/stock-chart.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "stock-valuation-prototype",
+      "unit": [
+        "tests/stock-valuation.test.ts"
+      ],
+      "integration": [
+        "tests/stock-valuation.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/stock-valuation.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -478,7 +490,7 @@
     },
     {
       "id": "stock-chart-prototype",
-      "name": "Optional dividend price-history chart and recorded holding separation",
+      "name": "Dividend-card chart auto-loading, ranges and recorded holding separation",
       "sources": [
         "app/prototype/welcome/StockPricePreview.tsx",
         "app/prototype/welcome/stock-chart.ts",
@@ -488,6 +500,19 @@
         "tests/stock-chart.test.ts",
         "tests/stock-chart.integration.test.tsx",
         "e2e/stock-chart.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "stock-valuation-prototype",
+      "name": "User-entered share-price valuation with dated FX and unchanged dividend income",
+      "sources": [
+        "app/prototype/welcome/StockValuePreview.tsx",
+        "app/prototype/welcome/stock-valuation.ts"
+      ],
+      "tests": [
+        "tests/stock-valuation.test.ts",
+        "tests/stock-valuation.integration.test.tsx",
+        "e2e/stock-valuation.e2e.spec.ts"
       ]
     }
   ],
@@ -510,7 +535,8 @@
       "tests/topup.test.ts",
       "tests/local-test-database.test.ts",
       "tests/credit-prototype.test.ts",
-      "tests/stock-chart.test.ts"
+      "tests/stock-chart.test.ts",
+      "tests/stock-valuation.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -574,7 +600,8 @@
       "tests/worker-safety.test.ts",
       "tests/welcome-prototype.integration.test.tsx",
       "tests/credit-prototype.integration.test.tsx",
-      "tests/stock-chart.integration.test.tsx"
+      "tests/stock-chart.integration.test.tsx",
+      "tests/stock-valuation.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -612,7 +639,8 @@
       "e2e/stock-investment.spec.ts",
       "e2e/welcome-prototype.e2e.spec.ts",
       "e2e/credit-prototype.e2e.spec.ts",
-      "e2e/stock-chart.e2e.spec.ts"
+      "e2e/stock-chart.e2e.spec.ts",
+      "e2e/stock-valuation.e2e.spec.ts"
     ]
   },
   "conditional": [

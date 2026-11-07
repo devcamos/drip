@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("entry prototype supports the first-account journey without auth requests or saved account data", async ({ page }) => {
   const apiRequests: string[] = [];
+  await page.route("https://www.tradingview-widget.com/**", route => route.fulfill({ contentType: "text/html", body: "<!doctype html><p>Chart fixture: no market data.</p>" }));
   page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url()); });
   await page.goto("/prototype/welcome");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
@@ -25,6 +26,9 @@ test("entry prototype supports the first-account journey without auth requests o
   await expect(add).toBeFocused();
   await add.click();
   await page.getByRole("button", { name: /Stocks & funds/ }).click();
+  const stockDialog = page.getByRole("dialog", { name: "Realty Income share price" });
+  await expect(stockDialog.locator("iframe")).toHaveCount(1);
+  await stockDialog.getByRole("button", { name: "Back to accounts" }).click();
   const stock = page.getByRole("button", { name: /Realty Income.*£2,500/ });
   await expect(stock).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByText("Average price", { exact: true })).toBeVisible();

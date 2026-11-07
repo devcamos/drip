@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { chartRanges, stockChartDescriptor, stockInstrument } from "./stock-chart";
 import type { ChartRange } from "./stock-chart";
+import StockValuePreview from "./StockValuePreview";
+import type { StockPriceInput } from "./stock-valuation";
 import s from "./stock-price.module.css";
 
-export default function StockPricePreview({ onClose }: { onClose: () => void }) {
+export default function StockPricePreview({ onClose, priceInput, onPriceChange }: { onClose: () => void; priceInput: StockPriceInput | null; onPriceChange: (input: StockPriceInput | null) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const loadTrigger = useRef<HTMLButtonElement>(null);
   const [range, setRange] = useState<ChartRange>("1M");
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(true);
   const [frameOpened, setFrameOpened] = useState(false);
   const instrument = stockInstrument("realty-income");
   const descriptor = stockChartDescriptor("realty-income", range);
@@ -26,21 +28,17 @@ export default function StockPricePreview({ onClose }: { onClose: () => void }) 
         <div className={s.chartViewport}>
           {loaded && descriptor ? <iframe key={descriptor.iframeUrl} src={descriptor.iframeUrl} className={s.chart} title="Realty Income delayed share-price chart" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" onLoad={() => setFrameOpened(true)} /> : <div className={s.consent}>
             <span className={s.chartIcon} aria-hidden="true"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="6" width="24" height="20" rx="4" /><path d="M4 12h24M9 9h1M13 9h1" /></svg></span>
-            <h4>A separate window on the market.</h4><p>Load TradingView’s chart to explore Realty Income’s share-price history. US market data may be delayed or supplied by Cboe.</p><button ref={loadTrigger} className={s.loadButton} disabled={!descriptor} onClick={() => setLoaded(true)}>Load TradingView chart <span aria-hidden="true">↗</span></button><small>TradingView receives your IP, the public ticker and this page’s address. Your Drip holding figures aren’t sent.</small>
+            <h4>The chart is hidden.</h4><p>Show TradingView’s chart to explore Realty Income’s share-price history. US market data may be delayed or supplied by Cboe.</p><button ref={loadTrigger} className={s.loadButton} disabled={!descriptor} onClick={() => setLoaded(true)}>Show TradingView chart <span aria-hidden="true">↗</span></button>
           </div>}
         </div>
         <div className={s.providerRow}><span>Chart by <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a></span>{loaded ? <button className={s.hideButton} onClick={hideChart}>Hide chart</button> : null}</div>
         {loaded ? <p role="status" className={s.frameStatus}>{frameOpened ? "Chart frame opened. Prices and availability are supplied by TradingView." : "Opening the TradingView chart frame…"}</p> : null}
-        <p className={s.marketNote}>The chart is a market reference. It can differ from Trading 212’s prices and doesn’t update your recorded holding value.</p>
+        <p className={s.marketNote}>The chart opens with this card. It can differ from Trading 212’s prices. Enter a current price to estimate your holding value.</p>
+        <p className={s.marketNote}>TradingView receives your IP and the public ticker. Your holding figures aren’t sent. You can hide the chart at any time.</p>
         <p className={s.marketNote}>If the chart stays blank or this listing is unavailable, open it on TradingView.</p>
         {descriptor ? <a className={s.fallback} href={descriptor.externalUrl} target="_blank" rel="noopener noreferrer">Open chart on TradingView <span aria-hidden="true">↗</span></a> : <p className={s.marketNote}>A chart isn’t configured for this holding.</p>}
       </section>
-      <aside className={s.recorded} aria-labelledby="recorded-holding-heading">
-        <p className={s.eyebrow}>YOUR FIGURES · GBP</p><h3 id="recorded-holding-heading">Your recorded holding</h3><p className={s.recordedIntro}>The figures you enter in Drip stay separate from the market chart.</p>
-        <div className={s.recordedValue}><span>Holding value</span><strong>£2,500.00</strong><small>Recorded value · Prices are not live</small></div>
-        <dl className={s.holdingStats}><div><dt>Shares</dt><dd>50</dd></div><div><dt>Average purchase price</dt><dd>£48.00</dd></div><div><dt>Dividend yield</dt><dd>5.40%</dd></div><div><dt>Estimated annual income</dt><dd>£135.00</dd></div></dl>
-        <p className={s.currencyNote}><b>Two currencies, two different views.</b>The chart shows a share price in USD. Your holding value and average purchase price above are recorded in GBP; no currency conversion or market valuation is applied here.</p>
-      </aside>
+      <StockValuePreview input={priceInput} onUse={onPriceChange} />
     </div>
   </dialog>;
 }

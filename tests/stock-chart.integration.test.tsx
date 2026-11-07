@@ -15,22 +15,19 @@ afterEach(() => vi.restoreAllMocks());
 async function openStock(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(screen.getByRole("group", { name: "Preview screen" })).getByRole("button", { name: "Your accounts" }));
   await user.click(screen.getByRole("button", { name: /Realty Income.*£2,500/ }));
-  await user.click(screen.getByRole("button", { name: "Explore share price" }));
   return screen.getByRole("dialog", { name: "Realty Income share price" });
 }
 
-test("only explicit chart loading connects the correct listing and range; recorded GBP figures remain independent", async () => {
+test("opening a dividend card loads its chart immediately; changing ranges keeps recorded figures independent", async () => {
   const user = userEvent.setup();
   const writes = vi.spyOn(Storage.prototype, "setItem");
   render(<WelcomePrototype />);
   const dialog = await openStock(user);
-  expect(dialog.querySelector("iframe")).toBeNull();
+  expect(within(dialog).getByTitle("Realty Income delayed share-price chart")).toBeInTheDocument();
   const ranges = within(dialog).getByRole("group", { name: "Price history range" });
   await user.click(within(ranges).getByRole("button", { name: "1 year" }));
-  expect(dialog.querySelector("iframe")).toBeNull();
   const holding = within(dialog).getByRole("complementary", { name: "Your recorded holding" });
   for (const value of ["£2,500.00", "50", "£48.00", "5.40%", "£135.00"]) expect(holding).toHaveTextContent(value);
-  await user.click(within(dialog).getByRole("button", { name: "Load TradingView chart" }));
   const frame = within(dialog).getByTitle("Realty Income delayed share-price chart");
   const url = new URL(frame.getAttribute("src")!);
   const config = JSON.parse(decodeURIComponent(url.hash.slice(1)));
@@ -58,16 +55,15 @@ test("frame navigation never claims current prices; external fallback and dismis
   const fallback = within(dialog).getByRole("link", { name: "Open chart on TradingView" });
   expect(fallback).toHaveAttribute("href", "https://www.tradingview.com/symbols/NYSE-O/");
   expect(fallback).toHaveAttribute("rel", expect.stringContaining("noopener"));
-  await user.click(within(dialog).getByRole("button", { name: "Load TradingView chart" }));
   fireEvent.load(within(dialog).getByTitle("Realty Income delayed share-price chart"));
   expect(within(dialog).getByRole("status")).toHaveTextContent(/frame opened/i);
   expect(within(dialog).getByText("Delayed market data", { exact: true })).toBeVisible();
   fireEvent(dialog, new Event("cancel", { bubbles: false }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: "Explore share price" })).toHaveFocus());
+  await waitFor(() => expect(screen.getByRole("button", { name: /Realty Income.*£2,500/ })).toHaveFocus());
   await user.click(screen.getByRole("button", { name: "Explore share price" }));
   dialog = screen.getByRole("dialog");
-  expect(dialog.querySelector("iframe")).toBeNull();
+  expect(dialog.querySelector("iframe")).not.toBeNull();
   await user.click(within(dialog).getByRole("button", { name: "Back to accounts" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Explore share price" }));

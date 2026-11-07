@@ -45,6 +45,19 @@
 .recordedValue > span { display:block; color:#6f5c50; font-size:12px; }
 .recordedValue > strong { display:block; font-size:35px; letter-spacing:-1.5px; font-weight:600; font-variant-numeric:tabular-nums; margin:7px 0; }
 .recordedValue > small { display:block; color:#6f5c50; font-size:10px; line-height:1.7; }
+.priceForm { border-top:1px solid #deccb5; margin-top:20px; padding-top:20px; }
+.priceForm label { display:block; font-size:12px; font-weight:600; margin-bottom:9px; }
+.priceForm input { width:100%; min-width:0; min-height:48px; box-sizing:border-box; border:1px solid #bfa88e; border-radius:10px; padding:11px 12px; background:#fffcf6; color:#241b16; font:inherit; font-variant-numeric:tabular-nums; }
+.priceForm input:focus-visible { outline:3px solid #a84f2b; outline-offset:3px; }
+.priceForm p { color:#6f5c50; font-size:11px; line-height:1.75; margin:10px 0 15px; }
+.applyPrice { width:100%; min-height:48px; padding:11px 14px; border:1px solid #914425; border-radius:11px; background:linear-gradient(155deg,#ac552e,#914324); color:#fffaf1; font-size:12px; font-weight:700; box-shadow:inset 0 1px 0 #fff4; }
+.applyPrice:disabled { opacity:.65; cursor:wait; }
+.priceForm .valueError { color:#962c24; }
+.valuationBreakdown { border:1px solid #c5d7cc; border-radius:12px; background:#edf2e6; padding:12px; margin-top:16px; }
+.valuationBreakdown p { color:#43584b; font-size:11px; line-height:1.8; margin:0 0 6px; overflow-wrap:anywhere; }
+.valuationBreakdown b,.valuationBreakdown strong { display:block; }
+.valuationBreakdown strong { color:#24543d; font-size:17px; font-variant-numeric:tabular-nums; }
+.valuationBreakdown strong[data-negative="true"] { color:#962c24; }
 .holdingStats { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px 12px; border-top:1px solid #deccb5; margin:22px 0 0; padding-top:22px; }
 .holdingStats dt { color:#6f5c50; font-size:11px; line-height:1.7; }
 .holdingStats dd { margin:7px 0 0; font-size:19px; font-weight:600; letter-spacing:-.4px; font-variant-numeric:tabular-nums; }

@@ -5,6 +5,7 @@ import { AccountPreview, type ExampleAccount } from "./AccountPreview";
 import { Arrow, Brand, FirstAccountPreview, InstallPreview, SignInPreview } from "./WelcomePanels";
 import { sampleCreditCard } from "./credit-card";
 import type { CreditCard } from "./credit-card";
+import type { StockPriceInput } from "./stock-valuation";
 import s from "./welcome.module.css";
 
 type Mode = "signin" | "first" | "accounts";
@@ -20,22 +21,24 @@ export default function WelcomePrototype() {
   const [mode, setMode] = useState<Mode>("signin");
   const [selected, setSelected] = useState<ExampleAccount | null>(null);
   const [creditCard, setCreditCard] = useState<CreditCard>(sampleCreditCard);
+  const [stockPrice, setStockPrice] = useState<StockPriceInput | null>(null);
+  const [stockOpen, setStockOpen] = useState(false);
   const [chooser, setChooser] = useState(false);
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const trigger = useRef<HTMLElement | null>(null);
   const productHeading = useRef<HTMLElement>(null);
-  function navigate(next: Mode) { setMode(next); setSelected(null); setChooser(false); setNotice(""); requestAnimationFrame(() => productHeading.current?.focus()); }
+  function navigate(next: Mode) { setMode(next); setSelected(null); setStockOpen(false); setChooser(false); setNotice(""); requestAnimationFrame(() => productHeading.current?.focus()); }
   function add() { trigger.current = document.activeElement as HTMLElement | null; setChooser(true); }
   function close() { const previous = trigger.current; setChooser(false); requestAnimationFrame(() => previous?.focus()); }
-  function choose(id: ExampleAccount) { setChooser(false); setMode("accounts"); setSelected(id); setNotice(`Showing the ${id === "cash" ? "cash saver" : id === "stock" ? "dividend holding" : "credit card"} example. No account has been added.`); requestAnimationFrame(() => productHeading.current?.focus()); }
-  function reset() { navigate("signin"); setCreditCard(sampleCreditCard()); setRevision(value => value + 1); }
+  function choose(id: ExampleAccount) { setChooser(false); setMode("accounts"); setSelected(id); setStockOpen(id === "stock"); setNotice(`Showing the ${id === "cash" ? "cash saver" : id === "stock" ? "dividend holding" : "credit card"} example. No account has been added.`); if (id !== "stock") requestAnimationFrame(() => productHeading.current?.focus()); }
+  function reset() { navigate("signin"); setCreditCard(sampleCreditCard()); setStockPrice(null); setRevision(value => value + 1); }
   return <div className={s.page}>
     <div className={s.reviewBar}><div><b>First impressions</b><span>Interactive prototype · Sample data only</span></div><div className={s.modePicker} role="group" aria-label="Preview screen">{modes.map(item => <button key={item.id} aria-pressed={mode === item.id} onClick={() => navigate(item.id)}>{item.label}</button>)}</div><button className={s.reset} onClick={reset}>Reset demo</button></div>
     <div className={s.product} key={revision}>
       <header className={s.productHeader}><Brand />{mode !== "signin" ? <button className={s.avatarButton} aria-label="Return to demo sign-in" onClick={() => navigate("signin")}>dg</button> : <span className={s.headerNote}>Your accounts, in one place.</span>}</header>
       <main className={s.main} ref={productHeading} tabIndex={-1}>
-        {mode === "signin" ? <SignInPreview onEnter={() => navigate("accounts")} onNew={() => navigate("first")} /> : mode === "first" ? <FirstAccountPreview onAdd={add} onExample={() => navigate("accounts")} /> : <AccountPreview selected={selected} onSelect={setSelected} onAdd={add} creditCard={creditCard} onCreditChange={card => { setCreditCard(card); setNotice("Credit card figures updated in this demo. No payment was made."); }} />}
+        {mode === "signin" ? <SignInPreview onEnter={() => navigate("accounts")} onNew={() => navigate("first")} /> : mode === "first" ? <FirstAccountPreview onAdd={add} onExample={() => navigate("accounts")} /> : <AccountPreview stockOpen={stockOpen} onStockOpen={setStockOpen} stockPrice={stockPrice} onStockPrice={setStockPrice} selected={selected} onSelect={setSelected} onAdd={add} creditCard={creditCard} onCreditChange={card => { setCreditCard(card); setNotice("Credit card figures updated in this demo. No payment was made."); }} />}
         {mode !== "signin" ? <div className={s.setupWrap}><InstallPreview /></div> : null}
         <p role="status" className={s.notice}>{notice}</p>
       </main>
