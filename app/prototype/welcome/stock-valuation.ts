@@ -1,7 +1,8 @@
 import { convertedHolding, parseFxRate, type FxRate } from "@/lib/exchange-rates";
 import { investmentReturn, validInvestment } from "@/lib/stock-investment";
 
-export const sampleStockHolding = Object.freeze({ shares: 50, averagePriceGBP: 48, recordedValueGBP: 2500, annualIncomeGBP: 135 });
+export type StockHoldingStats = Readonly<{ shares: number; averagePriceGBP: number; recordedValueGBP: number; annualIncomeGBP: number; yieldPct: number }>;
+export const sampleStockHolding: StockHoldingStats = Object.freeze({ shares: 50, averagePriceGBP: 48, recordedValueGBP: 2500, annualIncomeGBP: 135, yieldPct: 5.4 });
 export type StockPriceInput = Readonly<{ priceUSD: string; fx: FxRate }>;
 export type ValuedHolding = Readonly<{ shares: number; averagePriceGBP: number }>;
 

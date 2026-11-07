@@ -65,6 +65,18 @@
       "browser": [
         "e2e/feedback-prototype.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "profile-wallet-prototype",
+      "unit": [
+        "tests/profile-wallet.test.ts"
+      ],
+      "integration": [
+        "tests/profile-wallet.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -416,7 +428,9 @@
         "e2e/credit-prototype.e2e.spec.ts",
         "tests/stock-chart.test.ts",
         "tests/stock-chart.integration.test.tsx",
-        "e2e/stock-chart.e2e.spec.ts"
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     },
     {
@@ -497,7 +511,9 @@
       "tests": [
         "tests/credit-prototype.test.ts",
         "tests/credit-prototype.integration.test.tsx",
-        "e2e/credit-prototype.e2e.spec.ts"
+        "e2e/credit-prototype.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     },
     {
@@ -511,7 +527,9 @@
       "tests": [
         "tests/stock-chart.test.ts",
         "tests/stock-chart.integration.test.tsx",
-        "e2e/stock-chart.e2e.spec.ts"
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     },
     {
@@ -524,7 +542,9 @@
       "tests": [
         "tests/stock-valuation.test.ts",
         "tests/stock-valuation.integration.test.tsx",
-        "e2e/stock-valuation.e2e.spec.ts"
+        "e2e/stock-valuation.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     },
     {
@@ -544,6 +564,19 @@
         "tests/feedback-prototype.integration.test.tsx",
         "e2e/feedback-prototype.e2e.spec.ts",
         "tests/holdings-prototype-route.test.tsx"
+      ]
+    },
+    {
+      "id": "profile-wallet-prototype",
+      "name": "Profile settings entry and independent multiple-account prototype",
+      "sources": [
+        "app/prototype/welcome/ProfilePreview.tsx",
+        "app/prototype/welcome/demo-accounts.ts"
+      ],
+      "tests": [
+        "tests/profile-wallet.test.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     }
   ],
@@ -568,7 +601,8 @@
       "tests/credit-prototype.test.ts",
       "tests/stock-chart.test.ts",
       "tests/stock-valuation.test.ts",
-      "tests/feedback-prototype.test.ts"
+      "tests/feedback-prototype.test.ts",
+      "tests/profile-wallet.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -634,7 +668,8 @@
       "tests/credit-prototype.integration.test.tsx",
       "tests/stock-chart.integration.test.tsx",
       "tests/stock-valuation.integration.test.tsx",
-      "tests/feedback-prototype.integration.test.tsx"
+      "tests/feedback-prototype.integration.test.tsx",
+      "tests/profile-wallet.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -674,7 +709,8 @@
       "e2e/credit-prototype.e2e.spec.ts",
       "e2e/stock-chart.e2e.spec.ts",
       "e2e/stock-valuation.e2e.spec.ts",
-      "e2e/feedback-prototype.e2e.spec.ts"
+      "e2e/feedback-prototype.e2e.spec.ts",
+      "e2e/profile-wallet.e2e.spec.ts"
     ]
   },
   "conditional": [

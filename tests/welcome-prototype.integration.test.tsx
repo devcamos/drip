@@ -53,7 +53,7 @@ test("first use leads with one add action and the cash choice opens matching sam
   expect(screen.getByText(/Showing the cash saver example. No account has been added/)).toBeVisible();
 });
 
-test("dividend example exposes recorded holding statistics and closes the previous card", async () => {
+test("adding a dividend example preserves the original holding, exposes its own statistics and closes the previous card", async () => {
   const user = userEvent.setup();
   render(<WelcomePrototype />);
   await mode(user, "Your accounts");
@@ -61,13 +61,14 @@ test("dividend example exposes recorded holding statistics and closes the previo
   await user.click(cash);
   await user.click(screen.getByRole("button", { name: "Add an example account" }));
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Stocks & funds/ }));
-  expect(screen.getByRole("dialog", { name: "Realty Income share price" }).querySelector("iframe")).not.toBeNull();
+  expect(screen.getByRole("dialog", { name: "Digital Realty share price" }).querySelector("iframe")).not.toBeNull();
   await user.click(screen.getByRole("button", { name: "Back to accounts" }));
   expect(cash).toHaveAttribute("aria-expanded", "false");
-  const stock = screen.getByRole("button", { name: /Realty Income.*£2,500/ });
+  expect(screen.getByRole("button", { name: /Realty Income.*£2,500/ })).toHaveAttribute("aria-expanded", "false");
+  const stock = screen.getByRole("button", { name: /Digital Realty.*£2,000/ });
   expect(stock).toHaveAttribute("aria-expanded", "true");
   const details = within(stock.closest("article")!);
-  for (const text of ["Recorded dividend yield", "Shares", "50", "Average price", "£48.00"]) expect(details.getByText(text)).toBeVisible();
+  for (const text of ["Recorded dividend yield", "Shares", "20", "Average price", "£90.00"]) expect(details.getByText(text)).toBeVisible();
   expect(details.getByText(/No current price applied/)).toBeVisible();
   await user.click(stock);
   expect(stock).toHaveAttribute("aria-expanded", "false");
