@@ -26,7 +26,7 @@ test("an entered price updates the holding, money and net position while preserv
   render(<WelcomePrototype />); await open(user);
   expect(fetcher).not.toHaveBeenCalled();
   price("60"); await user.click(screen.getByRole("button", { name: "Update demo value" }));
-  const calculation = await screen.findByLabelText("Applied price calculation");
+  const calculation = await screen.findByLabelText("Holding performance");
   expect(calculation).toHaveTextContent(`Frankfurter · Rate dated ${fx.date}`);
   expect(calculation).toHaveTextContent("-£150.00 (-6.25%)");
   const holding = screen.getByRole("complementary", { name: "Your recorded holding" });
@@ -59,7 +59,7 @@ test("validation, provider failures, stale FX and cancellation cannot apply a wr
   for (const response of [new Response("offline", { status: 503 }), Response.json({ ...fx, base: "EUR" }), Response.json({ ...fx, date: "2020-01-01" })]) {
     fetcher.mockResolvedValueOnce(response); price("60"); await user.click(screen.getByRole("button", { name: "Update demo value" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("last value is unchanged");
-    expect(screen.queryByLabelText("Applied price calculation")).toBeNull();
+    expect(screen.queryByLabelText("Holding performance")).toBeNull();
   }
   let resolve!: (value: Response) => void;
   fetcher.mockImplementationOnce(() => new Promise<Response>(done => { resolve = done; }));
@@ -67,9 +67,9 @@ test("validation, provider failures, stale FX and cancellation cannot apply a wr
   const signal = fetcher.mock.lastCall![1].signal as AbortSignal;
   price("80"); expect(signal.aborted).toBe(true);
   await act(async () => resolve(Response.json(fx)));
-  expect(screen.queryByLabelText("Applied price calculation")).toBeNull();
+  expect(screen.queryByLabelText("Holding performance")).toBeNull();
   await user.click(screen.getByRole("button", { name: "Update demo value" }));
-  expect(await screen.findByLabelText("Applied price calculation")).toHaveTextContent("£600.00 (25.00%)");
+  expect(await screen.findByLabelText("Holding performance")).toHaveTextContent("£600.00 (25.00%)");
   await user.click(screen.getByRole("button", { name: "Back to accounts" }));
   expect(screen.getByRole("region", { name: "Money overview" })).toHaveTextContent("£8,000.00");
   await user.click(screen.getByRole("button", { name: "Explore share price" }));

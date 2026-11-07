@@ -80,7 +80,7 @@ test("monthly and annual estimates remain separate from received income and date
   await mode(user, "Your accounts");
   const estimate = screen.getByRole("region", { name: "Estimated income" });
   expect(estimate).toHaveTextContent("£28.33");
-  expect(estimate).toHaveTextContent("Annual estimates ÷ 12");
+  expect(estimate).not.toHaveTextContent("÷");
   await user.click(within(estimate).getByRole("button", { name: "Yearly" }));
   expect(estimate).toHaveTextContent("£340.00");
   expect(estimate).toHaveTextContent("Estimated annual income");

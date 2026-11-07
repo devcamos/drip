@@ -1,5 +1,9 @@
 .page { --ink:#241b16; --copper:#a84f2b; --quiet:#6f5c50; --edge:#e6dacb; color:var(--ink); background:radial-gradient(ellipse at 80% 12%,#f4e5d5 0,transparent 48%),#fffaf1; min-height:100svh; padding-bottom:12px; }
 .page button { cursor:pointer; }
+.footer > div { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.feedbackLink { display:inline-flex; align-items:center; min-height:44px; color:#914325; border:0; background:none; padding:7px 0; font:inherit; font-size:11px; text-decoration:underline; text-underline-offset:4px; }
+.reviewActions { display:flex; align-items:center; gap:14px; }
+.reviewActions a { display:inline-flex; align-items:center; min-height:44px; color:#6f5c50; font-size:11px; text-underline-offset:4px; }
 .page button:focus-visible,.page input:focus-visible { outline:3px solid var(--copper); outline-offset:4px; }
 .reviewBar { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px max(20px,calc((100vw - 1160px)/2)); border-bottom:1px solid var(--edge); background:#f8f1e6; font-size:12px; }
 .reviewBar > div:first-child { display:flex; flex-direction:column; gap:3px; }
@@ -26,11 +30,11 @@
 .fan { position:relative; height:275px; width:min(100%,370px); flex:none; }
 .fanOrbit { position:absolute; width:240px; height:240px; border:1px solid #d5b89c; border-radius:50%; left:14%; top:5%; opacity:.45; box-shadow:0 0 0 25px #fffaf166,0 0 0 26px #d5b89c55; }
 .fanBack,.fanMiddle,.fanFront { position:absolute; width:230px; height:143px; border-radius:19px; border:1px solid #fffc; box-shadow:0 20px 28px #55341d20,inset 0 1px 0 #fff9; }
-.fanBack { left:14px; top:59px; transform:rotate(-17deg); background:linear-gradient(145deg,#f0d3bb,#d2b29c); }
-.fanMiddle { left:65px; top:48px; transform:rotate(-5deg); background:linear-gradient(135deg,#8272b0,#574781); }
+.fanBack { left:14px; top:59px; background:linear-gradient(145deg,#f0d3bb,#d2b29c); }
+.fanMiddle { left:65px; top:48px; background:linear-gradient(135deg,#8272b0,#574781); }
 .fanBack > span,.fanMiddle > span { display:block; width:42px; height:11px; margin:22px; border-radius:6px; background:#ffffff45; }
 .fanBack > i,.fanMiddle > i { display:block; width:100px; height:7px; margin:43px 22px; border-radius:5px; background:#ffffff35; }
-.fanFront { left:100px; top:87px; transform:rotate(9deg); background:linear-gradient(140deg,#fffdf6,#f2e3d3); color:#533522; padding:20px; }
+.fanFront { left:100px; top:87px; background:linear-gradient(140deg,#fffdf6,#f2e3d3); color:#533522; padding:20px; }
 .fanDrop { display:block; width:19px; height:24px; color:var(--copper); }
 .fanDrop svg { display:block; width:100%; height:100%; }
 .fanFront b { display:block; margin-top:15px; font-size:15px; letter-spacing:-.4px; }
@@ -119,8 +123,8 @@
 .sectionIntro { color:var(--quiet); font-size:11px; margin:3px 0 15px; }
 .addSmall { border:1px solid #ddcebc; background:#fffaf1; border-radius:50%; min-width:44px; min-height:44px; font-size:24px; font-weight:400; color:var(--copper); }
 .cardStack { padding:0 5px 0 2px; }
-.accountCard { position:relative; color:#fff; border:1px solid #ffffff55; border-radius:20px; box-shadow:0 12px 16px #3d203c20,inset 0 1px 0 #ffffff40; transform:rotate(-.8deg); overflow:hidden; }
-.accountCard + .accountCard { margin-top:-4px; transform:rotate(.65deg); }
+.accountCard { position:relative; color:#fff; border:1px solid #ffffff55; border-radius:20px; box-shadow:0 12px 16px #3d203c20,inset 0 1px 0 #ffffff40; overflow:hidden; }
+.accountCard + .accountCard { margin-top:-4px; }
 .purple { background:radial-gradient(ellipse at 10% 0,#7c65a5 0,transparent 65%),linear-gradient(130deg,#75609f,#48386e); }
 .green { background:radial-gradient(ellipse at 8% 0,#34796a 0,transparent 65%),linear-gradient(130deg,#276b5d,#154a40); }
 .cardTrigger { display:flex; align-items:center; gap:12px; border:0; color:inherit; width:100%; min-height:116px; padding:24px 21px; background:transparent; text-align:left; }
@@ -129,7 +133,7 @@
 .cardTitle small { display:block; font-size:11px; color:#fff; font-weight:400; margin-top:6px; }
 .cardValue { text-align:right; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .cardValue small { display:block; font-size:8px; font-weight:400; color:#fff; margin-top:7px; }
-.cardOpen { transform:rotate(0); z-index:1; }
+.cardOpen { z-index:1; }
 .accountCard.cardOpen + .accountCard { margin-top:12px; }
 .cardDetails { padding:0 22px 18px; }
 .cardDetails[hidden] { display:none; }

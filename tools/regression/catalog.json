@@ -53,6 +53,18 @@
       "browser": [
         "e2e/stock-valuation.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "feedback-prototype",
+      "unit": [
+        "tests/feedback-prototype.test.ts"
+      ],
+      "integration": [
+        "tests/feedback-prototype.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/feedback-prototype.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -514,6 +526,25 @@
         "tests/stock-valuation.integration.test.tsx",
         "e2e/stock-valuation.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "feedback-prototype",
+      "name": "Feedback experience and proposed C4 delivery architecture",
+      "sources": [
+        "app/prototype/feedback/page.tsx",
+        "app/prototype/feedback/FeedbackPrototype.tsx",
+        "app/prototype/feedback/FeedbackArchitecture.tsx",
+        "app/prototype/feedback/FeedbackExperience.tsx",
+        "app/prototype/feedback/FeedbackDialog.tsx",
+        "app/prototype/feedback/feedback-model.ts",
+        "app/prototype/feedback/feedback.module.css"
+      ],
+      "tests": [
+        "tests/feedback-prototype.test.ts",
+        "tests/feedback-prototype.integration.test.tsx",
+        "e2e/feedback-prototype.e2e.spec.ts",
+        "tests/holdings-prototype-route.test.tsx"
+      ]
     }
   ],
   "layers": {
@@ -536,7 +567,8 @@
       "tests/local-test-database.test.ts",
       "tests/credit-prototype.test.ts",
       "tests/stock-chart.test.ts",
-      "tests/stock-valuation.test.ts"
+      "tests/stock-valuation.test.ts",
+      "tests/feedback-prototype.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -601,7 +633,8 @@
       "tests/welcome-prototype.integration.test.tsx",
       "tests/credit-prototype.integration.test.tsx",
       "tests/stock-chart.integration.test.tsx",
-      "tests/stock-valuation.integration.test.tsx"
+      "tests/stock-valuation.integration.test.tsx",
+      "tests/feedback-prototype.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -640,7 +673,8 @@
       "e2e/welcome-prototype.e2e.spec.ts",
       "e2e/credit-prototype.e2e.spec.ts",
       "e2e/stock-chart.e2e.spec.ts",
-      "e2e/stock-valuation.e2e.spec.ts"
+      "e2e/stock-valuation.e2e.spec.ts",
+      "e2e/feedback-prototype.e2e.spec.ts"
     ]
   },
   "conditional": [

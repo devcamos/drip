@@ -19,7 +19,7 @@ test("opening a stock, entering its price and returning to Accounts updates valu
   await expect(holding).toContainText("£2,250.00");
   await expect(holding).toContainText("£48.00");
   await expect(holding).toContainText("£135.00");
-  await expect(dialog.getByLabel("Applied price calculation")).toContainText("-£150.00 (-6.25%)");
+  await expect(dialog.getByLabel("Holding performance")).toContainText("-£150.00 (-6.25%)");
   expect(rates).toHaveLength(1);
   const widths = await dialog.evaluate(el => ({ client: el.clientWidth, scroll: el.scrollWidth }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);

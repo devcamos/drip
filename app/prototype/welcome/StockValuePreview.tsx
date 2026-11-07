@@ -6,8 +6,6 @@ import { formatGBP } from "./CreditCardPreview";
 import { estimateStockValue, sampleStockHolding, validSharePrice, type StockPriceInput } from "./stock-valuation";
 import s from "./stock-price.module.css";
 
-const usd = new Intl.NumberFormat("en-GB", { style: "currency", currency: "USD", maximumFractionDigits: 10 });
-
 export default function StockValuePreview({ input, onUse }: { input: StockPriceInput | null; onUse: (input: StockPriceInput | null) => void }) {
   const priceId = useId();
   const [price, setPrice] = useState(input?.priceUSD ?? "");
@@ -48,8 +46,8 @@ export default function StockValuePreview({ input, onUse }: { input: StockPriceI
       <button className={s.applyPrice} disabled={busy}>{busy ? "Getting daily rate…" : "Update demo value"}</button>
       {error ? <p role="alert" className={s.valueError}>{error}</p> : null}
     </form>
-    {estimate ? <div className={s.valuationBreakdown} aria-label="Applied price calculation"><p>50 shares × {usd.format(estimate.priceUSD)} × {estimate.fx.rate} USD→GBP</p><p>Frankfurter · Rate dated {estimate.fx.date}</p><p><b>Capital return</b><strong data-negative={estimate.capital.amount < 0}>{formatGBP(estimate.capital.amount)}{estimate.capital.percent !== null ? ` (${estimate.capital.percent.toFixed(2)}%)` : ""}</strong></p><button className={s.hideButton} onClick={useRecorded}>Use recorded value</button></div> : null}
+    {estimate ? <div className={s.valuationBreakdown} aria-label="Holding performance"><p>Frankfurter · Rate dated {estimate.fx.date}</p><p><b>Capital return</b><strong data-negative={estimate.capital.amount < 0}>{formatGBP(estimate.capital.amount)}{estimate.capital.percent !== null ? ` (${estimate.capital.percent.toFixed(2)}%)` : ""}</strong></p><button className={s.hideButton} onClick={useRecorded}>Use recorded value</button></div> : null}
     <dl className={s.holdingStats}><div><dt>Shares</dt><dd>50</dd></div><div><dt>Average purchase price</dt><dd>£48.00</dd></div><div><dt>Recorded dividend yield</dt><dd>5.40%</dd></div><div><dt>Estimated annual income</dt><dd>£135.00</dd></div></dl>
-    <p className={s.currencyNote}><b>{estimate ? "Value moves. Income stays separate." : "One share price. Your whole holding."}</b>{estimate ? "The card and money total use this estimate. Your £2,500 recorded balance, purchase cost and dividend income stay unchanged." : "50 shares × a USD share price × the daily GBP exchange rate. Apply a price to try it in the cards and money total."} Daily reference rates can differ from your broker. Changes last only in this demo.</p>
+    <p className={s.currencyNote}>Daily reference rates can differ from your broker. Your recorded {formatGBP(sampleStockHolding.recordedValueGBP)} balance, purchase cost and dividend income stay unchanged. Changes last only in this demo.</p>
   </aside>;
 }
