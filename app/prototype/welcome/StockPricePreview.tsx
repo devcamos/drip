@@ -20,7 +20,7 @@ export default function StockPricePreview({ onClose, priceInput, onPriceChange, 
   function hideChart() { setLoaded(false); setFrameOpened(false); requestAnimationFrame(() => loadTrigger.current?.focus()); }
   return <dialog ref={dialog} className={s.dialog} aria-labelledby="stock-detail-heading" onCancel={onClose}>
     <div className={s.topBar}><button className={s.backButton} onClick={onClose}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h13" /></svg>Back to accounts</button><span>STOCK DETAIL · PROTOTYPE</span><button className={s.closeButton} onClick={onClose} aria-label="Close share price view">×</button></div>
-    <header className={s.heading}><div className={s.stockIdentity}><span className={s.companyMark} aria-hidden="true">{instrument.symbol.split(":")[1]}</span><div><p>{instrument.name.toUpperCase()}</p><h2 id="stock-detail-heading">{instrument.name} <span>share price</span></h2></div></div><span className={s.ticker}>{instrument.symbol} · USD</span></header>
+    <header className={s.heading}><div className={s.stockIdentity}><span className={s.companyMark} aria-hidden="true">{instrument.symbol.split(":")[1][0]}</span><div><p>{instrument.name.toUpperCase()}</p><h2 id="stock-detail-heading">{instrument.name} <span>share price</span></h2></div></div><span className={s.ticker}>{instrument.symbol} · USD</span></header>
     <div className={s.layout}>
       <section className={s.market} aria-label="Market price history">
         <div className={s.marketHeading}><div><p className={s.eyebrow}>MARKET VIEW</p><h3>A view beyond the balance.</h3></div><span className={s.dataLabel}>Delayed market data</span></div>

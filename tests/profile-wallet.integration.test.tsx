@@ -48,13 +48,16 @@ test("multiple holdings and credit cards retain independent charts, prices, stat
   await user.click(screen.getByRole("button", { name: "Add an example account" }));
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Stocks & funds/ }));
   const stock = screen.getByRole("dialog", { name: "Digital Realty share price" });
+  expect(within(stock).getByText("D", { exact: true })).toBeVisible();
   expect(decodeURIComponent(stock.querySelector("iframe")!.src)).toContain("NYSE:DLR");
   expect(within(stock).getByRole("complementary", { name: "Your recorded holding" })).toHaveTextContent("£2,000.00");
   await user.type(within(stock).getByLabelText("Current price per share (USD)"), "100");
   await user.click(within(stock).getByRole("button", { name: "Update demo value" }));
   expect(await screen.findByLabelText("Holding performance")).toHaveTextContent("-£300.00 (-16.67%)");
   await user.click(within(stock).getByRole("button", { name: "Back to accounts" }));
-  expect(screen.getByRole("button", { name: /Digital Realty.*£1,500/ })).toBeVisible();
+  const digitalRealty = screen.getByRole("button", { name: /Digital Realty.*£1,500/ });
+  expect(digitalRealty).toBeVisible();
+  expect(within(digitalRealty).getByText("D", { exact: true })).toBeVisible();
   expect(screen.getByRole("button", { name: /Realty Income.*£2,500/ })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Add an example account" }));
   await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Credit card/ }));
