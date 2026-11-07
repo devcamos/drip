@@ -51,6 +51,10 @@ Debt/valuation copies use encrypted format3; older asset-only copies remain1/2. 
 
 No SQL migration, Production account access, new auth scheme, paid quote API or financial-provider connection is part of this change. Actual phone notification delivery, physical biometric/install behaviour and automatic live quotes are separate verification boundaries. The feedback-service prototype remains a proposed integration; no fake submission confirmation is added to the saved app.
 
+## Transfer regression repair
+
+The original screenshot build remains recorded above. A subsequent review found that a transfer after applying a stock price could discard the recorded income basis. The [repair and regression evidence](../../testing/valuation-transfers.md) explains the correction; the primary feature suite now contains32 unit,8 integration and4 browser cases (approximately73/18/9). This does not relabel the previously completed856-test baseline run as a new run.
+
 ## Next steps
 
 1. Complete the real hosted Preview journeys using a task-owned synthetic user; local regression, screenshots and the actual mainba88e239→candidate update/offline journey have passed.
