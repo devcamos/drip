@@ -19,7 +19,7 @@ The published repair changes the widget selection, its documented settings and a
 ## Verification
 
 - New contract assertions failed against the old helper: four failing cases. All nine focused unit/component cases pass after the repair.
-- The complete regression run passed 783 unique cases with unchanged coverage thresholds. [Executed report](regression-report.md). The new stock feature remains 7 unit/2 integration/1 browser, or 70/20/10.
+- The complete regression run passed 783 unique cases with unchanged coverage thresholds. [Executed report](https://github.com/devcamos/drip/blob/3a42e8539836da4d57c0adc96fe4fa26085ba138/docs/screenshots/first-impression/regression-report.md). The new stock feature remains 7 unit/2 integration/1 browser, or 70/20/10.
 - Actual hosted source `7b9aa66356a0e7d62ecd33e0359fb9963789e082` passed at 390×844 and 1440×1000: real plot, correct identity, zero page exceptions, zero failed requests and no horizontal overflow. HTTPS and denied Web Locks were explicitly checked.
 - Every range was tested against the provider's actual period: 1M **Past month**, 3M **Past quarter**, 1Y **Past year**. The early harness expected the literal phrase “Past 3 months”; observing the real three-month plot corrected that terminology assumption. Exception checks remained intact.
 - Provider preload warnings remain visible in diagnostics. Zero exceptions does not mean a warning-free console, independent quote accuracy or physical-iPhone validation.

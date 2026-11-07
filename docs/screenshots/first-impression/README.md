@@ -4,7 +4,7 @@ Open `/prototype/welcome` on a Preview or local deployment. The route returns 40
 
 Use **Sign in**, **No accounts yet** and **Your accounts** above the product canvas to compare the entry states. The empty state simply means no financial accounts have been added. Try the sample chooser, card expansion, credit-card editor, monthly/yearly estimate and optional Home Screen reminder. **Reset demo** restores the initial sample state. See the [credit-card walkthrough](credit-cards.md).
 
-The sign-in fields are read-only samples. Account and credit-card edits use component state: they do not authenticate, connect financial accounts, change saved records or persist edits. Money, credit-card debt and net position are shown separately; plans and estimates stay distinct from received income. Recorded figures and payment dates are illustrative. The optional [share-price view](stock-prices.md) makes a separate TradingView connection only when requested.
+The sign-in fields are read-only samples. Account and credit-card edits use component state: they do not authenticate, connect financial accounts, change saved records or persist edits. Money, credit-card debt and net position are shown separately; plans and estimates stay distinct from received income. Recorded figures and payment dates are illustrative. Opening a stock card loads the separate [share-price view](stock-prices.md). The [price/value preview](stock-valuation.md) applies a user-entered USD price with dated FX to the sample overview; dividend income stays separate.
 
 ## Screenshots
 
@@ -29,11 +29,11 @@ Main comparisons use 390×844 mobile and 1440×1000 desktop. The prototype was a
 | Statement minimum and planned payment | Capture what the issuer requests and what the user plans independently. Providers can use different minimum formulas. Neither field makes a payment. | [Editable statement](../../../app/prototype/welcome/CreditCardPreview.tsx) |
 | Estimated versus received income | A prediction is useful without claiming a payment has arrived. | [Accounts view](../../../app/prototype/welcome/AccountPreview.tsx) |
 | Optional Home Screen task | Installation is a useful next action, with details available when wanted. It does not guarantee data retention. | [Install state](../../../app/prototype/welcome/WelcomePanels.tsx) |
-| Optional market chart | A free display widget provides price-history context while recorded holdings and income stay independent. An automatic valuation needs a different data contract. | [API comparison and stock view](stock-prices.md) |
+| Stock chart and estimated value | Opening a stock loads its chart. An entered USD price and dated FX change its sample value and totals while preserving recorded cost and dividend cash. Automatic quote import needs a separate feed. | [Price/value walkthrough and verification](stock-valuation.md), [API comparison](stock-prices.md) |
 
 ## Verification
 
-The combined prototype passed the complete `npm run test:regression` on source `7b9aa66`: **783 unique cases** (180 unit, 506 component/storage integration, 33 real Postgres/HTTP and 64 browser). Coverage: **97.54% lines, 92.34% branches, 94.01% functions, 94.55% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [real-provider verification](stock-prices.md#verification).
+The combined prototype passed the complete `npm run test:regression` on source `9c7c2e3`: **794 unique cases** (188 unit, 508 component/storage integration, 33 real Postgres/HTTP and 65 browser). Coverage: **97.54% lines, 92.36% branches, 93.97% functions, 94.60% statements**. Types, dependency boundaries, optimized build and audit passed; existing thresholds remain. See the [executed report](regression-report.md) and separate [current price/value verification](stock-valuation.md#verification).
 
 | Behaviour | Expected and observed | Where / evidence |
 | --- | --- | --- |
@@ -48,6 +48,6 @@ Three inherited historical old-build PWA journeys remain conditional, not passes
 ## Next steps
 
 1. Open `/prototype/welcome` in Preview. Compare **No accounts yet** with **Your accounts**; edit Barclaycard's minimum and plan, then use **Reset demo**.
-2. Try the [stock-price sample](stock-prices.md) from the Realty Income card. The recorded holding and external chart have separate sources and currencies.
+2. Open Realty Income for the chart; enter a current USD price and choose Update demo value. Review the changed card/totals, then Use recorded value. [Walkthrough and remaining automatic-quote setup](stock-valuation.md).
 3. Give feedback on information priority, card depth and payment-plan wording. The screenshot comparison section remains the visual reference.
 4. Apply the agreed design to saved accounts in a later implementation. This prototype does not authorize a Production rollout or change persisted account formats.

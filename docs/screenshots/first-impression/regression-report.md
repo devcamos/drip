@@ -1,4 +1,4 @@
-Source: `7b9aa66356a0e7d62ecd33e0359fb9963789e082`, complete local `npm run test:regression`, 6 November 2026. Optimized app, real disposable Postgres/HTTP and Chromium. Feature rows can reuse cases; only the layer totals represent unique cases. See the separate [real-provider verification](stock-prices.md#verification).
+Source: `9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d`, complete local `npm run test:regression`, 7 November 2026. Optimized app, real disposable Postgres/HTTP and Chromium. Feature rows can reuse cases; only the layer totals represent unique cases. The new valuation suite is 7/2/1 (70/20/10). See the separate [real-provider verification](stock-valuation.md#verification).
 
 # Drip regression report
 
@@ -6,10 +6,10 @@ Counts are executed test cases. Conditional/skipped journeys are unverified, not
 
 | Layer | Passed | Failed | Conditional |
 | --- | ---: | ---: | ---: |
-| unit | 180 | 0 | 0 |
-| integration | 506 | 0 | 0 |
+| unit | 188 | 0 | 0 |
+| integration | 508 | 0 | 0 |
 | postgres | 33 | 0 | 0 |
-| browser | 64 | 0 | 3 |
+| browser | 65 | 0 | 3 |
 
 | Feature | Result | Passed | Conditional |
 | --- | --- | ---: | ---: |
@@ -23,7 +23,7 @@ Counts are executed test cases. Conditional/skipped journeys are unverified, not
 | Balances, topups, withdrawals, rate changes and income arithmetic | PARTIAL | 52 | 1 |
 | Dividend portfolio and received-income totals | PASS | 25 | 0 |
 | Shares, acquisition cost, valuation and yield | PASS | 12 | 0 |
-| Daily FX estimates and bounded upstream API failures | PASS | 16 | 0 |
+| Daily FX estimates and bounded upstream API failures | PASS | 17 | 0 |
 | Trends, forecasts and deposit assumptions | PASS | 29 | 0 |
 | Expected payments, recurrence and reminders | PASS | 40 | 0 |
 | Phone-reminder enrolment, scheduling, limits and dispatch | PASS | 56 | 0 |
@@ -33,7 +33,8 @@ Counts are executed test cases. Conditional/skipped journeys are unverified, not
 | App navigation, identity and screen orchestration | PASS | 45 | 0 |
 | Regression catalog, change evidence and test-control guards | PASS | 23 | 0 |
 | Credit-card debt prototype and statement repayment planning | PASS | 20 | 0 |
-| Optional dividend price-history chart and recorded holding separation | PASS | 10 | 0 |
+| Dividend-card chart auto-loading, ranges and recorded holding separation | PASS | 10 | 0 |
+| User-entered share-price valuation with dated FX and unchanged dividend income | PASS | 10 | 0 |
 
 ## Conditional journeys
 
