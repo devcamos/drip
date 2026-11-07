@@ -1,0 +1,245 @@
+{
+  "origin": "http://127.0.0.1:4323",
+  "sourceCommit": "d79e879aca5eb2096efb91f876640d73b7e6f13d",
+  "buildId": "local-c596b035-9b49-4c09-9786-a6dc4a73676c",
+  "scope": "Actual running Drip UI; synthetic holdings, FX0.75 and feedback. Provider transport is a fixture; no actual market-data or feedback delivery claim.",
+  "errors": [],
+  "environment": "Optimized local build; Chromium; no real intake or provider-data verification in this capture.",
+  "statesChecked": 27,
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    },
+    {
+      "width": 320,
+      "height": 812
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "app/prototype/feedback/FeedbackArchitecture.tsx",
+      "sha256": "05f7592bb60b74ca247e31e2fc00a63324bdaa74f24a3a920011c47b68ccb468"
+    },
+    {
+      "path": "app/prototype/feedback/FeedbackDialog.tsx",
+      "sha256": "89b10d8e213f2f8285b6eb9f47789b5404cc7e49aff57e36d44aac95fb916289"
+    },
+    {
+      "path": "app/prototype/feedback/FeedbackExperience.tsx",
+      "sha256": "9ca727c37beaf9f455a0320809ff6d66b40b509b75d642392237177c31117df2"
+    },
+    {
+      "path": "app/prototype/feedback/FeedbackPrototype.tsx",
+      "sha256": "e61fe1a5884efcbf4b564a2f106c41c30d0d3406c54ef186b83b4e99b76f3a72"
+    },
+    {
+      "path": "app/prototype/feedback/feedback-model.ts",
+      "sha256": "a17c71cec3c47de6db0be4f6d14798069f47c5b02b694c65a16a65533cf950f9"
+    },
+    {
+      "path": "app/prototype/feedback/feedback.module.css",
+      "sha256": "c1fff1cb3e06bcf37ba952297d4e0e7db4f8274b121795c0faaaa8ac51cfe6ed"
+    },
+    {
+      "path": "app/prototype/feedback/page.tsx",
+      "sha256": "e0050859beed53f9c2b52d400793b6ddab75236402ae568267521324cbcae181"
+    },
+    {
+      "path": "app/prototype/welcome/AccountPreview.tsx",
+      "sha256": "e6c616cdba46b8a1d854b3e120875db0a06e01b6150023a11edcd75cf038c724"
+    },
+    {
+      "path": "app/prototype/welcome/CreditCardPreview.tsx",
+      "sha256": "c956678d6f52678ddc925f4615f9ac0c995b77f63853b88ed804680833b9b724"
+    },
+    {
+      "path": "app/prototype/welcome/StockPricePreview.tsx",
+      "sha256": "3811a28e4051bc3d3fc3f2122cbfc5de7e9ea88613d5253e36aa6aa5e7f6f21f"
+    },
+    {
+      "path": "app/prototype/welcome/StockValuePreview.tsx",
+      "sha256": "1189c28c20554e899d3046055e063ab58a7f6809b0ddb38d6cdd7edb20302d9e"
+    },
+    {
+      "path": "app/prototype/welcome/WelcomePanels.tsx",
+      "sha256": "800787afc340c71779722e39a84f3701a50509cd8426304fbabe0d8f9c12108d"
+    },
+    {
+      "path": "app/prototype/welcome/WelcomePrototype.tsx",
+      "sha256": "f45f0f09e32ca48f003fcd77ffdc7cd1180b8542c12541cd98a2330051bed14d"
+    },
+    {
+      "path": "app/prototype/welcome/credit-card.ts",
+      "sha256": "686dc4423496f8c177d8406bd06ea6592609835fd8068157962c90ae1d1ea5ef"
+    },
+    {
+      "path": "app/prototype/welcome/page.tsx",
+      "sha256": "fe5b61bc14acdb6612fa606c1c54384cda5b2c9283c978e480207c7312ac4af6"
+    },
+    {
+      "path": "app/prototype/welcome/stock-chart.ts",
+      "sha256": "9c56f27b94c05eea7d84d5d20a1f83940f68cdecbc22dd354aa1bcb03cbea45d"
+    },
+    {
+      "path": "app/prototype/welcome/stock-price.module.css",
+      "sha256": "cd73f6b2a3ab0e71fa05ed96bf0389ba684dd894f069ae4b0babe32e420b5644"
+    },
+    {
+      "path": "app/prototype/welcome/stock-valuation.ts",
+      "sha256": "cadd2685bae1864b5731deeebbb98ae31989789ed0533d9e11bda67e6d331f0c"
+    },
+    {
+      "path": "app/prototype/welcome/welcome.module.css",
+      "sha256": "aac07006bebb6214807a8165257932c32595434f891c43177fb63a49bcb75c02"
+    }
+  ],
+  "screenshots": [
+    {
+      "state": "accounts",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-accounts-desktop.png"
+    },
+    {
+      "state": "stock-results",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-stock-results-desktop.png"
+    },
+    {
+      "state": "c4-context",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-c4-context-desktop.png"
+    },
+    {
+      "state": "c4-containers",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-c4-containers-desktop.png"
+    },
+    {
+      "state": "feedback-write",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-write-desktop.png"
+    },
+    {
+      "state": "feedback-review",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-review-desktop.png"
+    },
+    {
+      "state": "feedback-receipt",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-receipt-desktop.png"
+    },
+    {
+      "state": "accounts",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-accounts-mobile.png"
+    },
+    {
+      "state": "stock-results",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-stock-results-mobile.png"
+    },
+    {
+      "state": "c4-context",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-c4-context-mobile.png"
+    },
+    {
+      "state": "c4-containers",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-c4-containers-mobile.png"
+    },
+    {
+      "state": "feedback-write",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-write-mobile.png"
+    },
+    {
+      "state": "feedback-review",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-review-mobile.png"
+    },
+    {
+      "state": "feedback-receipt",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "feedback-feedback-receipt-mobile.png"
+    }
+  ],
+  "financialCardsUpright": true,
+  "feedbackApiWriteCount": 0
+}

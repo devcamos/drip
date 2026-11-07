@@ -17,6 +17,66 @@
       "browser": [
         "e2e/payment-calendar.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "credit-prototype",
+      "unit": [
+        "tests/credit-prototype.test.ts"
+      ],
+      "integration": [
+        "tests/credit-prototype.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/credit-prototype.e2e.spec.ts"
+      ]
+    },
+    {
+      "featureId": "stock-chart-prototype",
+      "unit": [
+        "tests/stock-chart.test.ts"
+      ],
+      "integration": [
+        "tests/stock-chart.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/stock-chart.e2e.spec.ts"
+      ]
+    },
+    {
+      "featureId": "stock-valuation-prototype",
+      "unit": [
+        "tests/stock-valuation.test.ts"
+      ],
+      "integration": [
+        "tests/stock-valuation.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/stock-valuation.e2e.spec.ts"
+      ]
+    },
+    {
+      "featureId": "feedback-prototype",
+      "unit": [
+        "tests/feedback-prototype.test.ts"
+      ],
+      "integration": [
+        "tests/feedback-prototype.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/feedback-prototype.e2e.spec.ts"
+      ]
+    },
+    {
+      "featureId": "profile-wallet-prototype",
+      "unit": [
+        "tests/profile-wallet.test.ts"
+      ],
+      "integration": [
+        "tests/profile-wallet.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -345,17 +405,32 @@
     },
     {
       "id": "prototype",
-      "name": "Holdings-card prototype and preview-only route",
+      "name": "Design prototypes and Preview-only routes",
       "sources": [
         "app/prototype/HoldingsPrototype.tsx",
         "app/prototype/holdings.ts",
         "app/prototype/page.tsx",
-        "app/prototype/prototype.module.css"
+        "app/prototype/prototype.module.css",
+        "app/prototype/welcome/AccountPreview.tsx",
+        "app/prototype/welcome/WelcomePanels.tsx",
+        "app/prototype/welcome/WelcomePrototype.tsx",
+        "app/prototype/welcome/page.tsx",
+        "app/prototype/welcome/welcome.module.css"
       ],
       "tests": [
         "tests/holdings-prototype.test.tsx",
         "tests/holdings-prototype-route.test.tsx",
-        "e2e/holdings-prototype.spec.ts"
+        "e2e/holdings-prototype.spec.ts",
+        "tests/welcome-prototype.integration.test.tsx",
+        "e2e/welcome-prototype.e2e.spec.ts",
+        "tests/credit-prototype.test.ts",
+        "tests/credit-prototype.integration.test.tsx",
+        "e2e/credit-prototype.e2e.spec.ts",
+        "tests/stock-chart.test.ts",
+        "tests/stock-chart.integration.test.tsx",
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
       ]
     },
     {
@@ -425,6 +500,84 @@
       "tests": [
         "tests/regression-policy.test.ts"
       ]
+    },
+    {
+      "id": "credit-prototype",
+      "name": "Credit-card debt prototype and statement repayment planning",
+      "sources": [
+        "app/prototype/welcome/CreditCardPreview.tsx",
+        "app/prototype/welcome/credit-card.ts"
+      ],
+      "tests": [
+        "tests/credit-prototype.test.ts",
+        "tests/credit-prototype.integration.test.tsx",
+        "e2e/credit-prototype.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "stock-chart-prototype",
+      "name": "Dividend-card chart auto-loading, ranges and recorded holding separation",
+      "sources": [
+        "app/prototype/welcome/StockPricePreview.tsx",
+        "app/prototype/welcome/stock-chart.ts",
+        "app/prototype/welcome/stock-price.module.css"
+      ],
+      "tests": [
+        "tests/stock-chart.test.ts",
+        "tests/stock-chart.integration.test.tsx",
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "stock-valuation-prototype",
+      "name": "User-entered share-price valuation with dated FX and unchanged dividend income",
+      "sources": [
+        "app/prototype/welcome/StockValuePreview.tsx",
+        "app/prototype/welcome/stock-valuation.ts"
+      ],
+      "tests": [
+        "tests/stock-valuation.test.ts",
+        "tests/stock-valuation.integration.test.tsx",
+        "e2e/stock-valuation.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "feedback-prototype",
+      "name": "Feedback experience and proposed C4 delivery architecture",
+      "sources": [
+        "app/prototype/feedback/page.tsx",
+        "app/prototype/feedback/FeedbackPrototype.tsx",
+        "app/prototype/feedback/FeedbackArchitecture.tsx",
+        "app/prototype/feedback/FeedbackExperience.tsx",
+        "app/prototype/feedback/FeedbackDialog.tsx",
+        "app/prototype/feedback/feedback-model.ts",
+        "app/prototype/feedback/feedback.module.css"
+      ],
+      "tests": [
+        "tests/feedback-prototype.test.ts",
+        "tests/feedback-prototype.integration.test.tsx",
+        "e2e/feedback-prototype.e2e.spec.ts",
+        "tests/holdings-prototype-route.test.tsx"
+      ]
+    },
+    {
+      "id": "profile-wallet-prototype",
+      "name": "Profile settings entry and independent multiple-account prototype",
+      "sources": [
+        "app/prototype/welcome/ProfilePreview.tsx",
+        "app/prototype/welcome/demo-accounts.ts"
+      ],
+      "tests": [
+        "tests/profile-wallet.test.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
     }
   ],
   "layers": {
@@ -444,7 +597,12 @@
       "tests/recovery-api.test.ts",
       "tests/regression-policy.test.ts",
       "tests/topup.test.ts",
-      "tests/local-test-database.test.ts"
+      "tests/local-test-database.test.ts",
+      "tests/credit-prototype.test.ts",
+      "tests/stock-chart.test.ts",
+      "tests/stock-valuation.test.ts",
+      "tests/feedback-prototype.test.ts",
+      "tests/profile-wallet.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -505,7 +663,13 @@
       "tests/ui.test.tsx",
       "tests/upload-ack.test.ts",
       "tests/vault-ui.test.tsx",
-      "tests/worker-safety.test.ts"
+      "tests/worker-safety.test.ts",
+      "tests/welcome-prototype.integration.test.tsx",
+      "tests/credit-prototype.integration.test.tsx",
+      "tests/stock-chart.integration.test.tsx",
+      "tests/stock-valuation.integration.test.tsx",
+      "tests/feedback-prototype.integration.test.tsx",
+      "tests/profile-wallet.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -540,7 +704,13 @@
       "e2e/signin-update.spec.ts",
       "e2e/signup-errors.spec.ts",
       "e2e/smoke.spec.ts",
-      "e2e/stock-investment.spec.ts"
+      "e2e/stock-investment.spec.ts",
+      "e2e/welcome-prototype.e2e.spec.ts",
+      "e2e/credit-prototype.e2e.spec.ts",
+      "e2e/stock-chart.e2e.spec.ts",
+      "e2e/stock-valuation.e2e.spec.ts",
+      "e2e/feedback-prototype.e2e.spec.ts",
+      "e2e/profile-wallet.e2e.spec.ts"
     ]
   },
   "conditional": [

@@ -31,7 +31,17 @@ it("converts fractional shares in the correct direction without changing acquisi
 it("fetches only the fixed public pair with bounded time and no credentials or unvalidated-response caching", async () => {
   const fetcher = vi.fn(async () => Response.json([row]));
   expect(await fetchExchangeRate("USD", fetcher, now)).toEqual(quote);
-  expect(fetcher).toHaveBeenCalledWith("https://api.frankfurter.dev/v2/rates?base=USD&quotes=GBP", expect.objectContaining({ credentials: "omit", redirect: "error", headers: { Accept: "application/json" }, cache: "no-store", signal: expect.any(AbortSignal) }));
+  expect(fetcher).toHaveBeenCalledWith("https://api.frankfurter.dev/v2/rates?base=USD&quotes=GBP&date=2026-10-31", expect.objectContaining({ credentials: "omit", redirect: "error", headers: { Accept: "application/json" }, cache: "no-store", signal: expect.any(AbortSignal) }));
+});
+
+it("uses a dated lookup so next-day publishers cannot make a valid conversion unavailable", async () => {
+  const fetcher = vi.fn(async (url: string | URL | Request) => {
+    const bounded = new URL(String(url)).searchParams.get("date") === "2026-10-31";
+    return Response.json([{ ...row, date: bounded ? "2026-10-30" : "2026-11-01" }]);
+  });
+  // The consumer's UTC day bounds the lookup; a genuine prior publication keeps its own date.
+  expect(await fetchExchangeRate("USD", fetcher, now)).toEqual(quote);
+  expect(parseFxRate({ ...row, date: "2026-11-01" }, "USD", now)).toBeNull();
 });
 
 it.each([503, 429, 302])("rejects upstream status %s instead of manufacturing a rate", async status => {
