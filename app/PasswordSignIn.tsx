@@ -28,7 +28,7 @@ export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, sho
   }}>
     {showTitle && <h2>Sign in</h2>}
     <label htmlFor="login-tag">Gamertag</label>
-    <input id="login-tag" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} aria-describedby="login-hint" value={username} onChange={event => { edited.current = true; setUsername(event.target.value); setSwitchRequest(undefined); setDeviceLimit(false); setMessage(""); }} disabled={busy || disabled} />
+    <input id="login-tag" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} aria-describedby="login-hint" value={username} onFocus={() => { edited.current = true; }} onChange={event => { edited.current = true; setUsername(event.target.value); setSwitchRequest(undefined); setDeviceLimit(false); setMessage(""); }} disabled={busy || disabled} />
     <p id="login-hint" className="muted">Use your full gamertag, including any numbers.</p>
     <label htmlFor="login-password">Password</label>
     <input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={event => { setPassword(event.target.value); setDeviceLimit(false); setMessage(""); }} disabled={busy || disabled} />

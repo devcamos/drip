@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 const actions = vi.hoisted(() => ({ passwordUsername: vi.fn(), signInPassword: vi.fn(), setLoginPassword: vi.fn(), passwordRecoveryRoot: vi.fn() }));
 const passkeys = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), passkeyRecoveryRoot: vi.fn() }));
 vi.mock("../lib/password-login", () => actions);
@@ -22,6 +22,22 @@ it("does not replace a typed or autofilled gamertag with a late saved-account lo
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   await waitFor(() => expect(actions.signInPassword).toHaveBeenCalledWith("rampage201", "Synthetic password 42!", false, undefined));
 });
+it("keeps a focused gamertag stable when the saved lookup finishes before the first input event", async () => {
+  let finishLookup!: (name: string) => void;
+  actions.passwordUsername.mockReturnValueOnce(new Promise(resolve => { finishLookup = resolve; }));
+  render(<PasswordSignIn onSignedIn={vi.fn()} />);
+  const name = screen.getByLabelText("Gamertag");
+  // Browser focus and selection precede insertion. A late prefill here can
+  // move the selection and make the intended gamertag append to the saved one.
+  fireEvent.focus(name);
+  await act(async () => { finishLookup("tester"); });
+  expect(name).toHaveValue("");
+  fireEvent.change(name, { target: { value: "rampage201" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(actions.signInPassword).toHaveBeenCalledWith("rampage201", "Synthetic password 42!", false, undefined));
+});
+
 it("offers ordinary password-manager-compatible sign-in and keeps failed credentials for retry", async () => {
   actions.signInPassword.mockRejectedValueOnce(new Error("Gamertag or password is incorrect."));
   const done = vi.fn(); render(<PasswordSignIn onSignedIn={done} />);
