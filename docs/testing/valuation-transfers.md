@@ -16,6 +16,12 @@ adjusting the recorded basis by the cash amount. An explicit provider-balance
 replacement still establishes a new baseline. The UI explains when transfers
 are included in the saved price estimate; calculations stay inside the app.
 
+Withdrawing the whole remaining holding clears the income basis, including when
+the price estimate is below the recorded balance. An emptied holding forecasts
+zero income and restoring its recorded value cannot recreate a balance. A later
+deposit establishes only its own new basis. Partial withdrawals retain the
+recorded-basis adjustment shown above.
+
 Validation reconciles the quote with cash entries saved after its matching
 balance event. Saved order handles backdated dates. An older valid estimate
 without that anchor gets an anchor on its first transfer. Invalid dates,
@@ -39,9 +45,12 @@ The existing encrypted format and database version are unchanged.
 Focused local verification:48 unit cases,13 integration cases and4 browser
 journeys passed before the additional defensive unit case. The final focused
 valuation coverage check includes that case. The primary feature suite has
-32 unit,8 integration and4 browser cases (approximately73/18/9). Full current-head
-CI, coverage and hosted status are recorded in the PR; the earlier856-test
-release baseline is separate evidence, not a new run of this repair.
+33 unit,8 integration and4 browser cases (approximately73/18/9). Full current-head
+CI, coverage and hosted status are recorded in the PR. The first repair revision
+passed860 full-CI cases; a subsequent review found the full-withdrawal edge case.
+Its added regression fails on that revision and passes after the correction;
+real encrypted storage/backup/cloud roundtrip also covers the emptied holding.
+Earlier release and repair test totals remain separate evidence.
 
 ## Release boundary
 

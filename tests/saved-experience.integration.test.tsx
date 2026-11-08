@@ -43,6 +43,10 @@ it("round-trips multiple real encrypted debts and valued holdings while preservi
   accounts[1] = applyWithdraw(accounts[1], 100, "2026-11-07");
   expect(accounts[1].marketValuation?.recordedBalance).toBe(2400);
   expect(accounts[1].marketValuation?.priceUSD).toBe(100);
+  const losing = applyMarketValuation(accounts[2], { priceUSD: 100, fxRate: 0.75, fxDate: "2026-11-06" }, at);
+  accounts[2] = applyWithdraw(losing, losing.balance, "2026-11-07");
+  expect(accounts[2].balance).toBe(0);
+  expect(accounts[2].marketValuation?.recordedBalance).toBe(0);
   const data = releaseData(accounts); await seedVault(data);
   const stored = await rawStore();
   expect(stored.data.app).toBe("drip-local-data");

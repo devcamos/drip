@@ -196,6 +196,21 @@ test("transfers adjust a valued holding's recorded income basis while preserving
   }
 });
 
+test("withdrawing an entire valued holding clears income and cannot restore a phantom recorded balance", () => {
+  for (const priceUSD of [40, 100]) {
+    const valued = applyMarketValuation(releaseStock(), { ...price, priceUSD }, at);
+    const emptied = M.applyWithdraw(valued, valued.balance, "2026-11-07");
+    expect(emptied.balance).toBe(0);
+    expect(emptied.marketValuation?.recordedBalance).toBe(0);
+    expect(portfolioTotals([emptied]).annualIncome).toBe(0);
+    expect(validMarketValuation(emptied.marketValuation, emptied)).toBe(true);
+    expect(clearMarketValuation(emptied, at).balance).toBe(0);
+    const laterDeposit = M.applyTopUp(emptied, 50, "2026-11-08");
+    expect(incomeBalance(laterDeposit)).toBe(50);
+    expect(portfolioTotals([laterDeposit]).annualIncome).toBe(2.7);
+  }
+});
+
 test("valued transfers handle backdated events, revaluation, clear and provider resets without changing cost or payouts", () => {
   const source = releaseStock(), valued = applyMarketValuation(source, price, at);
   const moved = M.applyTopUp(M.applyWithdraw(valued, 100, "2026-11-06"), 25, "2026-11-05");

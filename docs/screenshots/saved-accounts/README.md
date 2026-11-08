@@ -53,7 +53,7 @@ No SQL migration, Production account access, new auth scheme, paid quote API or 
 
 ## Transfer regression repair
 
-The original screenshot build remains recorded above. A subsequent review found that a transfer after applying a stock price could discard the recorded income basis. The [repair and regression evidence](../../testing/valuation-transfers.md) explains the correction; the primary feature suite now contains32 unit,8 integration and4 browser cases (approximately73/18/9). This does not relabel the previously completed856-test baseline run as a new run.
+The original screenshot build remains recorded above. A subsequent review found that a transfer after applying a stock price could discard the recorded income basis. The [repair and regression evidence](../../testing/valuation-transfers.md) explains the correction, including clearing income when a holding is fully withdrawn; the primary feature suite now contains33 unit,8 integration and4 browser cases (approximately73/18/9). This does not relabel the previously completed856-test baseline run as a new run.
 
 ## Next steps
 

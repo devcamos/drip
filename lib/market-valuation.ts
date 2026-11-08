@@ -36,7 +36,7 @@ export function applyValuationTransfer<T extends ValuedAccount>(account: T, type
   if (!value || !converted || !nonNegativeMoney(amount) || !calendarDay(date)) throw new Error("Could not record this holding transfer. Your saved figures are unchanged.");
   const change = roundMoney(amount) * (type === "topup" ? 1 : -1);
   const balance = roundMoney(account.balance + change);
-  const recordedBalance = roundMoney(Math.max(0, value.recordedBalance + change));
+  const recordedBalance = balance === 0 ? 0 : roundMoney(Math.max(0, value.recordedBalance + change));
   if (!nonNegativeMoney(recordedBalance) || !nonNegativeMoney(balance)) throw new Error("This transfer exceeds the supported holding value.");
   const quote = roundMoney(converted.valueGBP), events = account.events ?? [];
   const history: BalanceEvent[] = anchor(events, value, quote) >= 0 ? events : [...events, { type: "set", date: value.appliedAt.slice(0, 10), amount: quote }];
