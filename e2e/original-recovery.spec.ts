@@ -1,3 +1,4 @@
+import { signOutFromProfile } from "./saved-navigation";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -76,7 +77,7 @@ test(`signup saves original codes by ${method} without another password and resu
   if (method === "offline-return" || method === "initial-offline-return") {
     if (method === "offline-return") {
       page.on("dialog", dialog => dialog.accept());
-      await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      await signOutFromProfile(page);
       await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
       await expect.poll(() => cloudSignedIn).toBe(false);
     } else {
@@ -135,7 +136,7 @@ test(`signup saves original codes by ${method} without another password and resu
   await page.getByRole("checkbox", { name: /I’ve saved a screenshot/ }).check();
   if (method === "download") await capture(page, "saved-copy-confirmed");
   await page.getByRole("button", { name: "Continue to Accounts" }).click();
-  await expect(page.getByText("No accounts yet")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
   await expect(page.getByTestId("header-tag")).toContainText("original_demo");
   if (method === "download") await capture(page, "accounts-after-save");
   if (!original) expect(downloads).toBe(0);

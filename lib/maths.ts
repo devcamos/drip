@@ -1,4 +1,7 @@
 import { validDate } from "./products";
+import { accountAssets, isCreditAccount } from "./credit-card";
+import { applyValuationTransfer, incomeBalance } from "./market-valuation";
+export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -10,25 +13,32 @@ export function monthlyIncome(balance: number, ratePct: number): number {
 }
 
 const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
+type Categorised = Partial<Pick<Account, "productCategory">>;
+type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation">>;
+
+/** Price movements do not rewrite the provider balance used to estimate cash income. */
+export function accountMonthlyIncome(account: IncomeAccount): number {
+  return isCreditAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct);
+}
 
 /** Amount paid at each payout for the account's frequency. */
-export function payoutAmount(a: Pick<Account, "balance" | "ratePct" | "frequency">): number {
-  return (monthlyIncome(a.balance, a.ratePct) * 12) / PER_YEAR[a.frequency];
+export function payoutAmount(a: IncomeAccount & Pick<Account, "frequency">): number {
+  return (accountMonthlyIncome(a) * 12) / PER_YEAR[a.frequency];
 }
 
-export function totalBalance(accts: Pick<Account, "balance">[]): number {
-  return accts.reduce((s, a) => s + (a.balance > 0 ? a.balance : 0), 0);
+export function totalBalance(accts: (Pick<Account, "balance"> & Categorised)[]): number {
+  return accountAssets(accts).reduce((s, a) => s + (a.balance > 0 ? a.balance : 0), 0);
 }
 
-export function totalMonthlyIncome(accts: Pick<Account, "balance" | "ratePct">[]): number {
-  return accts.reduce((s, a) => s + monthlyIncome(a.balance, a.ratePct), 0);
+export function totalMonthlyIncome(accts: IncomeAccount[]): number {
+  return accts.reduce((s, a) => s + accountMonthlyIncome(a), 0);
 }
 
-/** Σ(balance × rate) ÷ Σ balance, as a %. */
-export function weightedYield(accts: Pick<Account, "balance" | "ratePct">[]): number {
+/** Expected annual cash income relative to current asset values; never includes APR. */
+export function weightedYield(accts: IncomeAccount[]): number {
   const total = totalBalance(accts);
   if (total === 0) return 0;
-  const w = accts.reduce((s, a) => s + (a.balance > 0 ? a.balance * Math.max(a.ratePct, 0) : 0), 0);
+  const w = accountAssets(accts).reduce((s, a) => s + Math.max(incomeBalance(a), 0) * Math.max(a.ratePct, 0), 0);
   return w / total;
 }
 
@@ -49,24 +59,25 @@ export function momGrowth(snaps: Snapshot[]): number | null {
   return ((cur.totalBalance - prev.totalBalance) / prev.totalBalance) * 100;
 }
 
-type ForecastAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
+type ForecastAccount = IncomeAccount & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
 /** Monthly forecast only: never writes estimates into saved accounts or recorded income. */
 export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = ymd(new Date())) {
   const total = totalBalance(accts);
-  const holdings = accts.map(a => ({ account: a, balance: Math.max(a.balance, 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
+  const holdings = accountAssets(accts).map(a => ({ account: a, balance: Math.max(a.balance, 0), incomeBasis: Math.max(incomeBalance(a), 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
   const out: { month: number; balance: number; income: number }[] = [];
   let cash = 0, income = 0;
   for (let month = 1; month <= months; month++) {
     const end = addMonths(today, month);
     for (const holding of holdings) {
       const a = holding.account;
-      let earned = monthlyIncome(holding.balance, a.ratePct);
+      let earned = monthlyIncome(holding.incomeBasis, a.ratePct);
       if (a.bonus && !holding.bonusApplied && a.bonus.expectedDate >= today && a.bonus.expectedDate <= end) {
         earned += a.bonus.amount; holding.bonusApplied = true;
       }
       income += earned;
-      if (a.reinvestIncome ?? a.rateType !== "dividend") holding.balance += earned;
-      holding.balance += monthlyDeposit * holding.share;
+      if (a.reinvestIncome ?? a.rateType !== "dividend") { holding.balance += earned; holding.incomeBasis += earned; }
+      const deposit = monthlyDeposit * holding.share;
+      holding.balance += deposit; holding.incomeBasis += deposit;
     }
     if (total === 0) cash += monthlyDeposit;
     out.push({ month, balance: holdings.reduce((sum, h) => sum + h.balance, cash), income });
@@ -75,16 +86,17 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
 }
 
 /** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
-export function recordedIncome(accts: Pick<Account, "payouts">[], month?: string, asOf = ymd(new Date())): number {
-  return accts.reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
+export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = ymd(new Date())): number {
+  return accountAssets(accts).reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
 }
 
-export function pendingBonuses(accts: Pick<Account, "bonus">[]): number {
-  return accts.reduce((sum, a) => sum + (a.bonus?.amount ?? 0), 0);
+export function pendingBonuses(accts: (Pick<Account, "bonus"> & Categorised)[]): number {
+  return accountAssets(accts).reduce((sum, a) => sum + (a.bonus?.amount ?? 0), 0);
 }
 
 /** Recording a payment does not assume it is missing from the user's confirmed balance. */
 export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType): Account {
+  if (isCreditAccount(a)) throw new Error("Credit-card payments are not income. Update the amount owed from your statement.");
   if (!Number.isFinite(amount) || round2(amount) <= 0) throw new Error("Income must be at least £0.01.");
   if (!validDate(date)) throw new Error("Enter a valid payment date.");
   const payout: Payout = { date, amount: round2(amount), kind: "actual", incomeType };
@@ -118,7 +130,7 @@ export function upcoming(accts: Account[], today: string, days = 31) {
   const [y, m, d] = today.split("-").map(Number);
   const end = ymd(new Date(Date.UTC(y, m - 1, d + days)));
   return accts
-    .filter((a) => a.frequency !== "daily")
+    .filter((a) => !isCreditAccount(a) && a.frequency !== "daily")
     .map((a) => ({ account: a, date: nextPayout(a.nextPayoutDate, a.frequency, today), amount: payoutAmount(a) }))
     .filter((p) => p.date <= end)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -189,7 +201,11 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
 function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
-  return { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+  const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
+  if (priced.marketValuation && (type === "topup" || type === "withdraw")) return applyValuationTransfer(priced, type, date, amount);
+  const updated = { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+  if ("marketValuation" in updated) { const { marketValuation: _valuation, ...recorded } = updated; return recorded as A; }
+  return updated;
 }
 
 /** Apply a top-up: adds to balance and logs the event. */
@@ -221,7 +237,7 @@ export function migrateRates<A extends Pick<Account, "ratePct" | "rateHistory" |
 }
 
 export function migrateData(d: AppData, today: string): AppData {
-  return { ...d, accounts: d.accounts.map((a) => { const m = migrateRates(a); return { ...m, events: m.events ?? [], ratePct: rateOn(m.rateHistory!, today) }; }) };
+  return { ...d, accounts: d.accounts.map((a) => { if (isCreditAccount(a)) return a; const m = migrateRates(a); return { ...m, events: m.events ?? [], ratePct: rateOn(m.rateHistory!, today) }; }) };
 }
 
 /** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. */
@@ -231,10 +247,10 @@ export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a
 }
 
 /** Sum of top-ups across accounts in a YYYY-MM month. */
-export function depositsInMonth(accts: Pick<Account, "events">[], month: string, type: "topup" | "withdraw" = "topup"): number {
-  return accts.reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === type && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
+export function depositsInMonth(accts: (Pick<Account, "events"> & Categorised)[], month: string, type: "topup" | "withdraw" = "topup"): number {
+  return accountAssets(accts).reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === type && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
 }
-export const withdrawalsInMonth = (accts: Pick<Account, "events">[], month: string) => depositsInMonth(accts, month, "withdraw");
+export const withdrawalsInMonth = (accts: (Pick<Account, "events"> & Categorised)[], month: string) => depositsInMonth(accts, month, "withdraw");
 
 /** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */
 export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: number; withdrawals: number; growth: number; growthPct: number } | null {

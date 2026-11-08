@@ -1,3 +1,4 @@
+import { addCashAccount, signOutFromProfile } from "./saved-navigation";
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { withAuthRetry, finishSignupRecovery, expectCloudSessionEnded, installLocalCloudFixture } from "./auth-helpers";
@@ -51,7 +52,7 @@ test("four browsers restore the same account; a fifth is blocked; account switch
   const second = await browser.newContext(), third = await browser.newContext(), fourth = await browser.newContext(), fifth = await browser.newContext(), target = await browser.newContext();
   try {
     await signup(page, name);
-    await page.getByRole("button", { name: "Add account", exact: true }).click();
+    await addCashAccount(page);
     await page.getByLabel("Balance", { exact: true }).fill("3000"); await page.getByLabel("Rate", { exact: true }).fill("4");
     await page.getByRole("button", { name: "Save", exact: true }).click(); await synced(page);
     const b = await second.newPage(); await b.goto("http://localhost:4321/");
@@ -72,7 +73,7 @@ test("four browsers restore the same account; a fifth is blocked; account switch
     await b.reload(); await login(b, name, b.getByTestId("header-tag"));
     expect(await (await page.request.get("http://localhost:4321/api/auth/get-session")).json()).not.toBeNull();
     page.on("dialog", dialog => dialog.accept());
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await signOutFromProfile(page);
     await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
     await expectCloudSessionEnded(page);
     await login(c, name, c.getByTestId("header-tag"));
@@ -93,12 +94,12 @@ test("four browsers restore the same account; a fifth is blocked; account switch
 
     // An offline top-up cannot be replaced by another account's cloud copy.
     await second.setOffline(true);
-    await b.getByRole("button", { name: /Zopa/ }).click();
+    await b.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ }).click();
     await b.getByRole("button", { name: "Top up", exact: true }).click();
     await b.getByLabel("amount", { exact: true }).fill("200");
     await b.getByRole("button", { name: "Save", exact: true }).click();
     await expect(b.locator(".bal")).toHaveText("£3,200.00");
-    b.on("dialog", dialog => dialog.accept()); await b.getByRole("button", { name: "Sign out", exact: true }).click();
+    b.on("dialog", dialog => dialog.accept()); await signOutFromProfile(b);
     await expect(b.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible();
     await second.setOffline(false);
     // Require signedOut AND the persisted remote acknowledgement. Checking

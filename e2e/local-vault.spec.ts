@@ -1,3 +1,4 @@
+import { signOutFromProfile } from "./saved-navigation";
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock } from "./vault-helpers";
@@ -52,7 +53,7 @@ test("legacy accounts migrate only with their code and reopen encrypted offline"
 test("encrypted local accounts never persist usable keys and sign-out retains only encrypted records", async ({ page }) => {
   const code = await legacyAccount(page, "vaulttester");
   expect((await storage(page)).hasKey).toBe(false);
-  page.on("dialog", d => d.accept()); await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  page.on("dialog", d => d.accept()); await signOutFromProfile(page);
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   const raw = await storage(page); expect(raw.data.app).toBe("drip-local-data"); expect(raw.hasKey).toBe(false);
   expect(JSON.stringify(raw)).not.toContain("vaulttester");

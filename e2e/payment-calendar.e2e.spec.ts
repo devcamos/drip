@@ -1,3 +1,4 @@
+import { showAccountDetails } from "./saved-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
@@ -58,6 +59,7 @@ test("an existing user views upcoming cash/dividend payments and opens the match
   await expect(following.getByRole("button", { name: "Open Zopa for 2026-12-15", exact: true })).toBeVisible();
   await capture(page, "monthly-calendar");
   await first.getByRole("button", { name: "Open Realty Income for 2026-11-15", exact: true }).click();
+  await showAccountDetails(page);
   await expect(page.getByRole("region", { name: "Your investment", exact: true })).toContainText("£1,200.00");
   await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();
   await expect(page.getByTestId("dividend-income-total")).toHaveText("£12.50");

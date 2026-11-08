@@ -9,6 +9,7 @@ import { saveData, setItem, loadData, emptyData } from "@/lib/db";
 import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
 import type { AppData, Account } from "@/lib/types";
+import { releaseDebt } from "./saved-experience-fixtures";
 
 const signup = vi.hoisted(() => vi.fn());
 vi.mock("../lib/password-login", async importOriginal => ({ ...await importOriginal<typeof import("../lib/password-login")>(), signUpPassword: signup }));
@@ -16,7 +17,7 @@ const signupPassword = "Green meadow 42!";
 const today = new Date().toISOString().slice(0, 10);
 const type = (el: HTMLElement, v: string) => fireEvent.change(el, { target: { value: v } });
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole("button", { name }));
-const tab = (name: string) => fireEvent.click(within(screen.getByRole("navigation")).getByRole("button", { name }));
+const tab = (name: string) => { fireEvent.click(within(screen.getByRole("navigation")).getByRole("button", { name })); if (name === "Add") click(/Cash savings/); };
 
 function acct(o: Partial<Account> = {}): Account {
   return { id: "a1", provider: "Zopa", label: "Rainy day pot", balance: 3000, ratePct: 7, rateType: "interest", frequency: "monthly",
@@ -65,7 +66,7 @@ describe("onboarding", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/already used/);
     expect(screen.queryByTestId("header-tag")).toBeNull(); expect(screen.queryByTestId("code")).toBeNull();
     expect(screen.getByLabelText("Create password")).toHaveValue(signupPassword);
-    click("Create account"); await screen.findByText(/No accounts yet/);
+    click("Create account"); await screen.findByRole("region", { name: "Your accounts are empty" });
     expect(within(screen.getByRole("navigation")).getByRole("button", { name: "Accounts" })).toHaveClass("on");
   });
   it("needs a valid gamertag and matching password, then opens Accounts without recovery", async () => {
@@ -83,7 +84,7 @@ describe("onboarding", () => {
     type(screen.getByLabelText("Create password"), signupPassword);
     type(screen.getByLabelText("Confirm new account password"), signupPassword);
     click("Create account");
-    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
     expect(screen.getByTestId("header-tag")).toHaveTextContent("devo");
     expect((await loadData()).identity?.handle).toBe("devo");
   });
@@ -101,7 +102,7 @@ describe("onboarding", () => {
     expect(await screen.findByText(/Wrong recovery code/)).toBeInTheDocument();
     type(screen.getByLabelText("Restore recovery code"), code);
     click("Restore");
-    expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Open Rainy day pot/ })).toBeInTheDocument();
     expect(screen.getByTestId("header-tag")).toHaveTextContent("restored");
   });
 
@@ -132,15 +133,27 @@ describe("migration", () => {
 });
 
 describe("accounts", () => {
+  it("does not let a stale legacy gamertag picker overwrite a profile and debt saved by another tab", async () => {
+    await seed({ identity: undefined, accounts: [acct()] });
+    render(<Drip />);
+    await screen.findByRole("heading", { name: "Pick your gamertag" });
+    await DB.mutateData(current => ({ ...current, identity: { id: "45b238ef-1320-44b5-a965-5ee2a165ee85", handle: "first_tag", createdAt: today }, accounts: [...current.accounts, releaseDebt()] }));
+    const confirmed = await loadData();
+    type(screen.getByLabelText(/Gamertag/), "late_tag"); click("Save gamertag");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This account changed in another tab");
+    expect(await loadData()).toEqual(confirmed);
+    expect(confirmed.identity?.handle).toBe("first_tag");
+    expect(confirmed.accounts.map(account => account.id)).toContain("credit");
+  });
   it("does not apply queued edits to a replacement backup with the same account id", async () => {
     const code = await seed({ accounts: [acct()] });
     const original = await loadData();
     const backup = await C.encryptBackup({ ...original, accounts: [acct({ balance: 8000 })] }, code, 100_000);
     let fail!: (reason: Error) => void;
-    const persist = DB.saveData;
-    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
-    writer.mockImplementationOnce(() => new Promise<void>((_, reject) => { fail = reject; }));
-    render(<Drip />); await screen.findByText("Rainy day pot");
+    const persist = DB.mutateData;
+    const writer = vi.spyOn(DB, "mutateData").mockImplementation(persist);
+    writer.mockImplementationOnce(() => new Promise<AppData>((_, reject) => { fail = reject; }));
+    render(<Drip />); await screen.findByRole("button", { name: /Open Rainy day pot/ });
     fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
     click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
     await waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
@@ -156,11 +169,11 @@ describe("accounts", () => {
   });
   it("does not carry a failed edit into another queued action", async () => {
     await seed({ accounts: [acct()] });
-    const persist = DB.saveData;
+    const persist = DB.mutateData;
     let fail!: (reason: Error) => void;
-    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
-    writer.mockImplementationOnce(() => new Promise<void>((_, reject) => { fail = reject; }));
-    render(<Drip />); await screen.findByText("Rainy day pot");
+    const writer = vi.spyOn(DB, "mutateData").mockImplementation(persist);
+    writer.mockImplementationOnce(() => new Promise<AppData>((_, reject) => { fail = reject; }));
+    render(<Drip />); await screen.findByRole("button", { name: /Open Rainy day pot/ });
     fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
     click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
     await waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
@@ -168,7 +181,7 @@ describe("accounts", () => {
     expect(writer).toHaveBeenCalledTimes(1);
     await act(async () => fail(new Error("QuotaExceededError")));
     await screen.findByText("Income recorded. Update your balance separately if needed.");
-    expect(await screen.findByText("Balance change could not be saved. Your entry is kept; retry.")).toBeInTheDocument();
+    expect(await screen.findByText("Balance change could not be saved. Your entry is kept; check the message above before retrying.")).toBeInTheDocument();
     const received = (await loadData()).accounts[0];
     expect(received.balance).toBe(3000); expect(received.events).toHaveLength(0); expect(received.payouts).toHaveLength(1);
     click("Save");
@@ -178,9 +191,9 @@ describe("accounts", () => {
   });
   it("retries failed top-ups, withdrawals and income without applying them twice", async () => {
     await seed({ accounts: [acct()] });
-    const persist = DB.saveData;
-    const writer = vi.spyOn(DB, "saveData").mockImplementation(persist);
-    render(<Drip />); await screen.findByText("Rainy day pot");
+    const persist = DB.mutateData;
+    const writer = vi.spyOn(DB, "mutateData").mockImplementation(persist);
+    render(<Drip />); await screen.findByRole("button", { name: /Open Rainy day pot/ });
     fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
 
     async function retryBalance(action: "Top up" | "Withdraw", amount: string, expected: number, eventType: "topup" | "withdraw") {
@@ -215,25 +228,30 @@ describe("accounts", () => {
   });
   it("shows a balance change as saved only after the encrypted write completes", async () => {
     await seed({ accounts: [acct()] });
-    const persist = DB.saveData;
+    const persist = DB.mutateData;
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    vi.spyOn(DB, "saveData").mockImplementation(async data => { await gate; await persist(data); });
-    render(<Drip />); await screen.findByText("Rainy day pot");
+    vi.spyOn(DB, "mutateData").mockImplementation(async data => { await gate; return persist(data); });
+    render(<Drip />); await screen.findByRole("button", { name: /Open Rainy day pot/ });
     fireEvent.click(screen.getByRole("button", { name: /Zopa/ }));
     click("Update balance"); type(screen.getByLabelText("amount"), "3200"); click("Save");
     expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saving changes…");
     expect(document.querySelector(".bal")).toHaveTextContent("£3,000.00");
     expect((await loadData()).accounts[0].balance).toBe(3000);
+    click(/Open profile and settings for/);
+    expect(within(screen.getByRole("dialog", { name: "Profile & settings" })).getByRole("button", { name: "Sign out" })).toBeDisabled();
+    click("Close profile and settings");
     await act(async () => { release(); });
     await waitFor(() => expect(screen.getByTestId("local-save-status")).toHaveTextContent("Saved on this device."));
     expect(document.querySelector(".bal")).toHaveTextContent("£3,200.00");
     expect((await loadData()).accounts[0].balance).toBe(3200);
+    click(/Open profile and settings for/);
+    expect(within(screen.getByRole("dialog", { name: "Profile & settings" })).getByRole("button", { name: "Sign out" })).toBeEnabled();
   });
   it("adds an account with a custom provider, then edits, tops up, withdraws, sets balance, logs payout, changes rate, deletes", async () => {
     await seed({});
     render(<Drip />);
-    click(await screen.findByRole("button", { name: "Add account" }).then(() => "Add account"));
+    fireEvent.click(await screen.findByRole("button", { name: "Add an account" })); click(/Cash savings/);
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "Other" } });
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     type(screen.getByLabelText("Provider name"), "My Bank");
@@ -291,22 +309,22 @@ describe("accounts", () => {
 
     // edit without rate change + cancel path
     click("Edit"); click("Cancel");
-    expect(await screen.findByText("Total balance")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Money overview" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /My Bank/ }));
     click("Delete");
-    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
   }, 30_000);
 
   it("home shows stacked cards and upcoming payouts; back button works", async () => {
     await seed({ accounts: [acct(), acct({ id: "a2", provider: "Chip", label: "", balance: 1000, ratePct: 3 })] });
     render(<Drip />);
-    expect(await screen.findByText("£4,000.00")).toBeInTheDocument();
-    expect(screen.getByText("Upcoming estimated payments")).toBeInTheDocument();
+    expect(within(await screen.findByRole("region", { name: "Money overview" })).getByText("£4,000.00", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Next little drop")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Chip/ }));
     expect(await screen.findByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
-    expect(screen.getByText("Total balance")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Money overview" })).toBeInTheDocument();
   });
 });
 
@@ -315,7 +333,7 @@ describe("trends", () => {
     const m = (o: number) => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + o); return d.toISOString().slice(0, 7); };
     await seed({ accounts: [acct()], snapshots: [{ month: m(-1), totalBalance: 2500, monthlyIncome: 10 }, { month: m(0), totalBalance: 3000, monthlyIncome: 17.5, deposits: 600, withdrawals: 117.5 }] });
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     tab("Trends");
     expect(screen.getByRole("heading", { name: "Trends" })).toBeInTheDocument();
     expect(screen.getByText("This month vs last")).toBeInTheDocument();
@@ -326,7 +344,7 @@ describe("trends", () => {
   it("explains missing history", async () => {
     await seed({ accounts: [] });
     render(<Drip />);
-    await screen.findByText(/No accounts yet/);
+    await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Trends");
     expect(screen.getByText(/appears after Drip has two months/)).toBeInTheDocument();
   });
@@ -339,7 +357,7 @@ describe("backup", () => {
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: (b: Blob) => { blob = b; return "blob:x"; }, revokeObjectURL: vi.fn() }));
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     type(screen.getByLabelText("Export recovery code"), "WRONG");
@@ -366,7 +384,7 @@ describe("backup", () => {
     const share = vi.fn().mockRejectedValueOnce(Object.assign(new Error("x"), { name: "AbortError" })).mockRejectedValueOnce(new Error("boom"));
     Object.assign(navigator, { canShare: () => true, share });
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     type(screen.getByLabelText("Export recovery code"), code);
     click("Export backup");
@@ -382,7 +400,7 @@ describe("backup", () => {
     const code = await seed({});
     const bad = await C.encryptBackup({ version: 9 }, code, 100_000);
     render(<Drip />);
-    await screen.findByText(/No accounts yet/);
+    await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     fireEvent.change(screen.getByLabelText("Backup file"), { target: { files: [new File([JSON.stringify(bad)], "b.json")] } });
     type(screen.getByLabelText("Restore recovery code"), code);
@@ -407,7 +425,7 @@ describe("banners", () => {
   it("Android install prompt and backup reminder dismissal", async () => {
     await seed({ accounts: [acct()], lastBackupAt: "2020-01-01T00:00:00Z" });
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     const prompt = vi.fn();
     act(() => { const e = new Event("beforeinstallprompt"); (e as any).prompt = prompt; window.dispatchEvent(e); });
     expect(await screen.findByRole("region", { name: "Install Drip task" })).toBeInTheDocument();
@@ -425,7 +443,7 @@ describe("app lock", () => {
     const create = vi.fn(async () => ({ rawId: raw }));
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create, get: vi.fn() } });
     render(<Drip />);
-    await screen.findByText(/No accounts yet/);
+    await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(screen.getByText(/screen lock only/)).toBeInTheDocument();
     expect(screen.getByTestId("settings-tag")).toHaveTextContent("devo");
@@ -443,7 +461,7 @@ describe("app lock", () => {
     vi.stubGlobal("PublicKeyCredential", { isUserVerifyingPlatformAuthenticatorAvailable: async () => true });
     Object.defineProperty(navigator, "credentials", { configurable: true, value: { create: async () => null, get: vi.fn() } });
     const { unmount } = render(<Drip />);
-    await screen.findByText(/No accounts yet/);
+    await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     await waitFor(() => expect(screen.getByRole("button", { name: "Turn on app lock" })).toBeEnabled());
     click("Turn on app lock");
@@ -451,7 +469,7 @@ describe("app lock", () => {
     unmount();
     vi.stubGlobal("PublicKeyCredential", undefined);
     render(<Drip />);
-    await screen.findByText(/No accounts yet/);
+    await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
     expect(await screen.findByText(/doesn't support a passkey lock/)).toBeInTheDocument();
   });
@@ -467,7 +485,7 @@ describe("app lock", () => {
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
     type(screen.getByLabelText("Unlock recovery code"), code);
     click("Unlock with code");
-    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
 
     // background for 5+ minutes -> locked again; passkey unlocks
     const now = Date.now(); const spy = vi.spyOn(Date, "now").mockReturnValue(now);
@@ -481,7 +499,7 @@ describe("app lock", () => {
     act(() => vis("visible"));
     expect(await screen.findByRole("heading", { name: /locked/ })).toBeInTheDocument();
     click("Unlock with Face ID / passkey");
-    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
   });
 });
 
@@ -500,7 +518,7 @@ describe("onboarding draft persistence", () => {
     type(screen.getByLabelText("Create password"), signupPassword);
     type(screen.getByLabelText("Confirm new account password"), signupPassword);
     click("Create account");
-    expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
     expect(await (await import("@/lib/draft")).loadDraft()).toBeNull();
   });
 });
@@ -509,7 +527,7 @@ describe("daily interest accounts", () => {
   it("adds a daily account without a payout date and shows 'Daily interest'", async () => {
     await seed({ accounts: [acct({ id: "m", provider: "Zopa", nextPayoutDate: today })] });
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     tab("Add");
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "MoneyFarm" } });
     type(screen.getByLabelText("Balance"), "10000");
@@ -521,15 +539,15 @@ describe("daily interest accounts", () => {
     expect(await screen.findByText("Per day (est.)")).toBeInTheDocument();
     expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
-    expect(screen.getByText(/Daily payments/)).toBeInTheDocument();
-    const up = screen.getByText("Upcoming estimated payments").closest(".panel")!;
-    expect(within(up as HTMLElement).queryByText("MoneyFarm")).toBeNull();
+    expect(within(screen.getByRole("region", { name: "Account cards" })).getByRole("button", { name: /Open Moneyfarm/i })).toBeInTheDocument();
+    const up = screen.getByRole("region", { name: "Next expected payment" });
+    expect(within(up).queryByText(/Moneyfarm/i)).toBeNull();
   });
   it("keeps an older daily balance authoritative on open and separates legacy estimates", async () => {
     const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
     await seed({ accounts: [acct({ id: "d", provider: "MoneyFarm", label: "", balance: 10000, ratePct: 3.65, frequency: "daily", accruedThrough: past, events: [{ type: "interest", date: past, amount: 12 }], rateHistory: [{ from: "2020-01-01", ratePct: 3.65 }] })] });
     render(<Drip />);
-    await screen.findByText("Total balance");
+    await screen.findByRole("region", { name: "Money overview" });
     expect((await loadData()).accounts[0]).toMatchObject({ balance: 10000, accruedThrough: past });
     fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
     expect(await screen.findByText("Previous interest estimates")).toBeInTheDocument();
@@ -542,8 +560,8 @@ describe("sign-out", () => {
   it("keeps accounts hidden across remount and reopens the local copy only with its code", async () => {
     const code = await seed({ accounts: [acct()] });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ available: false })));
-    const first = render(<Drip />); await screen.findByText("Total balance");
-    click("Sign out");
+    const first = render(<Drip />); await screen.findByRole("region", { name: "Money overview" });
+    click(/Open profile and settings for/); click("Sign out");
     expect(await screen.findByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
     expect(screen.queryByText("Rainy day pot")).toBeNull();
     first.unmount(); render(<Drip />);
@@ -552,7 +570,7 @@ describe("sign-out", () => {
     type(screen.getByLabelText("Recovery code"), "wrong"); click("Recover account");
     expect(await screen.findByText("That isn't your recovery code.")).toBeInTheDocument();
     type(screen.getByLabelText("Recovery code"), code); click("Recover account");
-    expect(await screen.findByText("Rainy day pot")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Open Rainy day pot/ })).toBeInTheDocument();
     expect((await loadData()).accounts[0].balance).toBe(3000);
   });
   it("does not let delayed startup overwrite a sign-out from another tab", async () => {

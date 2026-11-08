@@ -40,5 +40,5 @@ it("handles older holdings, zero-cost and positive return without a fabricated p
   rerender(<StockInvestmentSummary account={{...stock,investment:{shares:10,averagePriceGBP:0}}} onEdit={edit} />);expect(screen.queryByText(/Infinity|NaN/)).toBeNull();expect(screen.getAllByText(/£1,155.28/)).toHaveLength(2);
 });
 it("keeps portfolio card value, shares, average price and yield visible and opens the holding",()=>{
-  const open=vi.fn();render(<DividendPortfolio accounts={[{...stock,investment}]} onAdd={vi.fn()} onOpen={open} />);const card=screen.getByRole("button",{name:"Open Realty Income"});expect(card).toHaveTextContent("27.25750597 shares · Average US$60.41 (£44.99) · 5.7% yield");expect(card).toHaveTextContent("£1,155.28");fireEvent.click(card);expect(open).toHaveBeenCalledWith("stock");
+  const open=vi.fn();render(<DividendPortfolio accounts={[{...stock,investment}]} onAdd={vi.fn()} onOpen={open} />);const card=screen.getByRole("button",{name:"Open Realty Income"});expect(card).toHaveTextContent("27.25750597 shares · Average US$60.41 (£44.99) · 5.7% recorded yield");expect(card).toHaveTextContent("£1,155.28");fireEvent.click(card);expect(open).toHaveBeenCalledWith("stock");
 });

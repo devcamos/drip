@@ -1,3 +1,4 @@
+import { addCashAccount } from "./saved-navigation";
 import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { unlock, showCloudRecovery } from "./vault-helpers";
@@ -8,7 +9,7 @@ import { mkdir } from "node:fs/promises";
 
 async function createCashAccount(page: Page, category = "cash-isa", provider = "MoneyFarm") {
   const code = await legacyAccount(page, "producttest");
-  await page.getByRole("button", { name: "Add account", exact: true }).click();
+  await addCashAccount(page);
   await page.getByLabel("Product category", { exact: true }).selectOption(category);
   await page.getByLabel("Provider", { exact: true }).selectOption(provider);
   await page.getByLabel("Balance", { exact: true }).fill("3000");

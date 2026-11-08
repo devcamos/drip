@@ -79,6 +79,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const name = isOther ? custom.trim() : provider;
   const validHolding = validHoldingName(category, provider, customHolding, holding);
   const valid = investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
+  const retainsMarketBasis = !!existing?.marketValuation && M.round2(b) === existing.balance && holding.trim() === existing.holdingName && investment?.shares === existing.investment?.shares && rateType === "dividend";
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
     setFrequency(defaults.frequency); setReinvest(defaults.reinvestIncome);
@@ -94,14 +95,18 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         bonus: hasBonus ? { amount: M.round2(Number(bonusAmount)), expectedDate: bonusDate } : undefined,
         colour, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
         rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };
+      // A different holding or share quantity cannot retain a price estimate
+      // calculated for the previous holding. The entered value becomes the
+      // recorded provider balance and the new income baseline.
+      if (base.marketValuation && (rateType !== "dividend" || base.holdingName !== existing?.holdingName || base.investment?.shares !== existing?.investment?.shares)) delete base.marketValuation;
       const account = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
       setBusy(true); setError("");
-      try { if (await onSave(existing && b !== existing.balance ? M.applySetBalance(account, b, today()) : account) === false) setError("Could not save this account. Keep Drip open and retry."); }
+      try { if (await onSave(existing && M.round2(b) !== existing.balance ? M.applySetBalance({ ...account, balance: existing.balance }, b, today()) : account) === false) setError("Could not save this account. Your entry is kept. Check the message above before retrying."); }
       catch { setError("Could not save this account. Keep Drip open and retry."); }
       finally { setBusy(false); }
     }}>
       <label htmlFor="account-category">Product category</label>
-      <select disabled={busy} id="account-category" value={category} onChange={e => chooseCategory(e.target.value as ProductCategory)}>{Object.entries(PRODUCTS).map(([value, product]) => <option value={value} key={value}>{product.label}</option>)}</select>
+      <select disabled={busy} id="account-category" value={category} onChange={e => chooseCategory(e.target.value as ProductCategory)}>{Object.entries(PRODUCTS).filter(([value]) => value !== "credit-card").map(([value, product]) => <option value={value} key={value}>{product.label}</option>)}</select>
       <p className="muted">Sets calculation defaults for any provider. You can change the payment schedule below.</p>
       <label htmlFor="account-provider">Provider</label>
       <select disabled={busy} id="account-provider" value={isOther ? "Other" : provider} onChange={e => { setProvider(e.target.value); setCustomHolding(!!holding && !(TRADING_212_HOLDINGS as readonly string[]).includes(holding)); if (!colourChosen) setColour(normaliseColour(PROVIDERS[e.target.value])); }}>{Object.keys(PROVIDERS).map(p => <option key={p} value={p}>{displayProvider(p)}</option>)}</select>
@@ -129,6 +134,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <div><label htmlFor="account-paid">Paid</label><select disabled={busy} id="account-paid" value={frequency} onChange={e => setFrequency(e.target.value as Frequency)}><option value="daily">Daily</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
       </div>
       {rateType === "dividend" && <StockInvestmentFields value={investmentFields} onChange={setInvestmentFields} disabled={busy} />}
+      {existing?.marketValuation && <p className="muted">Changing the holding, share quantity or balance replaces the market estimate with your entered provider value and updates its income baseline.</p>}
       {rateChanged && <><label htmlFor="rate-from">New rate applies from</label><input disabled={busy} id="rate-from" type="date" value={rateFrom} onChange={e => setRateFrom(e.target.value)} /></>}
       {frequency !== "daily" ? <><label htmlFor="next-payout">Next payout date</label><input disabled={busy} id="next-payout" type="date" value={next} onChange={e => setNext(e.target.value)} /></>
         : <p className="muted">Daily payments need no payout date. Predictions never change your saved balance.</p>}
@@ -140,7 +146,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <label htmlFor="bonus-date">Expected bonus payment date</label><input disabled={busy} id="bonus-date" type="date" value={bonusDate} onChange={e => setBonusDate(e.target.value)} />
         <p className="muted">Enter your provider&apos;s accrued amount or your own estimate. Drip predicts this amount once on the expected date; it doesn&apos;t calculate eligibility or further bonus accrual.</p>
       </fieldset>}
-      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(b, r))} a month</p>}
+      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(retainsMarketBasis ? existing!.marketValuation!.recordedBalance : b, r))} a month</p>}
       <div className="row-gap"><button className="btn" type="submit" disabled={!valid || busy}>{busy ? "Saving…" : "Save"}</button><button className="btn ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button></div>
       {error && <p role="alert" className="err">{error}</p>}
     </form>

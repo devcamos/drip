@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function applyWorkerUpdate(worker: ServiceWorker, listenForChange: () => void, reload: () => void) {
   // Another tab may already have activated this update. No new controllerchange
@@ -8,12 +8,14 @@ export function applyWorkerUpdate(worker: ServiceWorker, listenForChange: () => 
   listenForChange(); worker.postMessage({ type: "SKIP_WAITING" });
 }
 
-export function PwaStatus() {
+export function PwaStatus({ allowReload = true }: Readonly<{ allowReload?: boolean }> = {}) {
   const [offline, setOffline] = useState(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const reloadAllowed = useRef(allowReload);
+  useEffect(() => { reloadAllowed.current = allowReload; }, [allowReload]);
   useEffect(() => {
     let active = true; let reloading = false;
-    const changed = () => { if (!reloading) { reloading = true; location.reload(); } };
+    const changed = () => { if (active && reloadAllowed.current && !reloading) { reloading = true; location.reload(); } };
     let registration: ServiceWorkerRegistration | undefined;
     let checking = false;
     const check = () => {
@@ -54,6 +56,6 @@ export function PwaStatus() {
   }, []);
   return <>
     {offline && <output className="banner warn">Offline — Drip is using this device&apos;s saved accounts. Cloud recovery resumes online.</output>}
-    {waiting && <div className="banner info"><span>Drip update ready. Finish editing before reloading.</span><button className="btn small" onClick={() => applyWorkerUpdate(waiting, () => { window.dispatchEvent(new Event("drip-accept-update")); }, () => location.reload())}>Reload update</button></div>}
+    {waiting && <div className="banner info"><span>{allowReload ? "Drip update ready. Finish editing before reloading." : "Drip update ready. Finish your edit and return to Accounts before reloading."}</span><button className="btn small" disabled={!allowReload} onClick={() => { if (allowReload) applyWorkerUpdate(waiting, () => { window.dispatchEvent(new Event("drip-accept-update")); }, () => location.reload()); }}>Reload update</button></div>}
   </>;
 }

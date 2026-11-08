@@ -1,0 +1,27 @@
+.page { max-width:1120px; padding:32px 28px; }
+.page .brand { margin-bottom:32px; letter-spacing:-.8px; font-size:27px; }
+.layout { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr); align-items:center; gap:70px; }
+.intro { min-width:0; }
+.eyebrow { margin:0; color:#6f5c50; font-size:10px; font-weight:700; letter-spacing:1.6px; line-height:1.6; }
+.statement { margin:18px 0; font-size:clamp(40px,4.6vw,64px); line-height:1.06; letter-spacing:-3px; font-weight:650; }
+.statement em { color:#a84f2b; font-style:normal; }
+.description { max-width:340px; color:#6f5c50; font-size:15px; line-height:1.65; }
+.surface { min-width:0; border:1px solid #e6dacb; border-radius:24px; padding:28px; background:linear-gradient(145deg,#fffef8,#f8efdf); box-shadow:0 15px 36px #5132180d,inset 0 1px 0 #fff; }
+.surface h1 { font-size:28px; }
+.surface :global(.panel) { background:transparent; margin:0; padding:0; }
+.surface :global(.btn),.surface :global(.text-link) { min-height:44px; }
+.surface :global(.btn:not(.ghost):not(.danger)) { background:linear-gradient(160deg,#ac552e,#a84f2b); box-shadow:0 5px 10px #9c4b2524,inset 0 1px 0 #ffffff38; }
+.surface input,.surface select { background:#fffaf2; }
+.fan { position:relative; width:min(100%,360px); height:270px; margin:15px 0 0 20px; }
+.orbit { position:absolute; width:240px; height:240px; left:14%; top:5%; border:1px solid #d5b89c70; border-radius:50%; box-shadow:0 0 0 25px #fffaf166,0 0 0 26px #d5b89c55; }
+.back,.middle,.front { position:absolute; width:230px; height:143px; border:1px solid #fffc; border-radius:19px; box-shadow:0 20px 28px #55341d20,inset 0 1px 0 #fff9; }
+.back { left:0; top:55px; background:linear-gradient(145deg,#f0d3bb,#d2b29c); }
+.middle { left:50px; top:44px; background:linear-gradient(135deg,#8272b0,#574781); }
+.front { left:85px; top:83px; padding:20px; color:#533522; background:linear-gradient(140deg,#fffdf6,#f2e3d3); }
+.front span { font-size:24px; color:#a84f2b; }
+.front b { display:block; margin-top:13px; font-size:15px; letter-spacing:-.4px; }
+.front small { display:block; margin-top:5px; font-size:10px; color:#7c634f; }
+.foot { color:#6f5c50; font-size:11px; line-height:1.6; }
+@media(max-width:800px) { .layout { gap:30px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .fan { margin-left:0; transform:scale(.85); transform-origin:left top; } }
+@media(max-width:640px) { .page { padding:24px 18px; } .page .brand { margin-bottom:26px; } .layout { grid-template-columns:minmax(0,1fr); gap:24px; } .statement { font-size:40px; line-height:1.06; letter-spacing:-1.8px; margin:12px 0; } .desktopBreak { display:none; } .description { margin:0; max-width:350px; font-size:14px; } .fan,.foot { display:none; } .surface { padding:22px 20px; border-radius:22px; } }
+@media(max-width:350px) { .surface { padding:20px 16px; } .statement { font-size:36px; } }

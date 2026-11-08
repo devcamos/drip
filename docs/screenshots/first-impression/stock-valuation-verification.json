@@ -1,0 +1,203 @@
+{
+  "passed": true,
+  "testedCommit": "9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d",
+  "date": "2026-11-07T02:56:39.549Z",
+  "origin": "https://drip-git-prototype-first-impression-devonte-amos-projects.vercel.app",
+  "transport": "Hosted Git Preview; exact-origin one-hop protection header only; real provider via managed proxy; task-local NSS CA trust and TLS enabled; no account sign-in or writes",
+  "credentialBoundaryBlocked": false,
+  "deploymentId": "dpl_4vopdrjJnFLNrCEUeYuTRke1gok6",
+  "quoteFeed": "No automatic raw stock-price feed configured. Valuation uses a user-entered USD60 scenario; chart is actual delayed provider data.",
+  "browser": "Chromium156 on Linux; HTTPS/TLS validation enabled; no physical-device claim",
+  "results": [
+    {
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "verifiedHead": "9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d",
+      "symbol": "NYSE:O",
+      "range": "1Y",
+      "providerOrigin": "https://www.tradingview-widget.com",
+      "providerNameVisible": true,
+      "canvases": 7,
+      "horizontalOverflow": false,
+      "pageErrorCount": 0,
+      "capabilities": {
+        "isSecureContext": true,
+        "locksAvailable": true,
+        "locksAllowed": false
+      },
+      "rangeChecks": [
+        {
+          "range": "1 month",
+          "providerLabel": "Past month",
+          "pass": true
+        },
+        {
+          "range": "3 months",
+          "providerLabel": "Past quarter",
+          "pass": true
+        },
+        {
+          "range": "1 year",
+          "providerLabel": "Past year",
+          "pass": true
+        }
+      ],
+      "valuationCheck": {
+        "userEnteredPriceUSD": 60,
+        "shares": 50,
+        "fx": {
+          "base": "USD",
+          "quote": "GBP",
+          "rate": 0.74404,
+          "date": "2026-11-07",
+          "source": "Frankfurter"
+        },
+        "expectedValueGBP": 2232.12,
+        "expectedMoneyGBP": 7232.12,
+        "expectedNetGBP": 6032.12,
+        "incomeMonthlyGBP": 28.33,
+        "annualStockIncomeGBP": 135,
+        "recordedBalanceGBP": 2500,
+        "quoteFeed": "not configured; user-entered scenario, not a live API quote",
+        "pass": true
+      },
+      "cdpExceptionCount": 0,
+      "failedRequests": [
+        {
+          "origin": "https://www.tradingview-widget.com",
+          "path": "/embed-widget/symbol-overview/"
+        }
+      ]
+    },
+    {
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "verifiedHead": "9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d",
+      "symbol": "NYSE:O",
+      "range": "1Y",
+      "providerOrigin": "https://www.tradingview-widget.com",
+      "providerNameVisible": true,
+      "canvases": 7,
+      "horizontalOverflow": false,
+      "pageErrorCount": 0,
+      "capabilities": {
+        "isSecureContext": true,
+        "locksAvailable": true,
+        "locksAllowed": false
+      },
+      "rangeChecks": [
+        {
+          "range": "1 month",
+          "providerLabel": "Past month",
+          "pass": true
+        },
+        {
+          "range": "3 months",
+          "providerLabel": "Past quarter",
+          "pass": true
+        },
+        {
+          "range": "1 year",
+          "providerLabel": "Past year",
+          "pass": true
+        }
+      ],
+      "valuationCheck": {
+        "userEnteredPriceUSD": 60,
+        "shares": 50,
+        "fx": {
+          "base": "USD",
+          "quote": "GBP",
+          "rate": 0.74404,
+          "date": "2026-11-07",
+          "source": "Frankfurter"
+        },
+        "expectedValueGBP": 2232.12,
+        "expectedMoneyGBP": 7232.12,
+        "expectedNetGBP": 6032.12,
+        "incomeMonthlyGBP": 28.33,
+        "annualStockIncomeGBP": 135,
+        "recordedBalanceGBP": 2500,
+        "quoteFeed": "not configured; user-entered scenario, not a live API quote",
+        "pass": true
+      },
+      "cdpExceptionCount": 0,
+      "failedRequests": [
+        {
+          "origin": "https://www.tradingview-widget.com",
+          "path": "/embed-widget/symbol-overview/"
+        }
+      ]
+    },
+    {
+      "size": "narrow",
+      "viewport": {
+        "width": 320,
+        "height": 812
+      },
+      "verifiedHead": "9c7c2e35a6197c8476aea4124e6c6b1e30b3b85d",
+      "symbol": "NYSE:O",
+      "range": "1Y",
+      "providerOrigin": "https://www.tradingview-widget.com",
+      "providerNameVisible": true,
+      "canvases": 7,
+      "horizontalOverflow": false,
+      "pageErrorCount": 0,
+      "capabilities": {
+        "isSecureContext": true,
+        "locksAvailable": true,
+        "locksAllowed": false
+      },
+      "rangeChecks": [
+        {
+          "range": "1 month",
+          "providerLabel": "Past month",
+          "pass": true
+        },
+        {
+          "range": "3 months",
+          "providerLabel": "Past quarter",
+          "pass": true
+        },
+        {
+          "range": "1 year",
+          "providerLabel": "Past year",
+          "pass": true
+        }
+      ],
+      "valuationCheck": {
+        "userEnteredPriceUSD": 60,
+        "shares": 50,
+        "fx": {
+          "base": "USD",
+          "quote": "GBP",
+          "rate": 0.74404,
+          "date": "2026-11-07",
+          "source": "Frankfurter"
+        },
+        "expectedValueGBP": 2232.12,
+        "expectedMoneyGBP": 7232.12,
+        "expectedNetGBP": 6032.12,
+        "incomeMonthlyGBP": 28.33,
+        "annualStockIncomeGBP": 135,
+        "recordedBalanceGBP": 2500,
+        "quoteFeed": "not configured; user-entered scenario, not a live API quote",
+        "pass": true
+      },
+      "cdpExceptionCount": 0,
+      "failedRequests": [
+        {
+          "origin": "https://www.tradingview-widget.com",
+          "path": "/embed-widget/symbol-overview/"
+        }
+      ]
+    }
+  ],
+  "networkQualification": "One TradingView embed navigation failure was recorded per viewport during range transitions. The capture did not retain an error code; the cause is unverified. Final company/canvases, all ranges and actual FX/value flow succeeded. Provider preload warnings are separate from page/CDP exceptions."
+}

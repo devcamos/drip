@@ -1,0 +1,215 @@
+{
+  "origin": "http://127.0.0.1:4323",
+  "sourceCommit": "a11236b92208ceb2834e68eee314054113b37bef",
+  "buildId": "local-f8d2ed9c-1329-4dab-8d57-52c17a2ec03b",
+  "source": [
+    {
+      "path": "app/prototype/welcome/AccountPreview.tsx",
+      "sha256": "85d2715953fa052895bee8dfaec1f04045357ef073006c6cf890b6571c78047a"
+    },
+    {
+      "path": "app/prototype/welcome/CreditCardPreview.tsx",
+      "sha256": "ca069d99a28723fd34392973934460a8f3a25a6df2e1e3c7e5bcaa46c9f58252"
+    },
+    {
+      "path": "app/prototype/welcome/ProfilePreview.tsx",
+      "sha256": "00d8318542e600f69db0372ea2ad28a77e5553a43a81156311687bde0d89c1b1"
+    },
+    {
+      "path": "app/prototype/welcome/StockPricePreview.tsx",
+      "sha256": "b9034b72916e3f5bd13550aa528a805d4c94d4448b55b762c005a3a6cbd64057"
+    },
+    {
+      "path": "app/prototype/welcome/StockValuePreview.tsx",
+      "sha256": "1cb82ec21b94fc6ec59251221101e79510ca9d8e369b764739c3b25be4dfb262"
+    },
+    {
+      "path": "app/prototype/welcome/WelcomePanels.tsx",
+      "sha256": "800787afc340c71779722e39a84f3701a50509cd8426304fbabe0d8f9c12108d"
+    },
+    {
+      "path": "app/prototype/welcome/WelcomePrototype.tsx",
+      "sha256": "27c81c4e3ebae0731723a11a36e81fc72024e7a68a3b8c1cceb417316ca096d8"
+    },
+    {
+      "path": "app/prototype/welcome/credit-card.ts",
+      "sha256": "686dc4423496f8c177d8406bd06ea6592609835fd8068157962c90ae1d1ea5ef"
+    },
+    {
+      "path": "app/prototype/welcome/demo-accounts.ts",
+      "sha256": "2e263e6ec8ab40f5534d5e62f0402026ea73133c352156e5913caddede447811"
+    },
+    {
+      "path": "app/prototype/welcome/page.tsx",
+      "sha256": "fe5b61bc14acdb6612fa606c1c54384cda5b2c9283c978e480207c7312ac4af6"
+    },
+    {
+      "path": "app/prototype/welcome/stock-chart.ts",
+      "sha256": "9c56f27b94c05eea7d84d5d20a1f83940f68cdecbc22dd354aa1bcb03cbea45d"
+    },
+    {
+      "path": "app/prototype/welcome/stock-price.module.css",
+      "sha256": "cd73f6b2a3ab0e71fa05ed96bf0389ba684dd894f069ae4b0babe32e420b5644"
+    },
+    {
+      "path": "app/prototype/welcome/stock-valuation.ts",
+      "sha256": "5ad21af25476a79db5d421341f2bc85f04c67a1c0616f1c4e725e9c90fefa97d"
+    },
+    {
+      "path": "app/prototype/welcome/welcome.module.css",
+      "sha256": "5e9dc697a429f7d7b7434b91aff196e25a32cb7dc47ab0fae38487108a759b34"
+    }
+  ],
+  "scope": "Running optimized prototype, synthetic holdings/credit/profile, FX0.75 and chart transport fixture. No actual quote, authentication, storage, device-management or feedback-delivery claim.",
+  "results": [
+    {
+      "state": "settings",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "17a41a9677cb7558a8e2e0f14d0a4144c6bf035b7bc22da9dc3ff0f77ef80dce"
+    },
+    {
+      "state": "settings-actions",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-actions-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "0477a2aa26d3c164efb4350dc7b9e8e8debcec0f8a0a0e5773b898511256baaf"
+    },
+    {
+      "state": "second-holding",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-second-holding-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "d800d5f3a9893d6e7841356c2ef3a93cd6f15443409d51d034a2392c0ad603ad"
+    },
+    {
+      "state": "second-credit",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-second-credit-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "df01272c64e89b16d98f8a0c1bf476d11b063186fe7240d9843ce602b09038ee"
+    },
+    {
+      "state": "multiple-accounts",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-multiple-accounts-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "d92485c925fbdd3f9df0f147d7459032b8c607cbb48770c0f9e7b4606f29e9ac"
+    },
+    {
+      "state": "multiple-counts",
+      "size": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "screenshot": "profile-multiple-counts-desktop.png",
+      "visuallyInspected": true,
+      "sha256": "2d1acbcd8396558222b0e817c878614f76a6263a0b7e67c6c50dc080caf33e2f"
+    },
+    {
+      "state": "settings",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "5f456383849083b59d540cd3fd8644fd7d1f052e71498fcd9a6ceb8c59ccdcdc"
+    },
+    {
+      "state": "settings-actions",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-settings-actions-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "25ca269dff738f32c5002f968189e6958c47d0c9be360b632d1dcdadd1eef903"
+    },
+    {
+      "state": "second-holding",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-second-holding-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "bee6e6f71b57514b09493f3dd8013924602d63c878faf9e8e25e47ae2768fbae"
+    },
+    {
+      "state": "second-credit",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-second-credit-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "7d0e4200acbd46bcbe0c3f529d64c757d66c3658cf04b58aabceaf6259420399"
+    },
+    {
+      "state": "multiple-accounts",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-multiple-accounts-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "e3f7f0bfe1442d60c340dd01857bfbf88c28cba2bc466709f2890b01715d4889"
+    },
+    {
+      "state": "multiple-counts",
+      "size": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "screenshot": "profile-multiple-counts-mobile.png",
+      "visuallyInspected": true,
+      "sha256": "38fe71dca6584b8a1b6016b7da21d0fffd1ae77a131b4427ef993524fd508a66"
+    }
+  ],
+  "errors": [],
+  "allCapturedStatesInspected": 18,
+  "reviewedBy": "Codex author visual review; no independent Nexus approval claimed",
+  "capturedAt": "2026-11-07",
+  "hostedChecks": "Recorded with exact PR head at handoff, not implied by these local images."
+}

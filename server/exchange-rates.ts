@@ -4,7 +4,10 @@ import { parseFxRate, type FxCurrency } from "../lib/exchange-rates";
  * cookies, identity, holdings, quantities, purchase prices or balances.
  */
 export async function fetchExchangeRate(base: FxCurrency, fetcher: typeof fetch = fetch, now = Date.now()) {
-  const response = await fetcher(`https://api.frankfurter.dev/v2/rates?base=${base}&quotes=GBP`, {
+  // V2 "latest" can include next-day publishers. Bound the lookup to our UTC
+  // day; the provider carries earlier observations forward with their real date.
+  const date = new Date(now).toISOString().slice(0, 10);
+  const response = await fetcher(`https://api.frankfurter.dev/v2/rates?base=${base}&quotes=GBP&date=${date}`, {
     headers: { Accept: "application/json" }, credentials: "omit", redirect: "error",
     // Cache only the validated public route response. A malformed upstream 200
     // must not be kept in the framework fetch cache and block a healthy retry.
