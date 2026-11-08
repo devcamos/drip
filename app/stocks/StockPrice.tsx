@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Account } from "@/lib/types";
 import { chartRanges, instrumentForHolding, stockChartDescriptor, validSharePriceInput, type ChartRange } from "@/lib/stock-chart";
 import { parseFxRate, type FxRate } from "@/lib/exchange-rates";
-import { applyMarketValuation, clearMarketValuation } from "@/lib/market-valuation";
+import { applyMarketValuation, clearMarketValuation, hasValuationTransfers } from "@/lib/market-valuation";
 import { averagePriceLabel, formatShares, investmentReturn } from "@/lib/stock-investment";
 import * as M from "@/lib/maths";
 import s from "./stock-price.module.css";
@@ -106,6 +106,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
           {error ? <p role="alert" className={s.valueError}>{error}</p> : null}{message ? <output className={s.frameStatus}>{message}</output> : null}
           {account.marketValuation ? <div className={s.valuationBreakdown} aria-label="Holding performance"><p>Frankfurter · Rate dated {account.marketValuation.fxDate}</p>{result ? <p><b>Capital return</b><strong data-negative={result.amount < 0}>{M.gbp(result.amount)}{result.percent !== null ? ` (${result.percent.toFixed(2)}%)` : ""}</strong></p> : null}<button className={s.hideButton} disabled={!!busy} onClick={restoreRecorded}>Use recorded value</button></div> : null}
           <dl className={s.holdingStats}><div><dt>Shares</dt><dd>{account.investment ? formatShares(account.investment.shares) : "—"}</dd></div><div><dt>Average purchase price</dt><dd>{account.investment ? averagePriceLabel(account.investment) : "—"}</dd></div><div><dt>Recorded dividend yield</dt><dd>{account.ratePct}%</dd></div><div><dt>Estimated annual income</dt><dd>{M.gbp(M.accountMonthlyIncome(account) *12)}</dd></div></dl>
+          {hasValuationTransfers(account) ? <p className={s.currencyNote}>Includes your recorded transfers since the price estimate.</p> : null}
           <p className={s.currencyNote}>Your recorded {M.gbp(original)} balance remains available. Market-value changes keep your purchase cost and recorded dividend assumptions separate.</p><button className={s.hideButton} disabled={!!busy} onClick={onEdit}>{account.investment ? "Edit holding details" : "Add share details"}</button>
         </aside>
       </div>

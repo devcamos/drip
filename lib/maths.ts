@@ -1,6 +1,6 @@
 import { validDate } from "./products";
 import { accountAssets, isCreditAccount } from "./credit-card";
-import { incomeBalance } from "./market-valuation";
+import { applyValuationTransfer, incomeBalance } from "./market-valuation";
 export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
@@ -201,6 +201,8 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
 function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
+  const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
+  if (priced.marketValuation && (type === "topup" || type === "withdraw")) return applyValuationTransfer(priced, type, date, amount);
   const updated = { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
   if ("marketValuation" in updated) { const { marketValuation: _valuation, ...recorded } = updated; return recorded as A; }
   return updated;

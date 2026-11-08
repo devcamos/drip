@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { accountAssets, creditCardDraft, creditCardWarnings, isCreditAccount, portfolioTotals, validCreditCardTerms, validateCreditCardDraft } from "../lib/credit-card";
-import { applyMarketValuation, clearMarketValuation, incomeBalance, validMarketValuation } from "../lib/market-valuation";
+import { applyMarketValuation, applyValuationTransfer, clearMarketValuation, hasValuationTransfers, incomeBalance, validMarketValuation } from "../lib/market-valuation";
 import { validProductFields } from "../lib/products";
 import { cloudPayload } from "../lib/cloud-payload";
 import { dataFormatVersion } from "../lib/data-format";
@@ -170,6 +170,86 @@ test("successive prices preserve the first recorded basis and can restore that e
   expect(restored.balance).toBe(2500);
   expect(restored.marketValuation).toBeUndefined();
   expect(clearMarketValuation(restored, at)).toBe(restored);
+});
+
+test("transfers adjust a valued holding's recorded income basis while preserving its quote and shares", () => {
+  const valued = applyMarketValuation(releaseStock(), price, at);
+  const withdrawn = M.applyWithdraw(valued, 100, "2026-11-07");
+  expect(withdrawn.balance).toBe(3650);
+  expect(withdrawn.marketValuation?.recordedBalance).toBe(2400);
+  expect(withdrawn.marketValuation).toMatchObject({ priceUSD: 100, fxRate: 0.75, fxDate: "2026-11-06" });
+  expect(withdrawn.investment).toEqual(valued.investment);
+  expect(portfolioTotals([withdrawn]).annualIncome).toBe(129.6);
+  expect(hasValuationTransfers(withdrawn)).toBe(true);
+  const topped = M.applyTopUp(withdrawn, 50, "2026-11-08");
+  expect(topped.balance).toBe(3700);
+  expect(topped.marketValuation?.recordedBalance).toBe(2450);
+  expect(topped.marketValuation?.priceUSD).toBe(100);
+  expect(portfolioTotals([topped]).annualIncome).toBe(132.3);
+  expect(validMarketValuation(topped.marketValuation, topped)).toBe(true);
+  const withoutHistory = M.applyTopUp({ ...valued, events: [] }, 50, "2026-11-07");
+  expect(validMarketValuation(withoutHistory.marketValuation, withoutHistory)).toBe(true);
+  expect(withoutHistory.events).toHaveLength(2);
+  for (const changed of [M.applyTopUp(valued, 1.005, "2026-11-07"), M.applyWithdraw(valued, 1.005, "2026-11-07")]) {
+    expect(validMarketValuation(changed.marketValuation, changed)).toBe(true);
+    expect(changed.events!.at(-1)!.amount).toBe(1.01);
+  }
+});
+
+test("withdrawing an entire valued holding clears income and cannot restore a phantom recorded balance", () => {
+  for (const priceUSD of [40, 100]) {
+    const valued = applyMarketValuation(releaseStock(), { ...price, priceUSD }, at);
+    const emptied = M.applyWithdraw(valued, valued.balance, "2026-11-07");
+    expect(emptied.balance).toBe(0);
+    expect(emptied.marketValuation?.recordedBalance).toBe(0);
+    expect(portfolioTotals([emptied]).annualIncome).toBe(0);
+    expect(validMarketValuation(emptied.marketValuation, emptied)).toBe(true);
+    expect(clearMarketValuation(emptied, at).balance).toBe(0);
+    const laterDeposit = M.applyTopUp(emptied, 50, "2026-11-08");
+    expect(incomeBalance(laterDeposit)).toBe(50);
+    expect(portfolioTotals([laterDeposit]).annualIncome).toBe(2.7);
+  }
+});
+
+test("valued transfers handle backdated events, revaluation, clear and provider resets without changing cost or payouts", () => {
+  const source = releaseStock(), valued = applyMarketValuation(source, price, at);
+  const moved = M.applyTopUp(M.applyWithdraw(valued, 100, "2026-11-06"), 25, "2026-11-05");
+  expect(moved.marketValuation?.recordedBalance).toBe(2425);
+  expect(moved.investment).toEqual(source.investment);
+  expect(moved.payouts).toEqual(source.payouts);
+  expect(validMarketValuation(moved.marketValuation, moved)).toBe(true);
+  const repriced = applyMarketValuation(moved, { ...price, priceUSD: 80 }, at);
+  expect(repriced.marketValuation?.recordedBalance).toBe(2425);
+  expect(repriced.balance).toBe(3000);
+  expect(clearMarketValuation(repriced, at).balance).toBe(2425);
+  const reset = M.applySetBalance(moved, 4000, "2026-11-07");
+  expect(reset.marketValuation).toBeUndefined();
+  expect(incomeBalance(reset)).toBe(4000);
+  expect(portfolioTotals([reset]).annualIncome).toBe(216);
+});
+
+test("unanchored or forged valuation totals cannot be validated by unrelated transfer entries", () => {
+  const valued = applyMarketValuation(releaseStock(), price, at);
+  const transfer = M.applyTopUp(valued, 50, "2026-11-08");
+  expect(validMarketValuation(transfer.marketValuation, { ...transfer, events: [] })).toBe(false);
+  expect(validMarketValuation(transfer.marketValuation, { ...transfer, balance: transfer.balance + 1 })).toBe(false);
+  expect(validMarketValuation(transfer.marketValuation, { ...transfer, events: transfer.events?.map((event, index) => index === transfer.events!.length - 1 ? { ...event, amount: 51 } : event) })).toBe(false);
+});
+
+test("invalid transfers and corrupt post-price ledgers fail closed without changing the holding", () => {
+  const valued = applyMarketValuation(releaseStock(), price, at), before = structuredClone(valued);
+  for (const amount of [NaN, Infinity, -1, Number.MAX_SAFE_INTEGER]) expect(() => applyValuationTransfer(valued, "topup", "2026-11-07", amount)).toThrow();
+  expect(() => applyValuationTransfer(valued, "topup", "2026-02-30", 1)).toThrow();
+  expect(() => applyValuationTransfer({ ...valued, investment: undefined }, "topup", "2026-11-07", 1)).toThrow();
+  expect(() => applyValuationTransfer(valued, "withdraw", "2026-11-07", 4000)).toThrow();
+  for (const event of [
+    { type: "set" as const, amount: 1, date: "2026-11-08" },
+    { type: "topup" as const, amount: -1, date: "2026-11-08" },
+    { type: "topup" as const, amount: 1, date: "2026-02-30" },
+  ]) expect(validMarketValuation(valued.marketValuation, { ...valued, events: [...valued.events!, event] })).toBe(false);
+  const huge = { type: "topup" as const, amount: Number.MAX_SAFE_INTEGER / 100, date: "2026-11-08" };
+  expect(validMarketValuation(valued.marketValuation, { ...valued, events: [...valued.events!, huge, huge] })).toBe(false);
+  expect(valued).toEqual(before);
 });
 
 test("a manual provider balance update clears market metadata and establishes its own income basis", () => {

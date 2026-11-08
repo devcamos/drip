@@ -52,16 +52,24 @@ test("opens each saved stock chart and explicitly revalues one holding without c
   await stock.getByRole("button", { name: "Update holding value", exact: true }).click();
   await expect(stock.getByText(/Holding value saved/)).toBeVisible();
   await expect(stock).toContainText("£3,750.00"); await expect(stock).toContainText("£135.00"); await expect(stock).toContainText("£48.00");
+  await stock.getByRole("button", { name: "Account details", exact: true }).click();
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("amount", { exact: true }).fill("100");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".bal")).toHaveText("£3,650.00");
+  await page.getByRole("button", { name: /Explore share price/ }).click();
+  await expect(stock).toContainText("£129.60");
+  await expect(stock).toContainText("Includes your recorded transfers since the price estimate.");
   await stock.getByRole("button", { name: "Back to accounts", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Money overview" })).toContainText("£5,750.00");
-  await expect(page.getByRole("region", { name: "Estimated income" })).toContainText("£16.58");
+  await expect(page.getByRole("region", { name: "Money overview" })).toContainText("£5,650.00");
+  await expect(page.getByRole("region", { name: "Estimated income" })).toContainText("£16.13");
   await cards(page).getByRole("button", { name: /Open Digital Realty/ }).click();
   const other = page.getByRole("dialog", { name: "Digital Realty share price" }); await expect(other).toBeVisible(); await expect(other).toContainText("£2,000.00");
   await page.reload(); await unlock(page, code); await cards(page).getByRole("button", { name: /Open Realty Income/ }).click();
-  await expect(stock).toContainText("£3,750.00"); await expect(stock).toContainText("£135.00");
+  await expect(stock).toContainText("£3,650.00"); await expect(stock).toContainText("£129.60");
   await stock.getByRole("button", { name: "Use recorded value", exact: true }).click();
   await expect(stock.getByText("Recorded value restored. Dividend income is unchanged.")).toBeVisible();
-  await expect(stock).toContainText("£2,500.00");
+  await expect(stock).toContainText("£2,400.00");
 });
 
 test("opens the real profile, persists the owner-scoped income preference, reaches security and signs out without exposing accounts", async ({ page }) => {
