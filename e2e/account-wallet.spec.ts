@@ -42,7 +42,8 @@ test("overlapping account wallet scrolls to every card without obscuring its con
   await page.setViewportSize({ width: 390, height: 1000 });
   // Check keyboard browsing separately from touch momentum.
   await wallet.focus();
-  for (const _ of accounts) await page.keyboard.press("Tab");
+  // Two group summaries precede their cards in the keyboard order.
+  for (let i = 0; i < accounts.length + 2; i++) await page.keyboard.press("Tab");
   const last = wallet.getByRole("button", { name: /Air Products and Chemicals/ });
   await expect(last).toBeFocused();
   await expect(last).toBeInViewport({ ratio: 1 });
@@ -73,4 +74,29 @@ test("overlapping account wallet scrolls to every card without obscuring its con
   await first.focus(); await page.keyboard.press("Enter");
   await expect(page.locator(".prov")).toHaveText("Zopa");
   await expect(page.locator(".bal")).toHaveText("£1,000.00");
+});
+
+test("account groups show their totals and can be collapsed", async ({ page }) => {
+  const debt: Account = { ...accounts[0], id: "credit-group", provider: "Barclaycard", productCategory: "credit-card", balance: 600, ratePct: 0, creditCard: { apr: 19.9, minimumPayment: 25 } };
+  await legacyAccount(page, "groups_demo", [...accounts, debt]);
+  const wallet = page.getByRole("region", { name: "Account cards", exact: true });
+  const cash = wallet.locator("details").filter({ hasText: "Cash" });
+  const investments = wallet.locator("details").filter({ hasText: "Investments" });
+  await expect(cash.locator("summary")).toContainText("£2,250.00");
+  await expect(investments.locator("summary")).toContainText("£12,750.00");
+  await expect(wallet.locator("details").filter({ hasText: "Debt" }).locator("summary")).toContainText("£600.00 owed");
+  await investments.locator("summary").click();
+  await expect(investments.getByRole("button", { name: /Open Digital Realty/ })).toBeHidden();
+  await investments.locator("summary").click();
+  await expect(investments.getByRole("button", { name: /Open Digital Realty/ })).toBeVisible();
+  if (process.env.DRIP_GROUP_CAPTURE) {
+    await mkdir("docs/screenshots/grouped-accounts", { recursive: true });
+    while (await wallet.locator("details[open] > summary").count()) await wallet.locator("details[open] > summary").first().click();
+    await wallet.evaluate(el => { el.scrollTop = 0; });
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: `docs/screenshots/grouped-accounts/accounts-${width}.png`, fullPage: true, scale: "css" });
+    }
+  }
 });

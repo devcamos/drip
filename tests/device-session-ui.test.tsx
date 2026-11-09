@@ -54,6 +54,19 @@ describe("visible sign-out and code return", () => {
     fireEvent.click(button);
     await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
   });
+  it("offers biometric unlock on reopening a locked vault and retains password fallback after cancellation", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    passkeys.unlockWithPasskey.mockRejectedValueOnce(new DOMException("Cancelled", "NotAllowedError"));
+    const resumed = vi.fn();
+    render(<SignedOut onSignedIn={resumed} mode="locked" />);
+    const button = await screen.findByRole("button", { name: "Unlock with Face ID, Touch ID or passkey" });
+    expect(screen.getByRole("form", { name: "Password sign-in" })).toBeInTheDocument();
+    fireEvent.click(button);
+    expect(await screen.findByText(/Passkey unlock was cancelled/)).toBeInTheDocument();
+    expect(resumed).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
+  });
   it("does not offer passkeys before legacy encryption, and keeps generic unlock failure visible", async () => {
     passkeys.hasPasskeyUnlock.mockResolvedValue(true);
     const { unmount } = render(<SignedOut onSignedIn={vi.fn()} mode="migration" />);

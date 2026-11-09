@@ -34,7 +34,7 @@ test("keeps multiple credit cards independently editable after encrypted reload 
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByRole("region", { name: "Credit card payment plan" })).toContainText("£90.00");
   await page.reload(); await unlock(page, code);
-  await expect(cards(page).getByRole("button")).toHaveCount(3);
+  await expect(cards(page).getByRole("button", { name: /^Open / })).toHaveCount(3);
   await cards(page).getByRole("button", { name: /Open Barclaycard/ }).click();
   await expect(page.getByRole("region", { name: "Credit card payment plan" })).toContainText("£90.00");
   await page.getByRole("button", { name: "← Accounts", exact: true }).click();
@@ -84,7 +84,7 @@ test("opens the real profile, persists the owner-scoped income preference, reach
   await page.getByRole("button", { name: /Open profile and settings/ }).click();
   await profile.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to Drip", exact: true })).toBeVisible(); await expect(cards(page)).toHaveCount(0);
-  await unlock(page, code); await expect(cards(page).getByRole("button")).toHaveCount(5);
+  await unlock(page, code); await expect(cards(page).getByRole("button", { name: /^Open / })).toHaveCount(5);
 });
 
 test("exports and restores the actual encrypted backup into a fresh browser with all holdings, credit terms and valuation baseline", async ({ page, browser }) => {
@@ -99,7 +99,7 @@ test("exports and restores the actual encrypted backup into a fresh browser with
     await restored.goto(new URL(page.url()).origin); await showCloudRecovery(restored);
     await restored.getByRole("button", { name: "Restore a backup", exact: true }).click(); await restored.getByLabel("Backup file", { exact: true }).setInputFiles((await file.path())!);
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code); await restored.getByRole("button", { name: "Restore", exact: true }).click();
-    await expect(cards(restored).getByRole("button")).toHaveCount(5); await expect(restored.getByRole("region", { name: "Money overview" })).toContainText("£8,950.00");
+    await expect(cards(restored).getByRole("button", { name: /^Open / })).toHaveCount(5); await expect(restored.getByRole("region", { name: "Money overview" })).toContainText("£8,950.00");
     await cards(restored).getByRole("button", { name: /Open Barclaycard/ }).click(); await expect(restored.getByRole("region", { name: "Credit card payment plan" })).toContainText("£75.00");
     await restored.getByRole("button", { name: "← Accounts", exact: true }).click(); await cards(restored).getByRole("button", { name: /Open Realty Income/ }).click();
     const stock = restored.getByRole("dialog", { name: "Realty Income share price" }); await expect(stock).toContainText("£3,750.00"); await expect(stock).toContainText("£135.00");

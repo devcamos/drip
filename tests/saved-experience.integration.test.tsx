@@ -17,6 +17,26 @@ import Drip from "../app/Drip";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseIdentity, releaseSaver, releaseStock } from "./saved-experience-fixtures";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 import type { AppData } from "../lib/types";
+import { AccountsHome } from "../app/accounts/AccountsHome";
+import { portfolioTotals } from "../lib/credit-card";
+
+it("groups accounts with separate totals, collapses sections and opens the correct card", () => {
+  const accounts = releaseHoldingsAndDebts();
+  const onOpen = vi.fn();
+  render(<AccountsHome accounts={accounts} totals={portfolioTotals(accounts)} creditPlans={[]} incomePeriod="month" onIncomePeriod={vi.fn()} onAdd={vi.fn()} onOpen={onOpen} onPortfolio={vi.fn()} />);
+  const cash = screen.getByText("Cash").closest("details")!;
+  const investments = screen.getByText("Investments").closest("details")!;
+  const debt = screen.getByText("Debt").closest("details")!;
+  expect(cash.querySelector("summary")).toHaveTextContent("£5,000.00");
+  expect(investments.querySelector("summary")).toHaveTextContent("£4,500.00");
+  expect(debt.querySelector("summary")).toHaveTextContent("£1,800.00 owed");
+  fireEvent.click(within(investments).getByText("Investments"));
+  expect(investments).not.toHaveAttribute("open");
+  fireEvent.click(within(investments).getByText("Investments"));
+  expect(investments).toHaveAttribute("open");
+  fireEvent.click(within(investments).getByRole("button", { name: /Open Digital Realty/ }));
+  expect(onOpen).toHaveBeenCalledWith("stock-2");
+});
 
 const at = Date.parse("2026-11-07T12:00:00Z");
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; };

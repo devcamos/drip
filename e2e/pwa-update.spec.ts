@@ -70,7 +70,7 @@ test("saved bookmark updates from the old worker, refreshes imported build ident
     await context.setOffline(true);
     expect(await other.evaluate(async path => (await fetch(path!)).ok, oldAsset)).toBe(true);
     await page.reload(); await unlock(page, code);
-    await expect(cards.getByRole("button")).toHaveCount(3);
+    await expect(cards.getByRole("button", { name: /^Open / })).toHaveCount(3);
     await expect(page.getByRole("region", { name: "Money overview" })).toContainText("£6,900.00");
     await cards.getByRole("button", { name: /Open Lloyds/ }).click();
     await expect(page.getByRole("region", { name: "Credit card payment plan" })).toContainText("£50.00");

@@ -7,6 +7,18 @@ import { dataFormatVersion } from "../lib/data-format";
 import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
 import * as M from "../lib/maths";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseSaver, releaseStock } from "./saved-experience-fixtures";
+import { groupAccounts } from "../app/accounts/presentation";
+
+test("groups recorded cash, investments, debt and unclassified products without mixing balances", () => {
+  const accounts = [releaseSaver({ balance: 0.1 }), releaseSaver({ id: "cash-2", balance: 0.2 }), releaseStock(), releaseDebt(), releaseSaver({ id: "other", productCategory: "other", balance: 5 })];
+  const before = structuredClone(accounts);
+  expect(groupAccounts(accounts).map(group => [group.label, group.accounts.length, group.total])).toEqual([
+    ["Cash", 2, 0.3], ["Investments", 1, 2500], ["Debt", 1, 1200], ["Other", 1, 5],
+  ]);
+  expect(accounts).toEqual(before);
+  expect(groupAccounts([releaseStock({ productCategory: undefined })])[0].label).toBe("Investments");
+  expect(groupAccounts([])).toEqual([]);
+});
 
 const at = Date.parse("2026-11-07T12:00:00Z");
 // Transfer fixtures include actual entries through8Nov; the quote clock remains explicit.
