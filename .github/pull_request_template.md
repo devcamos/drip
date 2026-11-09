@@ -4,7 +4,8 @@
 - **Type of Change:** 🐛 Bug Fix | ✨ Feature | 🧹 Refactor | ⚡ Performance | 🛡️ Security
 
 ### What changed?
-<!-- Summarize the changes at a high level (behavioral changes, not just file lists). -->
+<!-- Summarize the changes in bullet points, focusing on behavior rather than file lists. -->
+-
 
 ### Why this approach?
 <!-- Why was this solution chosen over alternative approaches? Any technical trade-offs made? -->
