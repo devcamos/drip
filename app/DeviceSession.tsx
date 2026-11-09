@@ -85,14 +85,14 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
     description={copy.description}>
     <PwaStatus />
     {signingIn && <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />}
-    {passkey && recovering && mode !== "migration" && <section className="panel" aria-label="Unlock with your passkey">
+    {passkey && mode !== "migration" && (recovering || (signingIn && mode === "locked")) && <section className="panel" aria-label="Unlock with your passkey">
       <h2>Use your saved unlock passkey</h2><p className="muted">No password or code needed. You can set a new password in Settings after unlocking.</p>
       <button className="btn" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
         try { await unlockWithPasskey(); await onSignedIn(); }
         catch (error) { setMessage((error as Error).name === "NotAllowedError" ? "Passkey unlock was cancelled or unavailable. Try again or use a recovery code." : "Could not unlock with this passkey. Try again or use a recovery code."); }
         finally { setBusy(false); }
-      }}>{busy ? "Unlocking…" : "Unlock with passkey"}</button>
+      }}>{busy ? "Unlocking…" : signingIn ? "Unlock with Face ID, Touch ID or passkey" : "Unlock with passkey"}</button>
       <p className="muted">Use Face ID, Touch ID or your device lock.</p>
     </section>}
     {signingIn && <>
