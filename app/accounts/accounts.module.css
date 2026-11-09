@@ -50,6 +50,16 @@
 .addSmall { display:grid; place-items:center; border:1px solid #ddcebc; background:#fffaf1; border-radius:50%; width:44px; height:44px; flex:none; font-size:24px !important; font-weight:400; color:var(--copper); }
 .cardStack { position:relative; isolation:isolate; margin:0 -6px; padding:12px 6px 26px; max-height:clamp(300px,68svh,670px); overflow-y:auto; overflow-x:hidden; scroll-snap-type:y proximity; scroll-padding-block:12px; border-radius:22px; }
 .cardStack:focus-visible { outline:3px solid var(--copper); outline-offset:1px; }
+.accountGroup + .accountGroup { margin-top:18px; }
+.groupHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; padding:12px 4px; color:var(--ink); }
+.groupHeading::before { content:'›'; display:inline-block; font-size:21px; line-height:1; transition:transform .15s ease; }
+.accountGroup[open] > .groupHeading::before { transform:rotate(90deg); }
+.groupHeading > span { flex:1; }
+.groupHeading span { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.groupHeading small { color:var(--quiet); font-size:12px; }
+.groupHeading strong { font-size:14px; text-align:right; }
+.groupHeading:focus-visible { outline:3px solid var(--copper); outline-offset:2px; border-radius:8px; }
+.groupCards { padding:4px 0 2px; }
 button.accountCard { display:flex; align-items:center; gap:12px; position:relative; color:inherit; border:1px solid #ffffff60; border-radius:20px; box-shadow:0 11px 17px #3d203c20,inset 0 1px 0 #ffffff45; overflow:hidden; width:100%; min-height:116px; padding:24px 21px; text-align:left; scroll-snap-align:start; scroll-margin-block:12px; }
 button.accountCard + button.accountCard { margin-top:-6px; }
 button.accountCard:hover { box-shadow:0 14px 24px #3d203c30,inset 0 1px 0 #ffffff45; }

@@ -26,6 +26,24 @@ export type NextAccountPayment = Readonly<{
 }>;
 export type AccountCounts = Readonly<{ cash: number; stocks: number; credits: number }>;
 
+export function groupAccounts(accounts: readonly Account[]) {
+  const groups: { key: string; label: string; accounts: Account[]; total: number }[] = [
+    { key: "cash", label: "Cash", accounts: [], total: 0 },
+    { key: "investments", label: "Investments", accounts: [], total: 0 },
+    { key: "debt", label: "Debt", accounts: [], total: 0 },
+    { key: "other", label: "Other", accounts: [], total: 0 },
+  ];
+  for (const account of accounts) {
+    const group = account.productCategory === "credit-card" ? groups[2]
+      : account.productCategory === "other" ? groups[3]
+      : account.productCategory === "stocks-funds" || (!account.productCategory && account.rateType === "dividend") ? groups[1]
+      : groups[0];
+    group.accounts.push(account);
+    group.total += Math.round(account.balance * 100);
+  }
+  return groups.filter(group => group.accounts.length).map(group => ({ ...group, total: group.total / 100 }));
+}
+
 export function profileInitials(identity?: Pick<Identity, "handle">): string {
   const handle = identity?.handle?.trim();
   if (!handle) return "dr";
