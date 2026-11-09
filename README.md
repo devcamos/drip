@@ -1,151 +1,59 @@
 # Drip
 
-A local-first savings and passive-income tracker, installable as a PWA. Track ISAs, savers and investments, record interest and dividends, and see projections. Data is encrypted on the device, with optional end-to-end encrypted cloud recovery. No real name, email address or phone number is requested.
+Drip is a local-first personal finance tracker and installable PWA. It brings savings, investments and credit-card debt together, with recorded income, reminders and projections. No real name, email or phone number is required.
 
-**Live:** https://drip-one-xi.vercel.app
+**Live app:** [drip-one-xi.vercel.app](https://drip-one-xi.vercel.app/) · **Changes:** [GitHub Releases](https://github.com/devcamos/drip/releases)
 
-## Stack
+## What you can do
 
-- Next.js 16 (App Router), React 19, TypeScript, Node 24
-- IndexedDB with AES-256-GCM encryption on the device; Better Auth (passwords and passkeys) and PostgreSQL (Neon) for optional encrypted cloud recovery
-- Self-hosted DM Sans; warm ivory / terracotta / espresso palette
-- Vitest with coverage, Playwright (mobile Chromium, offline reload); deployed on Vercel
+- Group cash, investments and debt; update balances and choose account colours.
+- Record interest, dividends and bonuses separately from balances. View dividend holdings, payment dates and estimated future income.
+- Record credit-card APR, minimum and planned payments. Reminders do not make payments or change the amount owed.
+- View trends and projections. Figures are estimates, not financial advice or confirmed provider payments.
+- Install Drip on a supported phone or desktop and opt in to payment reminders. iPhone push notifications require the Home Screen app and notification permission.
 
-## Run and test locally
+Balances and rates are entered by the user. Drip does not connect to banks, execute trades or fetch live share prices. Where supported, manually entered share prices can be converted using Frankfurter reference exchange rates; the result is an estimate.
 
-Node **24.22.1** (the current Vercel-supported LTS; see `.nvmrc`). `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, then `npm start`.
-CI and PR Intelligence use the pinned runtime. Vercel supports the 24.x major and manages its patch rollout. Keep `@types/node` on 24.x to match the runtime; update within that major. Assess newer-major dependency suggestions against host and framework support before upgrading.
+## Getting started
 
-`npm run e2e` exercises mobile Chromium, including an offline reload. This is now a full-stack Next.js app, not a static `out/` export.
+Use Node **24.22.1** as pinned in [`.nvmrc`](.nvmrc):
 
-## Optional encrypted cloud recovery
+```sh
+npm ci
+npm run dev
+```
 
-Copy `.env.example` to ignored `.env.local`, supply a dedicated environment's database and random auth secret, and set `BETTER_AUTH_URL` to that environment's stable origin. Do not use deployment-specific URLs: storage and passkeys belong to a hostname. Never share Preview database credentials or auth secrets with Production. Run `node --env-file=.env.local scripts/migrate.mjs` against the selected database before starting.
+Open [http://localhost:3000](http://localhost:3000). To use cloud-backed signup, login and recovery locally, copy `.env.example` to ignored `.env.local` and configure a **dedicated non-production** database, auth secret and stable local origin. Apply the schema to that environment with `node --env-file=.env.local scripts/migrate.mjs` before use. Phone reminders need their own configuration and additive migration; see [payment notifications](docs/payment-notifications.md).
 
-New gamertag/password signup creates encrypted cloud access automatically. Existing local-only accounts can enable it in Settings using their saved recovery code; local tracking still works without enabling cloud. On a fresh browser, sign in with a configured gamertag/password to restore the latest successfully synced copy, or choose Forgot password to recover with a saved code. A cloud sign-in passkey authenticates but still needs a recovery code to decrypt on that browser; it is separate from browser-local Passkey unlock. A display gamertag remains a label; the sign-in gamertag registered below is unique and case-insensitive.
+```sh
+npm run typecheck
+npm test
+npm run build
+npm run start
+```
 
-Cloud authentication uses Better Auth and its passkey plugin. A domain-separated digest of the random recovery code supplies an internal synthetic `.invalid` email identifier and another digest supplies an authentication secret. No mail is sent. The root code is never sent to the server. Server-side authentication still handles security metadata such as rate limiting; this is pseudonymous, not a promise of anonymous financial data.
+For the full regression gate, including browser journeys and a disposable local Postgres database, see the [regression standard](docs/testing/regression-policy.md). Never point test databases at Production. CI also runs a dependency audit.
 
-Cloud payloads use AES-256-GCM with random IVs and PBKDF2-SHA256 (600,000 iterations). The separate non-exportable cloud key stays only in memory while this page is unlocked. Backups are encrypted. There is no administrator decryption/reset; keep recovery codes outside this device.
+## Security and recovery
 
-Local changes and their queued-upload marker commit together. Sync runs on changes, reconnect, returning to the foreground, and periodically while the app is open. It is not a continuously running background service. Failed uploads keep local data. Local writes carry monotonically increasing revisions, and upload acknowledgements atomically preserve any newer revisions. After encryption and before upload, sync rechecks the account, connection generation and base version: a restore or reconnect completed during encryption cancels the stale upload. Connection generations also prevent a delayed acknowledgement from changing a restored/reconnected device. Every private request is bound to an expected account as well as a server session. Every upload uses compare-and-swap versions; a stale device gets a visible conflict and cannot overwrite the cloud copy. This version does not automatically merge accounts or events. Export a local backup before explicitly restoring a newer cloud copy. Expired sessions can be renewed using the code without replacing local accounts. File imports disconnect cloud recovery to prevent accidental cross-account uploads. Explicit disconnect clears connection metadata only after confirmed server sign-out, with device/connection generation checks; a failed disconnect retains the connection and queued edits. Device app-lock credentials are excluded from cloud restores.
+Financial records are encrypted in the browser before local storage or cloud sync. A gamertag and password provide sign-in; cloud sessions are limited to four devices and expire after seven days. Sign-out locks the local vault and retains its encrypted data. A fresh page needs a password, a configured unlock passkey or a recovery code to unlock it.
 
-## Installing Drip
+Save the original recovery codes somewhere safe. If the password, recovery codes and all configured devices are lost, Drip cannot decrypt or reset the account for you. A cloud copy contains the latest successfully synced data; unsynced changes remain on their original device. Sync conflicts require review rather than silently overwriting another device.
 
-Installation guidance is a contextual setup task: complete or dismiss it once per
-browser. Native installation/standalone detection completes it automatically;
-iOS also offers **I've added Drip**, because the original tab cannot reliably
-observe installation in another context. Completion briefly confirms, fades and
-disappears. Reduced-motion users get the same confirmation without animation.
-This non-secret preference is separate from encrypted financial data. Installing
-does not itself provide cloud recovery; Settings retains recovery and backup tools.
+Passkey unlock can use Face ID, Touch ID or a device lock on compatible browsers and password managers supporting WebAuthn PRF. Set it up in Settings on each browser after signing in; Preview and Production are separate origins. Phone reminders use generic lock-screen text, not account names or amounts.
 
-## Gamertag and password sign-in
+For the architecture and trust boundaries, see [Architecture](docs/architecture.md). For session expiry and limitations, see [Session policy](docs/session-policy.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-Drip separates **Sign in**, **Sign up** and **Forgot password?** into screens in
-the same app window; file restore is reached from recovery. Leaving a password
-form clears its unsent password. Signed-out devices retain their encrypted
-accounts; opening an auth form is not permission to replace them. **Use another
-account** requires confirmation before replacing this browser's local copy.
+## Developer guide
 
-Online password sign-in first verifies credentials without creating a session.
-If another account is saved here, it offers an inline switch only when that
-copy is already cloud-saved. Cancelling leaves it intact; unsynced or device-only
-copies must be synced before replacement. Confirmation is bound to the exact
-saved copy, so concurrent edits cancel the switch rather than being overwritten.
+- [Architecture and C4 diagrams](docs/architecture.md)
+- [Encrypted sync, account workflows and compatibility](docs/account-workflows.md)
+- [Device management](docs/device-management.md) and [guided recovery](docs/guided-recovery.md)
+- [Payment calendar](docs/payment-calendar.md) and [phone notifications](docs/payment-notifications.md)
+- [Exchange rates](docs/exchange-rates.md) and [investment statistics](docs/dividend-investment-stats.md)
+- [Regression policy and test layers](docs/testing/regression-policy.md)
+- [UI screenshots](docs/screenshots/)
 
-Up to four browser profiles/devices can hold active cloud sessions per account.
-Reopening the same browser renews its slot; a fifth browser must wait for a sign-out.
-An opaque browser identifier is shared across tabs and retained across sign-out;
-it is not a hardware fingerprint. Password, recovery and cloud-passkey sign-in
-share server-side admission. The cap cannot revoke offline copies or keys already
-held elsewhere. See the [release preparation](docs/releases/account-wallet-and-signin.md)
-for the additive session migration and reviewed legacy-session cleanup.
+## Licence
 
-Normal sign-in uses a unique, case-insensitive sign-in gamertag and a password (12–256 characters; case, spaces and punctuation preserved). Password managers use standard username/current-password/new-password autocomplete. Signup requires a gamertag and matching password, then opens Accounts directly. It does not show a recovery code or a save-code checkbox. New registration needs a connection; existing encrypted accounts continue to work offline with configured credentials. Existing accounts use a recovery code once in **Settings → Sign-in & password** to add a password. **Forgot password?** opens the separate recovery screen and restores access; the same setup form sets a new password. No real name, email or phone is required.
-
-The additive `drip_password_login` table links the existing Better Auth user to a unique login gamertag, a Better Auth/scrypt-hashed domain-separated password proof, and an encrypted recovery-root wrapper. No second user/principal or homemade session is introduced. Better Auth creates/verifies ordinary sessions/cookies. The browser derives an AES-256-GCM wrapping key from the exact password with PBKDF2-SHA256/600,000 iterations and a random salt; authenticated metadata binds username, owner, version and salt. Authentication receives a separate SHA-256 proof, never the plaintext password or root. Only a successful password login returns the encrypted wrapper; unknown users and wrong passwords use the same failure, including dummy hashing. Durable global/IP/name limits, explicit same-origin checks, 4KB streamed body limits and owner/recovery-proof verification protect the new endpoints. Setup/reset preserves the original random recovery credential and all existing accounts/backups. Other cloud sessions are deleted on reset; this cannot revoke keys or old offline wrappers already held by other devices.
-
-Password setup saves/links encrypted cloud recovery where no cloud copy exists. It never silently overwrites a different cloud revision. Returning to a known browser unlocks its local copy without replacing unsynced changes; first sign-in on a fresh browser restores the latest successfully synced copy. Offline return works only with this browser's cached encrypted password wrapper. Online password login always verifies on the server before opening a cached copy, so an outdated password does not silently fall back to offline unlock. A fully offline old device may retain its pre-reset wrapper; revoking previously held keys requires a separate root-rotation design. Database compromise exposes material subject to offline password guessing; use a strong password. Display gamertags, device nicknames and sign-in gamertags have distinct privacy roles: sign-in names and wrapper metadata are account identifiers, while balances/history stay encrypted. Password hashes/proofs and password wrappers are excluded from financial exports/sync payloads; each browser caches only its own current wrapper. Replacement deletes the old local wrapper.
-
-Apply `scripts/migrate.mjs` to the intended environment before deploying this feature. Development migration was tested only on the isolated Preview database; Production migration/release needs its own authorization. No Production data copying is involved.
-
-Password reset and login finalization share an owner-row lock in a short READ COMMITTED transaction. Better Auth creates a candidate session before that transaction, but Drip publishes no cookie or encrypted unlock wrapper until the current credential and session are checked under the lock. A reset that wins the overlap causes the stale login's candidate to be removed and rejected. If login finalizes first, reset revokes that session. The reset mutation runs in a separate statement after taking the lock so it sees sessions committed while waiting. Auth-adapter calls stay outside the transaction to avoid exhausting the shared connection pool. Transaction failures fail closed without publishing the candidate token. This does not revoke encryption roots or offline wrappers already held elsewhere.
-
-Cloud sign-ins have an explicit seven-day expiry without automatic extension, host-only HttpOnly/Secure-on-HTTPS cookies, no cached session authorization and no-store auth responses. Better Auth sensitive endpoints use a five-minute freshness window; ordinary access is not logged out after five minutes. Local vault unlock remains separate. See [session policy and its limits](docs/session-policy.md), including the optional screen lock and the absence of a mandatory server idle timeout.
-
-Dividend holdings with shares and USD/EUR original-price details offer [daily GBP currency estimates](docs/exchange-rates.md) using Frankfurter's free blended reference rates. Enter the current share price to calculate a separate estimate; recorded balances, purchase cost and dividend assumptions stay unchanged. No API key or live stock-price feed is involved. [UI evidence](docs/screenshots/daily-exchange-rates/README.md).
-
-## Encrypted local accounts
-
-Local unlock is independent of cloud authentication. After sign-out, a valid recovery code opens the existing encrypted device copy before a best-effort cloud sign-in runs. Authentication outages keep local accounts, edits and queued uploads usable. The renewal is bound to the device generation and cannot start after a later sign-out/account switch. If it fails, sync reports that sign-in is needed; Settings → Device sign-in options → Sign in without replacing local data renews the session later. A cached password wrapper, configured passkey, original code or already cached alternative can unlock offline without a server lookup.
-
-Account records, balances, history, gamertag and device app-lock settings are stored in IndexedDB as AES-256-GCM ciphertext. Each vault has a random 256-bit data key; a random-salt PBKDF2-SHA256/AES-GCM wrapper protects it under the original recovery root. Data encryption uses a fresh 96-bit nonce per write and authenticates the vault id. Non-exportable local and cloud keys exist only in page memory. IndexedDB retains the wrapped data key, salted recovery verifier, encrypted recovery wrappers and non-secret connection/session metadata (random ids, versions, revisions, timestamps and flags), not usable CryptoKeys or the root code.
-
-A full reload, new tab or process restart needs a configured password, passkey or recovery code. Set up **Settings → Passkey unlock** once with a valid recovery code. A saved, discoverable WebAuthn credential with required user verification supplies a 32-byte PRF result; HKDF-SHA256 derives a non-exportable AES-256-GCM wrapping key. Only an authenticated encrypted recovery-root wrapper, credential id and public salt are stored in this browser. The wrapper is bound to the vault id, origin, RP id, credential id, salt and format version. Setup verifies an actual PRF authentication and encryption round-trip before committing. Unsupported/cancelled setup preserves the existing code path and any existing wrapper. Ordinary cloud-sign-in and legacy screen-lock passkeys are separate and do not decrypt the vault.
-
-Passkey unlock is browser-local: a synced passkey alone cannot restore a cleared browser or a new device; sign in with a configured gamertag/password or use a recovery code, then configure passkey unlock there. Removing passkey unlock deletes only this browser's wrapper; the saved credential can be deleted separately in the password manager. Sign-out drops active keys and revokes the server session while retaining the sealed wrapper for explicit sign-in. Unlock and setup are bound to the device generation and vault id, so a sign-out or replacement during a prompt cancels them. Vault replacement removes its wrapper. Each tab unlocks independently; foregrounding a still-unlocked page preserves its session. Sync runs only while unlocked. The optional legacy screen lock remains distinct and keeps the active page's keys in memory.
-
-Existing installs show **Encrypt this device** before revealing accounts. A matching code verifies the existing recovery verifier and legacy cloud key. Encryption is decrypted and checked before one guarded transaction replaces plaintext, removes the old stored cloud key/onboarding key and installs the wrapped-key header. Failure, a competing restore or sign-out leaves the old copy intact. Schema v2 prevents legacy v1 clients from writing plaintext over the vault. Do not downgrade to an old client after migration. Migration removes accessible old records; secure physical erasure from browser/OS backups is not guaranteed.
-
-Unfinished signup names stay in memory only; passwords clear on leaving the form. Registration saves cloud/password access before atomically installing the encrypted local vault and its password wrapper. A failed registration stays on signup without creating a local account that lacks usable credentials. Concurrent local account creation cancels installation rather than replacing that account. File/cloud imports create a new local vault under that account's root and invalidate pending writes from the replaced copy. Before committing a replacement, one IndexedDB transaction verifies that the stored data and cloud metadata still match the pre-encryption snapshot. An edit from this or another tab, or a completed sync during encryption, cancels replacement and preserves the current copy. Data encryption does not protect an already unlocked page from malicious same-origin scripts or a compromised device. Losing all passwords, recovery codes and configured passkeys after the page closes also loses access to unsynced local data.
-
-## PWA lifecycle
-
-Manifest, icons, standalone mode and a service worker support installation. Bookmark the stable app address, or open it in Safari → Share → Add to Home Screen; Android browsers also offer an install action. Keep using that same address: a one-off deployment URL stays tied to that deployment, and another hostname has separate local storage and passkeys. Browser storage can still be cleared; installation is not a backup.
-
-Once a new version is deployed to that address, opening the bookmark online loads the current app. A running copy checks for updates when brought to the foreground, when a connection returns and periodically while visible. Each build supplies a public release identity so the offline shell updates along with the app; no manual cache-version bump is required. Finish editing, wait for the local save, then choose **Reload update** when offered. Updates replace app files, preserving encrypted local accounts and queued saves; they do not require reinstalling or clearing browser data. Offline copies keep their previous working version until an update can be downloaded.
-
-The service worker caches only the public shell, fonts and static assets. Auth/session/vault APIs are never cached. Update/version messages are accepted only from the app's own origin. Before authentication or private requests, a worker-version handshake blocks any legacy Drip worker that cached all GETs until the user accepts the update. Previous immutable chunks remain available while another app tab is open. Physical iPhone/Safari install behaviour must be tested separately; Chromium emulation is not that test.
-
-## Backend verification
-
-`DRIP_CLOUD_E2E=1 npm run e2e` additionally tests against the configured isolated Preview database: cross-device restore, offline queued writes, conflicts and unauthorised vault access. It creates synthetic encrypted test accounts. Ordinary CI skips this database-dependent case when credentials are absent but runs all offline and local journeys. Use dedicated non-production test data.
-
-`e2e/password-race.spec.ts` uses that flag and an explicit isolated-Preview host/local-origin guard. It pauses real authentication during verification and session creation, completes reset in another request, and checks that stale logins receive no session cookie and leave no extra session. It also checks owner-lock exclusion, fresh post-lock session visibility and progress with the three-connection pool. Its synthetic user and cascaded rows are removed afterward; never point this test at Production.
-
-Server auth and vault endpoints require a session, same-origin writes, bounded encrypted payloads, per-owner vault rate limits and version checks. Never put database URLs, auth secrets, recovery codes, cookies or browser traces containing them into git or public CI artifacts.
-
-## Device-only nicknames
-
-Cloud payloads use an explicit allowlist, including nested account/history fields. Account nicknames and device lock settings are excluded before encryption. New local fields are not synced by default. Cloud restores strip those fields from older copies; restoring the same account while this device is unlocked preserves its current local nicknames by account id. A new device starts with blank nicknames.
-
-The next successful sync replaces an older current cloud copy containing excluded fields even when no financial edits are queued. This does not claim to erase historical infrastructure backups. Manual encrypted file exports remain full copies of the local records, including nicknames; that is an explicit export rather than automatic cloud sync.
-
-## Recovery codes and Trends
-
-After signup, optionally open Settings → Six ways back in → confirm your password → Create six recovery codes → Download recovery codes. No earlier recovery code is required for a password account. Existing code-only accounts can still verify with their saved code after enabling cloud recovery and syncing. This creates a numbered text file containing six independent, reusable codes. Each random `DRIP2-` code encrypts the same original root using PBKDF2-SHA256 (600,000 iterations) and AES-GCM. Only SHA-256 locators and encrypted wrappers reach the server. Lookup returns no account data; authentication and vault decryption still happen using the recovered root in the browser. Original codes remain supported. Do not save this file alongside shared exports.
-
-Replacing a set atomically removes its server lookups; this is not key revocation. Previously recovered devices or anyone who retained a decrypted root/wrapper keep access. Codes do not recover unsynced changes. New-device recovery requires network access; encrypted wrappers cached on a trusted device also support offline unlock. Downloads are shown only during that screen visit; save before leaving. Server save success still reveals the codes if local wrapper caching fails. Public recovery lookup and authenticated rotation have durable global/IP rate limits. IP buckets are HMAC-derived; forwarded IPs are trusted only on Vercel.
-
-The old storage/fortnightly backup nags are replaced with local-only, queued or cloud-saved status. File backups, imports and app lock remain under Advanced. Recovery codes are optional setup in Settings, separate from signup and everyday sign-in. Save them before losing a password. A configured passkey unlocks only a browser where its encrypted wrapper is retained; it does not restore a cleared or new browser on its own. Without a usable password, saved recovery code or accessible configured device, there is no administrator reset or decryption service. Codes recover the latest successfully synced copy, not unsynced edits on another device.
-
-Trends plots recorded month-end snapshots, a Today marker, and dashed future estimates. No history is invented. The 3m/6m/1y/Max/Future controls filter the chart. Projection assumptions (monthly top-up and 1/3/5-year horizon) are saved with account data and included in encrypted recovery. The baseline shows today's balance plus planned top-ups, not historical cost basis. An accessible table provides the chart values.
-
-## Products, income and predictions
-
-Choose Cash ISA, Cash Lifetime ISA (LISA), easy-access saver, regular saver, current account, stocks/funds or Other. Moneybox is available as a provider, including for Cash LISAs and Cash ISAs. Cash LISAs use interest calculations and retain their Lifetime ISA classification in backups and cloud recovery. Categories set editable calculation defaults for every provider, without enforcing eligibility, deposit limits or withdrawal conditions. Stocks/funds can be marked as held in a Stocks & Shares ISA. Providers never determine ISA status automatically; older accounts remain unclassified until edited.
-
-Lloyds Bank is available for easy-access savers and other selected categories. For Trading 212 stocks/funds, choose Realty Income, Digital Realty, Prologis, American Tower, Brookfield Infrastructure or Air Products and Chemicals, enter another holding name, or track the whole account. The list supplies names only: enter your own balance, expected dividend yield and payment schedule. Holding identity is separate from the private nickname and travels in encrypted backups/cloud recovery. Existing whole-account portfolios stay supported. Account colours can be changed in Add/Edit using presets or a custom colour, previewed before saving and reset to the provider default. Later edits preserve the chosen colour; card text adapts for readability.
-
-The entered balance is authoritative. Opening Drip, logging interest/dividends/bonus payments and calculating predictions never credit interest to that balance. Use Update balance to match the provider, or Top up/Withdraw for transfers. Forms wait for the encrypted write before finishing; wait for "Saved on this device" before reloading or closing. Failed writes leave saved data unchanged and keep form entries available for retry. Edits are serialized from the last confirmed snapshot so retrying never applies a failed action twice. Balance corrections aren't inferred to be income. Actual income is recorded separately by receipt date, with monthly/all-time totals and weekly/monthly grouping; log individual payments or one monthly total, without duplicating both. Mistaken receipts can be removed. Old actual payouts are retained. Previous auto-generated daily estimates remain under Previous interest estimates, separate from actual income; existing balances aren't retroactively changed.
-
-Enter the standard annual interest rate or expected dividend yield. Monthly/daily figures are approximate averages, not exact provider settlements or an AER-to-gross conversion. Forecasts average income monthly at the current rate, with reinvestment configurable per account (on for cash products, off for stocks/funds by default). Stock price changes aren't predicted. Planned deposits arrive at month end and are split in proportion to starting account balances. Predicted income excludes deposits and includes income paid out, even when that income isn't reinvested into the projected balance.
-
-An optional pending bonus stores only an amount and expected payment date. Update this from the provider; Drip doesn't calculate further bonus accrual or eligibility. Future-dated bonuses enter the prediction once, never the saved balance or recorded income. Past-dated pending bonuses stay visible but are excluded from forecasts until their date is updated. Recording a bonus receipt clears its pending prediction; update the account balance separately if needed. Categories, ISA status, income receipts, reinvestment assumptions and pending bonuses are included in encrypted backups and cloud recovery. Device-only nicknames remain excluded from cloud payloads.
-
-## Sign out
-
-Use **Sign out** beside your gamertag. It locks Drip on this device, pauses cloud sync and ends the cloud session when connected. Already-accepted local saves finish before locking. Encrypted accounts and queued revisions are retained; usable local/cloud keys and the decrypted account view are dropped from this page. Use your configured password or passkey for normal return; an original or previously cached recovery code remains the recovery fallback. Online return renews the matching cloud session without restoring over pending changes. Newly used alternative codes require online lookup.
-
-Offline/failed cloud revocation stays visibly pending, retries on reconnect, and offers Retry cloud sign-out. Reload and other tabs keep the gate. Unlocking one tab does not give keys to another; each unlocks independently. Private requests and sign-out use the browser's shared Web Lock where available (per-tab queue fallback); generation checks reject stale sign-in/sign-out and restore completion. File/cloud restores commit data, verifier and connection atomically only while the initiating device session remains active. Sign-out does not delete the cloud account or cloud copy.
-
-From the signed-out screen, **Use another account** offers gamertag/password sign-in for an existing cloud account; **Forgot password?** there opens recovery with a saved code. Both restore the latest successfully synced copy after confirmation that it replaces this browser's local accounts. Unsynced edits are not transferred: sign back in to the current account and sync or export a backup before replacing it. A failed restore keeps the previous copy intact. The new account's ciphertext, verifier, wrapped data key and active device generation commit together; usable keys are activated only in memory after the commit. Cancelling the prompt leaves the device signed out. Sign-out retains local data; confirmed account replacement is a different action.
-
-## Security
-
-Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
-
-## License
-
-Proprietary. Copyright devcamos, all rights reserved. See [LICENSE](LICENSE).
+Proprietary. Copyright devcamos, all rights reserved. See [LICENSE](LICENSE); third-party dependencies retain their own licences.
