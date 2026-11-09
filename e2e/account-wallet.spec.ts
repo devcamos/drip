@@ -28,7 +28,7 @@ test("overlapping account wallet scrolls to every card without obscuring its con
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await wallet.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+    expect(await wallet.evaluate(el => getComputedStyle(el).overflowY)).not.toMatch(/auto|scroll/);
     // The following card may cover only the preceding card's empty footer.
     expect(await wallet.locator(".card").evaluateAll(cards => cards.slice(0, -1).every((card, i) => {
       const content = card.lastElementChild!.getBoundingClientRect();
@@ -36,7 +36,7 @@ test("overlapping account wallet scrolls to every card without obscuring its con
     }))).toBe(true);
   }
   await page.setViewportSize({ width: 390, height: 1000 });
-  await wallet.evaluate(el => { el.scrollTop = 0; });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await screenshot(page, "mobile-start", 390);
   await screenshot(page, "desktop-start", 1280);
   await page.setViewportSize({ width: 390, height: 1000 });
@@ -50,21 +50,11 @@ test("overlapping account wallet scrolls to every card without obscuring its con
   await screenshot(page, "mobile-end", 390);
   await screenshot(page, "desktop-end", 1280);
   await page.setViewportSize({ width: 390, height: 1000 });
-  await wallet.evaluate(el => { el.scrollTop = 0; });
-  await wallet.hover();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await wallet.locator("summary").first().scrollIntoViewIfNeeded();
+  const beforeScroll = await page.evaluate(() => window.scrollY);
   await page.mouse.wheel(0, 380);
-  await expect.poll(() => wallet.evaluate(el => el.scrollTop)).toBeGreaterThan(100);
-  await wallet.evaluate(el => { el.scrollTop = 0; });
-  const bounds = (await wallet.boundingBox())!;
-  const touch = await page.context().newCDPSession(page);
-  const x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height - 30;
-  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-  for (let step = 1; step <= 8; step++) {
-    await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - step * 35 }] });
-  }
-  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await expect.poll(() => wallet.evaluate(el => el.scrollTop)).toBeGreaterThan(100);
-  await touch.detach();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(beforeScroll);
   await last.tap();
   await showAccountDetails(page);
   await expect(page.locator(".holding")).toHaveText("Air Products and Chemicals");
@@ -90,13 +80,17 @@ test("account groups show their totals and can be collapsed", async ({ page }) =
   await investments.locator("summary").click();
   await expect(investments.getByRole("button", { name: /Open Digital Realty/ })).toBeVisible();
   if (process.env.DRIP_GROUP_CAPTURE) {
-    await mkdir("docs/screenshots/grouped-accounts", { recursive: true });
+    const captureDir = process.env.DRIP_GROUP_CAPTURE_DIR || "docs/screenshots/grouped-accounts";
+    await mkdir(captureDir, { recursive: true });
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await wallet.locator("summary").first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${captureDir}/expanded-390.png`, fullPage: true, scale: "css" });
     while (await wallet.locator("details[open] > summary").count()) await wallet.locator("details[open] > summary").first().click();
     await wallet.evaluate(el => { el.scrollTop = 0; });
     for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.screenshot({ path: `docs/screenshots/grouped-accounts/accounts-${width}.png`, fullPage: true, scale: "css" });
+      await page.screenshot({ path: `${captureDir}/accounts-${width}.png`, fullPage: true, scale: "css" });
     }
   }
 });

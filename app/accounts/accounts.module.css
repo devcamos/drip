@@ -48,7 +48,7 @@
 .sectionHeading h2 > span { font-size:11px; font-weight:400; color:var(--quiet); margin-left:7px; }
 .sectionIntro { color:var(--quiet); font-size:11px; line-height:1.65; margin:4px 0 5px; }
 .addSmall { display:grid; place-items:center; border:1px solid #ddcebc; background:#fffaf1; border-radius:50%; width:44px; height:44px; flex:none; font-size:24px !important; font-weight:400; color:var(--copper); }
-.cardStack { position:relative; isolation:isolate; margin:0 -6px; padding:12px 6px 26px; max-height:clamp(300px,68svh,670px); overflow-y:auto; overflow-x:hidden; scroll-snap-type:y proximity; scroll-padding-block:12px; border-radius:22px; }
+.cardStack { position:relative; isolation:isolate; margin:0 -6px; padding:12px 6px 26px; border-radius:22px; }
 .cardStack:focus-visible { outline:3px solid var(--copper); outline-offset:1px; }
 .accountGroup + .accountGroup { margin-top:18px; }
 .groupHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; padding:12px 4px; color:var(--ink); }
