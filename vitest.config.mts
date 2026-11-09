@@ -22,7 +22,7 @@ export default defineConfig({
       exclude: ["lib/types.ts", "**/*.css"],
       thresholds: {
         // whole app (UI included)
-        lines: 85, functions: 85, branches: 85, statements: 85,
+        lines: 90, functions: 90, branches: 90, statements: 90,
         // logic code keeps its stricter limits
         "lib/**": { lines: 90, functions: 90, branches: 85, statements: 90 },
       },

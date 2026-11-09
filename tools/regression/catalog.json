@@ -139,7 +139,8 @@
         "integration/account-http.integration.test.ts",
         "tests/local-test-database.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/credential-validation.unit.test.ts"
       ]
     },
     {
@@ -175,7 +176,8 @@
         "integration/account-http.integration.test.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/recovery-boundaries.unit.test.ts"
       ]
     },
     {
@@ -199,7 +201,8 @@
         "tests/saved-experience.integration.test.tsx",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/recovery-boundaries.unit.test.ts"
       ]
     },
     {
@@ -229,7 +232,9 @@
         "integration/saved-experience-http.integration.test.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/cloud-sync.unit.test.ts"
       ]
     },
     {
@@ -256,7 +261,8 @@
         "e2e/four-device-signin.spec.ts",
         "integration/device-management.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/device-management.unit.test.ts"
       ]
     },
     {
@@ -272,7 +278,8 @@
         "tests/lock.test.ts",
         "tests/passkey-ui.test.tsx",
         "tests/passkey-unlock.test.ts",
-        "e2e/passkey-unlock.spec.ts"
+        "e2e/passkey-unlock.spec.ts",
+        "tests/credential-validation.unit.test.ts"
       ]
     },
     {
@@ -296,7 +303,8 @@
         "e2e/saved-experience.e2e.spec.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts"
       ]
     },
     {
@@ -352,7 +360,8 @@
       "name": "Shares, acquisition cost, valuation and yield",
       "sources": [
         "app/StockInvestment.tsx",
-        "lib/stock-investment.ts"
+        "lib/stock-investment.ts",
+        "lib/decimal-input.ts"
       ],
       "tests": [
         "tests/stock-investment.test.ts",
@@ -363,7 +372,8 @@
         "e2e/saved-experience.e2e.spec.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts"
       ]
     },
     {
@@ -381,7 +391,8 @@
         "e2e/exchange-rates.spec.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts"
       ]
     },
     {
@@ -455,7 +466,9 @@
         "integration/notification-rate-limits.test.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/notification-boundaries.unit.test.ts"
       ]
     },
     {
@@ -584,6 +597,7 @@
         "tools/regression/run.mjs",
         "vitest.calendar.config.mts",
         "vitest.config.mts",
+        "vitest.unit-coverage.config.mts",
         "vitest.integration.config.mts",
         "tools/regression/cloud.mjs",
         "tools/regression/prepare-cloud.mjs",
@@ -740,7 +754,13 @@
       "tests/feedback-prototype.test.ts",
       "tests/profile-wallet.test.ts",
       "tests/saved-experience.test.ts",
-      "tests/account-workflows.test.ts"
+      "tests/account-workflows.test.ts",
+      "tests/domain-boundaries.unit.test.ts",
+      "tests/notification-boundaries.unit.test.ts",
+      "tests/credential-validation.unit.test.ts",
+      "tests/device-management.unit.test.ts",
+      "tests/recovery-boundaries.unit.test.ts",
+      "tests/cloud-sync.unit.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",

@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
+import appConfig from "../vitest.config.mjs";
+import domainConfig from "../vitest.unit-coverage.config.mjs";
 import { inspectTests, mergeBrowserResults, migrationStatements, sourceFile, summarizeResults, testFile, validateCatalog, validateChanges, validateTestControls, type Catalog, type TestResult } from "../tools/regression/policy.mjs";
 
 const catalog = (): Catalog => ({ version: 1, features: [{ id: "cash", name: "Cash income", sources: ["lib/cash.ts"], tests: ["tests/cash.test.ts"] }], layers: { unit: ["tests/cash.test.ts"] }, conditional: [] });
 const files = ["lib/cash.ts", "tests/cash.test.ts"];
 
 describe("regression evidence guard", () => {
+  it("keeps both domain-unit and combined app coverage gates at 90%", () => {
+    for (const config of [domainConfig, appConfig]) {
+      expect(config.test?.coverage?.thresholds).toMatchObject({ lines: 90, statements: 90, functions: 90, branches: 90 });
+    }
+    expect(domainConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["lib/maths.ts", "lib/stock-investment.ts", "server/notifications/model.ts"]));
+    expect(appConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["app/**", "lib/**", "server/**"]));
+  });
   it("replaces a local fixture skip with an actually passing cloud journey", () => {
     const required = [{ file: "e2e/account.spec.ts", title: "signup", method: "skip" }];
     const merged = mergeBrowserResults([{ file: required[0].file, title: "signup", status: "skipped" }], [{ file: required[0].file, title: "signup", status: "passed" }], required);

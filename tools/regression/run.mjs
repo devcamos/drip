@@ -20,6 +20,7 @@ const stages = [
   [process.execPath, ["tools/regression/check.mjs", "--base", base]],
   ["npm", ["run", "typecheck"]],
   ["npm", ["run", "depcruise"]],
+  ["npm", ["run", "test:unit:coverage"]],
   [process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--coverage", "--reporter=default", "--reporter=json", "--outputFile.json=regression-results/vitest.json"]],
   ["npm", ["run", "build"]],
   [process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--reporter=list,json"]],

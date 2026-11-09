@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --project integration --coverage",
     "test:unit": "vitest run --project unit",
+    "test:unit:coverage": "vitest run --config vitest.unit-coverage.config.mts --coverage",
     "test:components": "vitest run --project integration",
     "test:policy": "node tools/regression/check.mjs",
     "test:regression": "node tools/regression/run.mjs",
