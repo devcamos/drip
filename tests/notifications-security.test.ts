@@ -17,6 +17,8 @@ it("strictly bounds subscription crypto and schedules, rejecting extra financial
   expect(subscriptionSchema.safeParse({ ...subscription, keys: { ...subscription.keys, auth: `${subscription.keys.auth}==` } }).success).toBe(true);
   for (const value of [{ ...schedule, balance: 123 }, { ...schedule, plans: [{ ...schedule.plans[0], provider: "Private" }] }, { ...schedule, timeZone: "MadeUp/Zone" }, { ...schedule, plans: [{ anchor: "2026-02-30", frequency: "daily" }] }, { ...schedule, plans: [{ anchor: "0099-01-01", frequency: "monthly" }] }, { ...schedule, plans: Array(501).fill(schedule.plans[0]) }]) expect(scheduleSchema.safeParse(value).success).toBe(false);
   expect(scheduleSchema.parse({ ...schedule, plans: [{ ...schedule.plans[0], skipDate: "2026-10-29" }] }).plans).toHaveLength(1);
+  expect(scheduleSchema.parse({ ...schedule, plans: [{ anchor: "2026-10-29", frequency: "monthly", once: true }] }).plans[0].once).toBe(true);
+  expect(scheduleSchema.safeParse({ ...schedule, plans: [{ anchor: "2026-10-29", frequency: "monthly", once: false }] }).success).toBe(false);
 });
 it("requires a complete dedicated key configuration and verifies the VAPID pair", () => {
   const { config, env } = pushFixture();

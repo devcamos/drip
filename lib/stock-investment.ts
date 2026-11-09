@@ -21,7 +21,8 @@ export function parseInvestment(input: InvestmentInputs): StockInvestment | null
   return validInvestment(value) ? value : null;
 }
 /** Capital movement only. Never adds dividends, changes balances or infers FX. */
-export function investmentReturn(account: Pick<Account, "balance" | "investment">) {
+export function investmentReturn(account: Pick<Account, "balance" | "investment"> & Partial<Pick<Account, "positionReviewRequired">>) {
+  if (account.positionReviewRequired) return null;
   if (!validInvestment(account.investment)) return null;
   const cost = account.investment.shares * account.investment.averagePriceGBP;
   const amount = account.balance - cost;

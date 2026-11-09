@@ -1,6 +1,7 @@
 import { validDate } from "./products";
 import { accountAssets, isCreditAccount } from "./credit-card";
 import { applyValuationTransfer, incomeBalance } from "./market-valuation";
+import { isArchivedAccount } from "./account-lifecycle";
 export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
@@ -13,12 +14,12 @@ export function monthlyIncome(balance: number, ratePct: number): number {
 }
 
 const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
-type Categorised = Partial<Pick<Account, "productCategory">>;
-type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation">>;
+type Categorised = Partial<Pick<Account, "productCategory" | "archivedAt">>;
+type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation" | "archivedAt">>;
 
 /** Price movements do not rewrite the provider balance used to estimate cash income. */
 export function accountMonthlyIncome(account: IncomeAccount): number {
-  return isCreditAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct);
+  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct);
 }
 
 /** Amount paid at each payout for the account's frequency. */
@@ -87,7 +88,7 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
 
 /** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
 export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = ymd(new Date())): number {
-  return accountAssets(accts).reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
+  return accts.filter(account => !isCreditAccount(account)).reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
 }
 
 export function pendingBonuses(accts: (Pick<Account, "bonus"> & Categorised)[]): number {
@@ -201,9 +202,12 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
 function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
+  if (!validDate(date) || date > ymd(new Date())) throw new Error("Use today or a past date for an actual balance change.");
   const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
-  if (priced.marketValuation && (type === "topup" || type === "withdraw")) return applyValuationTransfer(priced, type, date, amount);
-  const updated = { ...a, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+  const transfer = type === "topup" || type === "withdraw";
+  const review = transfer && priced.investment ? { positionReviewRequired: true as const } : {};
+  if (priced.marketValuation && transfer) return { ...applyValuationTransfer(priced, type, date, amount), ...review };
+  const updated = { ...a, ...review, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
   if ("marketValuation" in updated) { const { marketValuation: _valuation, ...recorded } = updated; return recorded as A; }
   return updated;
 }
@@ -248,7 +252,7 @@ export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a
 
 /** Sum of top-ups across accounts in a YYYY-MM month. */
 export function depositsInMonth(accts: (Pick<Account, "events"> & Categorised)[], month: string, type: "topup" | "withdraw" = "topup"): number {
-  return accountAssets(accts).reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === type && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
+  return accts.filter(account => !isCreditAccount(account)).reduce((s, a) => s + (a.events ?? []).filter((e) => e.type === type && e.date.startsWith(month)).reduce((x, e) => x + e.amount, 0), 0);
 }
 export const withdrawalsInMonth = (accts: (Pick<Account, "events"> & Categorised)[], month: string) => depositsInMonth(accts, month, "withdraw");
 

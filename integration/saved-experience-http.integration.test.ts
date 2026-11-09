@@ -18,6 +18,8 @@ import { passwordProof, wrapPasswordRoot, unwrapPasswordRoot } from "../lib/pass
 import { releaseData, releaseHoldingsAndDebts } from "../tests/saved-experience-fixtures";
 import { migrateData } from "../lib/maths";
 import { applyMarketValuation } from "../lib/market-valuation";
+import { archiveAccount } from "../lib/account-lifecycle";
+import { unseal as previousUnseal } from "../tests/fixtures/pre-workflow-client/cloud";
 import type { Pool as NeonPool } from "@neondatabase/serverless";
 
 type RouteAuth = { handler(request: Request): Promise<Response>; api: { getSession(input: { headers: Headers }): Promise<{ user: { id: string } } | null> } };
@@ -130,4 +132,20 @@ it("restores every debt and valued holding through real HTTP/auth/Postgres after
   expect((await put("/api/cloud", { version: 1, envelope: a.envelope }, cookie(signed), a.owner)).status).toBe(409);
   const final = await (await send("/api/cloud", undefined, cookie(signed), a.owner)).json();
   expect(final.version).toBe(2); expect(await unseal(final.envelope, a.key)).toEqual(migrateData(edited, "2026-11-07"));
+}, 30000);
+
+it("stores v4 archived income and paid statements over real authenticated HTTP while fencing stale replacement", async () => {
+  const a = await createAccount();
+  const data = { ...a.data, accounts: a.data.accounts.map(account => account.rateType === "dividend" ? archiveAccount(account, "2026-11-08T12:00:00.000Z") : account.creditCard ? { ...account, creditCard: { ...account.creditCard, statementPaid: true as const } } : account) };
+  const envelope = await seal(data, a.key); expect(envelope.v).toBe(4);
+  expect((await put("/api/cloud", { version: 1, envelope }, a.session, a.owner)).status).toBe(200);
+  await startAuth();
+  const current = await (await send("/api/cloud", undefined, a.session, a.owner)).json();
+  expect(current.envelope.v).toBe(4);
+  const restored = await unseal(current.envelope, a.key);
+  expect(restored.accounts[1].archivedAt).toBe("2026-11-08T12:00:00.000Z");
+  expect(restored.accounts[3].creditCard?.statementPaid).toBe(true);
+  await expect(previousUnseal(current.envelope, a.key)).rejects.toThrow("Unsupported cloud copy");
+  expect((await put("/api/cloud", { version: 1, envelope: a.envelope }, a.session, a.owner)).status).toBe(409);
+  expect((await pool.query("SELECT envelope FROM drip_vault WHERE user_id=$1", [a.owner])).rows[0].envelope).toEqual(envelope);
 }, 30000);

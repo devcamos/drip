@@ -90,6 +90,18 @@
       "browser": [
         "e2e/saved-experience.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "account-workflows",
+      "unit": [
+        "tests/account-workflows.test.ts"
+      ],
+      "integration": [
+        "tests/account-workflows.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -160,7 +172,10 @@
         "e2e/recovery.spec.ts",
         "e2e/guided-recovery.spec.ts",
         "e2e/original-recovery.spec.ts",
-        "integration/account-http.integration.test.ts"
+        "integration/account-http.integration.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -181,7 +196,10 @@
         "tests/vault-ui.test.tsx",
         "e2e/local-vault.spec.ts",
         "e2e/save-confidence.spec.ts",
-        "tests/saved-experience.integration.test.tsx"
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -208,7 +226,10 @@
         "integration/account-http.integration.test.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "integration/saved-experience-http.integration.test.ts"
+        "integration/saved-experience-http.integration.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -272,7 +293,10 @@
         "e2e/products.spec.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -294,7 +318,10 @@
         "e2e/products.spec.ts",
         "e2e/smoke.spec.ts",
         "tests/saved-experience.test.ts",
-        "tests/saved-experience.integration.test.tsx"
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -314,7 +341,10 @@
         "e2e/income-notifications.spec.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -330,7 +360,10 @@
         "e2e/stock-investment.spec.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -364,7 +397,10 @@
         "tests/gaps.test.ts",
         "e2e/smoke.spec.ts",
         "tests/saved-experience.test.ts",
-        "tests/saved-experience.integration.test.tsx"
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -385,7 +421,10 @@
         "e2e/payment-calendar.e2e.spec.ts",
         "e2e/income-notifications.spec.ts",
         "tests/saved-experience.test.ts",
-        "tests/saved-experience.integration.test.tsx"
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -413,7 +452,10 @@
         "tests/income-notifications-ui.test.tsx",
         "e2e/income-notifications.spec.ts",
         "integration/notifications-postgres.test.ts",
-        "integration/notification-rate-limits.test.ts"
+        "integration/notification-rate-limits.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -492,7 +534,10 @@
         "tests/deployment-preflight.test.ts",
         "tests/database-types.test.ts",
         "e2e/signin-update.spec.ts",
-        "tests/local-test-database.test.ts"
+        "tests/local-test-database.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -516,7 +561,10 @@
         "e2e/auth-screens.spec.ts",
         "e2e/gamertag-signin.spec.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     },
     {
@@ -647,7 +695,24 @@
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
         "integration/saved-experience-http.integration.test.ts",
-        "e2e/saved-experience.e2e.spec.ts"
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "account-workflows",
+      "name": "Safe actual balance dates, share reviews, draft protection, statement reminders and archived income",
+      "sources": [
+        "lib/account-lifecycle.ts",
+        "app/useDraftGuard.tsx",
+        "app/ArchivedAccounts.tsx"
+      ],
+      "tests": [
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
       ]
     }
   ],
@@ -674,7 +739,8 @@
       "tests/stock-valuation.test.ts",
       "tests/feedback-prototype.test.ts",
       "tests/profile-wallet.test.ts",
-      "tests/saved-experience.test.ts"
+      "tests/saved-experience.test.ts",
+      "tests/account-workflows.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -742,7 +808,8 @@
       "tests/stock-valuation.integration.test.tsx",
       "tests/feedback-prototype.integration.test.tsx",
       "tests/profile-wallet.integration.test.tsx",
-      "tests/saved-experience.integration.test.tsx"
+      "tests/saved-experience.integration.test.tsx",
+      "tests/account-workflows.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -785,7 +852,8 @@
       "e2e/stock-valuation.e2e.spec.ts",
       "e2e/feedback-prototype.e2e.spec.ts",
       "e2e/profile-wallet.e2e.spec.ts",
-      "e2e/saved-experience.e2e.spec.ts"
+      "e2e/saved-experience.e2e.spec.ts",
+      "e2e/account-workflows.e2e.spec.ts"
     ]
   },
   "conditional": [

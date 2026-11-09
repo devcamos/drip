@@ -71,6 +71,7 @@ export function incomeBalance(account: Pick<Account, "balance"> & Partial<Pick<A
 
 /** No quote API is implied: the user supplies a USD price; FX must be recent. */
 export function applyMarketValuation(account: Account, input: { priceUSD: number; fxRate: number; fxDate: string }, appliedAt = Date.now()): Account {
+  if (account.positionReviewRequired) throw new Error("Check your recorded shares after the cash movement before applying another price.");
   if (account.productCategory === "credit-card" || account.rateType !== "dividend" || !validInvestment(account.investment) ||
     !nonNegativeMoney(input.priceUSD) || input.priceUSD === 0 || !Number.isFinite(appliedAt)) throw new Error("Enter a valid share price for a recorded dividend holding.");
   const fx = parseFxRate({ base: "USD", quote: "GBP", rate: input.fxRate, date: input.fxDate, source: "Frankfurter" }, "USD", appliedAt);

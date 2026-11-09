@@ -8,6 +8,7 @@ import { applyMarketValuation, clearMarketValuation, hasValuationTransfers } fro
 import { averagePriceLabel, formatShares, investmentReturn } from "@/lib/stock-investment";
 import * as M from "@/lib/maths";
 import s from "./stock-price.module.css";
+import { useUnsavedDraft } from "../useDraftGuard";
 
 type Props = Readonly<{ account: Account; onChange: (change: (current: Account) => Account) => void | Promise<boolean>; onEdit: () => void; onBack: () => void }>;
 
@@ -26,6 +27,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
   const pending = useRef<AbortController | null>(null);
   const priceId = useId();
   const descriptor = instrument ? stockChartDescriptor(instrument.id, range) : null;
+  const commitDraft = useUnsavedDraft({ price }, open);
   const result = investmentReturn(account);
   const original = account.marketValuation?.recordedBalance ?? account.balance;
   useEffect(() => {
@@ -46,6 +48,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
     event.preventDefault(); setError(""); setMessage("");
     if (!validSharePriceInput(price)) { setError("Enter a positive USD share price, for example 60.00."); return; }
     if (!account.investment) { setError("Add your share quantity and purchase price before applying a value."); return; }
+    if (account.positionReviewRequired) { setError("Check your recorded shares after the cash movement before applying another price."); return; }
     const controller = new AbortController(); pending.current?.abort(); pending.current = controller;
     setBusy("rate");
     try {
@@ -68,6 +71,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
         return applyMarketValuation(current, input, appliedAt);
       });
       if (accepted === false) throw new Error("save");
+      commitDraft();
       setMessage("Holding value saved. Your purchase cost and recorded dividend-income assumptions are unchanged.");
     } catch {
       if (!controller.signal.aborted) setError("Could not update this holding value. Your last saved value is kept; check the price and try again.");
@@ -79,7 +83,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
     try {
       const accepted = await onChange(current => clearMarketValuation(current, restoredAt));
       if (accepted === false) throw new Error("save");
-      setPrice(""); setMessage("Recorded value restored. Dividend income is unchanged.");
+      commitDraft({ price: "" }); setPrice(""); setMessage("Recorded value restored. Dividend income is unchanged.");
     } catch { setError("Could not restore the recorded value. Your last saved value is kept; retry."); }
     finally { setBusy(null); }
   }
@@ -102,7 +106,8 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
         </section>
         <aside className={s.recorded} aria-labelledby="saved-holding-heading"><p className={s.eyebrow}>YOUR HOLDING · GBP</p><h3 id="saved-holding-heading">Your investment</h3>
           <div className={s.recordedValue}><span>{account.marketValuation ? "Estimated market value" : "Recorded holding value"}</span><strong>{M.gbp(account.balance)}</strong><small>{account.marketValuation ? `Price applied ${new Date(account.marketValuation.appliedAt).toLocaleDateString("en-GB")}` : "Your saved provider balance"}</small></div>
-          <form className={s.priceForm} onSubmit={apply} noValidate><label htmlFor={priceId}>Current price per share (USD)</label><input id={priceId} disabled={!!busy || !account.investment} inputMode="decimal" maxLength={30} value={price} placeholder="e.g. 60.00" onChange={event => { setPrice(event.target.value); setError(""); }} /><p>Enter your provider’s price. A dated exchange rate estimates the GBP value.</p><button className={s.applyPrice} disabled={!!busy || !account.investment}>{busy === "rate" ? "Getting daily rate…" : busy === "save" ? "Saving value…" : "Update holding value"}</button></form>
+          {account.positionReviewRequired && <p className={s.valueError}>Check your share position after the cash movement. Use Edit holding details below before updating the price.</p>}
+          <form className={s.priceForm} onSubmit={apply} noValidate><label htmlFor={priceId}>Current price per share (USD)</label><input id={priceId} disabled={!!busy || !account.investment || account.positionReviewRequired} inputMode="decimal" maxLength={30} value={price} placeholder="e.g. 60.00" onChange={event => { setPrice(event.target.value); setError(""); }} /><p>Enter your provider’s price. A dated exchange rate estimates the GBP value.</p><button className={s.applyPrice} disabled={!!busy || !account.investment || account.positionReviewRequired}>{busy === "rate" ? "Getting daily rate…" : busy === "save" ? "Saving value…" : "Update holding value"}</button></form>
           {error ? <p role="alert" className={s.valueError}>{error}</p> : null}{message ? <output className={s.frameStatus}>{message}</output> : null}
           {account.marketValuation ? <div className={s.valuationBreakdown} aria-label="Holding performance"><p>Frankfurter · Rate dated {account.marketValuation.fxDate}</p>{result ? <p><b>Capital return</b><strong data-negative={result.amount < 0}>{M.gbp(result.amount)}{result.percent !== null ? ` (${result.percent.toFixed(2)}%)` : ""}</strong></p> : null}<button className={s.hideButton} disabled={!!busy} onClick={restoreRecorded}>Use recorded value</button></div> : null}
           <dl className={s.holdingStats}><div><dt>Shares</dt><dd>{account.investment ? formatShares(account.investment.shares) : "—"}</dd></div><div><dt>Average purchase price</dt><dd>{account.investment ? averagePriceLabel(account.investment) : "—"}</dd></div><div><dt>Recorded dividend yield</dt><dd>{account.ratePct}%</dd></div><div><dt>Estimated annual income</dt><dd>{M.gbp(M.accountMonthlyIncome(account) *12)}</dd></div></dl>

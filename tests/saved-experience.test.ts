@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { accountAssets, creditCardDraft, creditCardWarnings, isCreditAccount, portfolioTotals, validCreditCardTerms, validateCreditCardDraft } from "../lib/credit-card";
 import { applyMarketValuation, applyValuationTransfer, clearMarketValuation, hasValuationTransfers, incomeBalance, validMarketValuation } from "../lib/market-valuation";
 import { validProductFields } from "../lib/products";
@@ -9,6 +9,8 @@ import * as M from "../lib/maths";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseSaver, releaseStock } from "./saved-experience-fixtures";
 
 const at = Date.parse("2026-11-07T12:00:00Z");
+// Transfer fixtures include actual entries through8Nov; the quote clock remains explicit.
+beforeEach(() => vi.setSystemTime(new Date("2026-11-08T12:00:00Z")));
 const price = { priceUSD: 100, fxRate: 0.75, fxDate: "2026-11-06" };
 const complete = () => ({ balance: "1200.25", apr: "24.9", minimumPayment: "35.25", plannedPayment: "75", paymentDate: "2026-11-20" });
 
@@ -122,7 +124,7 @@ test("debt does not generate interest, received income, projections or incoming 
   expect(M.recordedIncome([debt])).toBe(0);
   expect(M.projection([asset, debt], 3, 0, "2026-11-07")).toEqual(M.projection([asset], 3, 0, "2026-11-07"));
   expect(paymentReminders([debt], "2026-11-20")).toEqual([]);
-  expect(reminderSchedule([debt], "2026-11-20", "Europe/London").plans).toEqual([]);
+  expect(reminderSchedule([debt], "2026-11-20", "Europe/London").plans).toEqual([{ anchor: "2026-11-20", frequency: "monthly", once: true }]);
 });
 
 test("historical asset snapshots retain their meaning when credit cards are added", () => {
@@ -218,7 +220,10 @@ test("valued transfers handle backdated events, revaluation, clear and provider 
   expect(moved.investment).toEqual(source.investment);
   expect(moved.payouts).toEqual(source.payouts);
   expect(validMarketValuation(moved.marketValuation, moved)).toBe(true);
-  const repriced = applyMarketValuation(moved, { ...price, priceUSD: 80 }, at);
+  expect(() => applyMarketValuation(moved, { ...price, priceUSD: 80 }, at)).toThrow(/shares/);
+  // User confirms the existing share quantity after checking the provider.
+  const { positionReviewRequired: _review, ...confirmed } = moved;
+  const repriced = applyMarketValuation(confirmed, { ...price, priceUSD: 80 }, at);
   expect(repriced.marketValuation?.recordedBalance).toBe(2425);
   expect(repriced.balance).toBe(3000);
   expect(clearMarketValuation(repriced, at).balance).toBe(2425);

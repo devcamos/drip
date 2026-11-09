@@ -15,10 +15,10 @@ export function DividendPortfolio({ accounts, onOpen, onAdd }: Readonly<{ accoun
   const maximum = Math.max(1, ...portfolio.history.map(month => month.income));
   return <>
     <div className="section-heading"><p className="section-eyebrow">YOUR INVESTMENTS</p><h1>Dividend portfolio</h1><p className="muted">See what your holdings have paid, and what they could earn.</p></div>
-    {!portfolio.holdings.length ? <section className="panel portfolio-empty"><h2>No dividend holdings yet</h2><p className="muted">Add stocks or funds with a dividend yield to start your portfolio. Cash interest stays in Accounts.</p><button className="btn" onClick={onAdd}>Add dividend holding</button></section> : <>
-      <section className="panel dividend-hero" aria-label="Dividend income total"><p className="muted">Dividends received · {periodName.toLowerCase()}</p><div className="big" data-testid="dividend-income-total">{gbp(dividendIncome(portfolio.holdings, day, period))}</div>
+    {!portfolio.holdings.length && <section className="panel portfolio-empty"><h2>No dividend holdings yet</h2><p className="muted">Add stocks or funds with a dividend yield to start your portfolio. Cash interest stays in Accounts. Any archived dividend history is kept below.</p><button className="btn" onClick={onAdd}>Add dividend holding</button></section>}
+      <section className="panel dividend-hero" aria-label="Dividend income total"><p className="muted">Dividends received · {periodName.toLowerCase()}</p><div className="big" data-testid="dividend-income-total">{gbp(dividendIncome(accounts, day, period))}</div>
         <fieldset className="income-periods"><legend className="sr-only">Income period</legend>{(["month", "year", "all"] as const).map(value => <button key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>{({ month: "This month", year: "This year", all: "All time" })[value]}</button>)}</fieldset>
-        <p className="muted">Payments you have logged for your current dividend holdings. Interest, bonuses, top-ups and unreceived estimates are excluded.</p>
+        <p className="muted">Payments you have logged for your current and archived dividend holdings. Interest, bonuses, top-ups and unreceived estimates are excluded.</p>
       </section>
       <section className="grid" aria-label="Dividend portfolio figures">
         <div className="stat"><div className="muted">Portfolio value</div><div className="v">{gbp(portfolio.value)}</div></div>
@@ -33,6 +33,5 @@ export function DividendPortfolio({ accounts, onOpen, onAdd }: Readonly<{ accoun
       <section aria-labelledby="dividend-holdings-title"><div className="wallet-heading"><h2 id="dividend-holdings-title">Your dividend holdings</h2><button className="btn ghost small" onClick={onAdd}>Add holding</button></div>
         <ul className="portfolio-holdings">{portfolio.holdings.map(holding => <li key={holding.id}><button onClick={() => onOpen(holding.id)} aria-label={`Open ${holding.holdingName ?? displayProvider(holding.provider)}`}><span><b>{holding.holdingName ?? displayProvider(holding.provider)}</b><small>{holding.holdingName ? displayProvider(holding.provider) : "Dividend account"}</small></span><strong>{gbp(holding.balance)}</strong>{holding.investment && <small className="portfolio-position">{formatShares(holding.investment.shares)} shares · Average {averagePriceLabel(holding.investment)} · {holding.ratePct}% recorded yield</small>}<span className="holding-income">Received · {periodName.toLowerCase()} <b>{gbp(dividendIncome([holding], day, period))}</b></span><span className="holding-income">Estimated monthly <b>{gbp(accountMonthlyIncome(holding))}</b></span></button></li>)}</ul>
       </section>
-    </>}
   </>;
 }

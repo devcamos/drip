@@ -6,6 +6,7 @@ import { accountCardStyle, normaliseColour } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { investmentInputs, parseInvestment } from "@/lib/stock-investment";
 import { StockInvestmentFields } from "./StockInvestment";
+import { useUnsavedDraft } from "./useDraftGuard";
 const today = () => M.ymd(new Date());
 const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
 const colourChoices = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
@@ -73,12 +74,14 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [hasBonus, setHasBonus] = useState(!!existing?.bonus);
   const [bonusAmount, setBonusAmount] = useState(initial.bonusAmount);
   const [bonusDate, setBonusDate] = useState(existing?.bonus?.expectedDate ?? "");
+  const [positionConfirmed, setPositionConfirmed] = useState(false);
+  useUnsavedDraft({ provider, custom, category, wrapper, label, holding, customHolding, colour, balance, rate, rateType, investmentFields, frequency, reinvest, next, rateFrom, hasBonus, bonusAmount, bonusDate, positionConfirmed });
   const isOther = isOtherProvider(provider, existing);
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
   const validHolding = validHoldingName(category, provider, customHolding, holding);
-  const valid = investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
+  const valid = (!existing?.positionReviewRequired || positionConfirmed) && investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const retainsMarketBasis = !!existing?.marketValuation && M.round2(b) === existing.balance && holding.trim() === existing.holdingName && investment?.shares === existing.investment?.shares && rateType === "dividend";
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
@@ -99,6 +102,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       // calculated for the previous holding. The entered value becomes the
       // recorded provider balance and the new income baseline.
       if (base.marketValuation && (rateType !== "dividend" || base.holdingName !== existing?.holdingName || base.investment?.shares !== existing?.investment?.shares)) delete base.marketValuation;
+      delete base.positionReviewRequired;
       const account = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
       setBusy(true); setError("");
       try { if (await onSave(existing && M.round2(b) !== existing.balance ? M.applySetBalance({ ...account, balance: existing.balance }, b, today()) : account) === false) setError("Could not save this account. Your entry is kept. Check the message above before retrying."); }
@@ -134,6 +138,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <div><label htmlFor="account-paid">Paid</label><select disabled={busy} id="account-paid" value={frequency} onChange={e => setFrequency(e.target.value as Frequency)}><option value="daily">Daily</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annually">Yearly</option></select></div>
       </div>
       {rateType === "dividend" && <StockInvestmentFields value={investmentFields} onChange={setInvestmentFields} disabled={busy} />}
+      {existing?.positionReviewRequired && <section className="panel" aria-label="Check share position"><h2>Check your share position</h2><p>Cash transfers do not buy or sell shares in Drip. Enter your provider's current share quantity, average purchase cost and remaining investment value. For a fully sold holding, enter zero shares and zero value. Recorded dividends are kept.</p><label className="check-label"><input type="checkbox" checked={positionConfirmed} disabled={busy} onChange={event => setPositionConfirmed(event.target.checked)} />I have checked these share details against my provider.</label></section>}
       {existing?.marketValuation && <p className="muted">Changing the holding, share quantity or balance replaces the market estimate with your entered provider value and updates its income baseline.</p>}
       {rateChanged && <><label htmlFor="rate-from">New rate applies from</label><input disabled={busy} id="rate-from" type="date" value={rateFrom} onChange={e => setRateFrom(e.target.value)} /></>}
       {frequency !== "daily" ? <><label htmlFor="next-payout">Next payout date</label><input disabled={busy} id="next-payout" type="date" value={next} onChange={e => setNext(e.target.value)} /></>

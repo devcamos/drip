@@ -79,7 +79,7 @@ it("displays only generic push content and uses a same-day tag to coalesce retri
   push({ data: { json() { throw new Error("malformed"); } } }); expect(showNotification).not.toHaveBeenCalled();
   let work: Promise<unknown> | undefined;
   push({ data: { json: () => ({ type: "payment-reminder", date: "2026-10-29", title: "Private account", body: "£999", url: "https://evil.test" }) }, waitUntil: (p: Promise<unknown>) => { work = p; } }); await work;
-  expect(showNotification).toHaveBeenCalledWith("Drip payment reminder", expect.objectContaining({ tag: "drip-payment-2026-10-29" }));
+  expect(showNotification).toHaveBeenCalledWith("Drip payment reminder", expect.objectContaining({ tag: "drip-payment-2026-10-29", body: "A payment needs your attention today. Open Drip to check." }));
   expect(JSON.stringify(showNotification.mock.calls)).not.toMatch(/Private|999|evil/);
   push({ data: { json: () => ({ type: "notification-test", date: "2026-10-29" }) }, waitUntil: (p: Promise<unknown>) => { work = p; } }); await work;
   expect(showNotification).toHaveBeenLastCalledWith("Drip notification test", expect.objectContaining({ tag: "drip-payment-test" }));

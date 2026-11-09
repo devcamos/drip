@@ -38,9 +38,12 @@ import { DividendPortfolio } from "./DividendPortfolio";
 import { PaymentNotifications } from "./PaymentNotifications";
 import { PhoneReminderSync } from "./PhoneReminders";
 import { useCalendarDay } from "./useCalendarDay";
-import { paymentReminders } from "@/lib/payment-reminders";
+import { paymentReminders, debtPaymentReminders } from "@/lib/payment-reminders";
+import { activeAccounts, archiveAccount, isArchivedAccount, restoreAccount } from "@/lib/account-lifecycle";
+import { ArchivedAccounts } from "./ArchivedAccounts";
+import { DraftGuardContext, useDraftGuardState } from "./useDraftGuard";
 
-type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" };
+type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" } | { name: "archived" };
 type Verifier = { salt: string; hash: string };
 
 const today = () => M.ymd(new Date());
@@ -95,6 +98,11 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const replaceData = useCallback((next: AppData) => { dataGeneration.current++; latestData.current = next; setData(next); }, []);
   const [verifier, setVerifier] = useState<Verifier | null | undefined>(undefined);
   const [view, setView] = useState<View>({ name: "home" });
+  const draftGuard = useDraftGuardState();
+  const navigate = useCallback((nextView: View) => {
+    if (JSON.stringify(nextView) === JSON.stringify(view)) return;
+    if (draftGuard.leave()) setView(nextView);
+  }, [view, draftGuard.leave]);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileButton = useRef<HTMLButtonElement>(null);
   const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>("month");
@@ -126,12 +134,12 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   }, [data]);
   useEffect(() => {
     const open = () => {
-      if (["add", "detail", "settings"].includes(view.name) || pendingSaves) { setPaymentPrompt(true); return; }
+      if (["add", "detail", "settings"].includes(view.name) || pendingSaves || draftGuard.dirty) { setPaymentPrompt(true); return; }
       setView({ name: "payments" }); setPaymentPrompt(false);
     };
     window.addEventListener("drip-open-payments", open);
     return () => window.removeEventListener("drip-open-payments", open);
-  }, [view.name, pendingSaves]);
+  }, [view.name, pendingSaves, draftGuard.dirty]);
   useEffect(() => {
     if (!data) return;
     let hiddenAt: number | null = null;
@@ -216,15 +224,17 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
 
   if (locked && data.lock?.credentialId) return <LockScreen credentialId={data.lock.credentialId} verifier={verifier} onUnlock={() => setLocked(false)} />;
 
-  const pendingPayments = paymentReminders(data.accounts, calendarDay).filter(item => item.date === calendarDay && !item.logged).length;
+  const active = activeAccounts(data.accounts);
+  const archived = data.accounts.filter(isArchivedAccount);
+  const pendingPayments = paymentReminders(active, calendarDay).filter(item => item.date === calendarDay && !item.logged).length + debtPaymentReminders(active, calendarDay).filter(item => item.date <= calendarDay).length;
   const ownerId = data.identity.id;
   const assets = accountAssets(data.accounts);
-  const creditPlans = data.accounts.filter(isCreditAccount).map(account => ({ accountId: account.id, name: accountTitle(account), apr: account.creditCard!.apr, minimumPayment: account.creditCard!.minimumPayment, plannedPayment: account.creditCard!.plannedPayment, paymentDate: account.nextPayoutDate }));
+  const creditPlans = active.filter(isCreditAccount).map(account => ({ accountId: account.id, name: accountTitle(account), apr: account.creditCard!.apr, minimumPayment: account.creditCard!.minimumPayment, plannedPayment: account.creditCard!.plannedPayment, paymentDate: account.nextPayoutDate }));
   const counts = { cash: assets.filter(account => account.rateType !== "dividend").length, stocks: assets.filter(account => account.rateType === "dividend").length, credits: creditPlans.length };
   const next = M.upcoming(assets, calendarDay)[0];
   const nextPayment = next ? { accountId: next.account.id, name: accountTitle(next.account), date: next.date, amount: next.amount } : null;
   function closeProfile() { setProfileOpen(false); requestAnimationFrame(() => profileButton.current?.focus()); }
-  function profileNavigate(nextView: View) { setProfileOpen(false); setView(nextView); }
+  function profileNavigate(nextView: View) { if (draftGuard.leave()) { setProfileOpen(false); setView(nextView); } }
   async function changePeriod(period: IncomePeriod) {
     const sequence = ++preferenceSequence.current;
     setPreferenceBusy(true); setPreferenceError(""); setPreferenceStatus("");
@@ -236,18 +246,24 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     } catch { if (sequence === preferenceSequence.current) setPreferenceError("Could not save your display preference. Your previous view is kept; retry."); }
     finally { if (sequence === preferenceSequence.current) setPreferenceBusy(false); }
   }
-  const accountsCanvas = <AccountsHome accounts={data.accounts} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(assets, calendarDay.slice(0, 7), calendarDay)} nextPayment={nextPayment} estimatedValues={assets.some(account => !!account.marketValuation)} onAdd={() => setView({ name: "choose" })} onOpen={id => setView({ name: "detail", id })} onPortfolio={() => setView({ name: "portfolio" })} />;
+  const accountsCanvas = <AccountsHome accounts={active} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(data.accounts, calendarDay.slice(0, 7), calendarDay)} nextPayment={nextPayment} estimatedValues={assets.some(account => !!account.marketValuation)} onAdd={() => navigate({ name: "choose" })} onOpen={id => navigate({ name: "detail", id })} onPortfolio={() => navigate({ name: "portfolio" })} />;
   let body: React.ReactNode;
   switch (view.name) {
   case "detail": {
-    const a = data.accounts.find((x) => x.id === view.id);
-    body = a ? <AccountDetail key={a.id} a={a} onBack={() => setView({ name: "home" })} onEdit={() => setView({ name: "add", id: a.id })}
+    const a = active.find((x) => x.id === view.id);
+    body = a ? <AccountDetail key={a.id} a={a} onBack={() => navigate({ name: "home" })} onEdit={() => navigate({ name: "add", id: a.id })}
       onChange={(fn) => update((d) => {
         if (!d.accounts.some(account => account.id === a.id)) throw new Error("This account was removed. Return to Accounts.");
         return { ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) };
       })}
+      onArchive={async () => {
+        if (!draftGuard.leave() || !confirm(`Archive ${accountTitle(a)}? It will leave your current balances, predictions and reminders. Recorded payments are kept.`)) return true;
+        const saved = await update(d => ({ ...d, accounts: d.accounts.map(x => x.id === a.id ? archiveAccount(x) : x) }));
+        if (saved) setView({ name: "home" });
+        return saved;
+      }}
       onDelete={async () => {
-        if (!confirm(`Delete ${a.provider}?`)) return true;
+        if (!draftGuard.leave() || !confirm(`Permanently delete ${accountTitle(a)} and its recorded income history? This cannot be undone. Archive the account instead to keep its history.`)) return true;
         const saved = await update((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) }));
         if (saved) setView({ name: "home" });
         return saved;
@@ -257,13 +273,13 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   case "add": {
     const existing = view.id ? data.accounts.find((x) => x.id === view.id) : undefined;
     const Form = view.category === "credit-card" || (existing && isCreditAccount(existing)) ? CreditCardForm : AccountForm;
-    body = <Form key={view.id ?? view.category ?? "new"} existing={existing} initialCategory={view.category} onCancel={() => setView({ name: "home" })} onSave={async (a) => {
+    body = <Form key={view.id ?? view.category ?? "new"} existing={existing} initialCategory={view.category} onCancel={() => { draftGuard.reset(); setView({ name: "home" }); }} onSave={async (a) => {
       const saved = await update((d) => {
         if (existing && !d.accounts.some(account => account.id === existing.id)) throw new Error("This account was removed. Return to Accounts.");
         if (existing && JSON.stringify(d.accounts.find(account => account.id === existing.id)) !== JSON.stringify(existing)) throw Object.assign(new Error("Stale account edit"), { name: "StaleAccountEdit" });
         return { ...d, accounts: d.accounts.some(x => x.id === a.id) ? d.accounts.map((x) => x.id === a.id ? a : x) : [...d.accounts, a] };
       });
-      if (saved) setView({ name: "detail", id: a.id });
+      if (saved) { draftGuard.reset(); setView({ name: "detail", id: a.id }); }
       return saved;
     }} />;
     break;
@@ -272,47 +288,56 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     body = <Trends data={data} onAssumptions={(projection) => update(d => ({ ...d, projection }))} />;
     break;
   case "portfolio":
-    body = <DividendPortfolio accounts={assets} onOpen={id => setView({ name: "detail", id })} onAdd={() => setView({ name: "add", category: "stocks-funds" })} />;
+    body = <DividendPortfolio accounts={data.accounts.filter(account => !isCreditAccount(account))} onOpen={id => navigate({ name: "detail", id })} onAdd={() => navigate({ name: "add", category: "stocks-funds" })} />;
     break;
   case "payments":
-    body = <PaymentNotifications accounts={data.accounts} identityId={data.identity.id} onOpen={id => setView({ name: "detail", id })} />;
+    body = <PaymentNotifications accounts={data.accounts} identityId={data.identity.id} onOpen={id => navigate({ name: "detail", id })} />;
+    break;
+  case "archived":
+    body = <ArchivedAccounts accounts={archived} onBack={() => navigate({ name: "settings" })}
+      onRestore={id => update(d => ({ ...d, accounts: d.accounts.map(account => account.id === id ? restoreAccount(account) : account) }))}
+      onDelete={async id => {
+        const account = data.accounts.find(value => value.id === id);
+        if (!account || !confirm(`Permanently delete ${accountTitle(account)} and all its recorded income? This cannot be undone.`)) return true;
+        return update(d => ({ ...d, accounts: d.accounts.filter(value => value.id !== id) }));
+      }} />;
     break;
   case "settings":
-    body = <Settings data={data} verifier={verifier}
-    onNotifications={() => setView({ name: "payments" })}
+    body = <><button className="btn ghost" onClick={() => navigate({ name: "archived" })}>Archived accounts ({archived.length})</button><Settings data={data} verifier={verifier}
+    onNotifications={() => navigate({ name: "payments" })}
     onCloudRestored={async (d) => { setVerifier((await getItem<Verifier>("verifier")) ?? null); replaceData(d); }}
     onLock={(lock) => update((d) => ({ ...d, lock }))}
     onBackedUp={() => update((d) => ({ ...d, lastBackupAt: new Date().toISOString() }))}
-    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); replaceData(n); }} />;
+    onRestore={async (d, code, expectedGeneration) => { const v = await C.codeVerifier(code); const n = { ...d, lock: undefined, lastBackupAt: new Date().toISOString() }; await commitCloudRestore(n, undefined, v, expectedGeneration, undefined, code); window.dispatchEvent(new Event("drip-cloud-changed")); setVerifier(v); replaceData(n); }} /></>;
     break;
   case "choose":
-    body = <>{accountsCanvas}<AccountChooser onClose={() => setView({ name: "home" })} onChoose={category => setView({ name: "add", category })} /></>;
+    body = <>{accountsCanvas}<AccountChooser onClose={() => navigate({ name: "home" })} onChoose={category => navigate({ name: "add", category })} /></>;
     break;
   default:
     body = accountsCanvas;
   }
 
   return (
-    <>
+    <DraftGuardContext.Provider value={draftGuard}>
       <main className={view.name === "home" || view.name === "choose" ? "accounts-page" : undefined}>
-        <AppAccountHeader identity={data.identity} pendingPayments={pendingPayments} onProfile={() => setProfileOpen(true)} onPayments={() => setView({ name: "payments" })} profileButtonRef={profileButton} profileOpen={profileOpen} />
-        <output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : "Saved on this device."}</output>
-        <PwaStatus allowReload={!pendingSaves && !preferenceBusy && (view.name === "home" || view.name === "portfolio")} />
-        <CloudSync hasData={data.accounts.length > 0} /><PhoneReminderSync identityId={data.identity.id} accounts={assets} onManage={() => setView({ name: "payments" })} />
+        <AppAccountHeader identity={data.identity} pendingPayments={pendingPayments} onProfile={() => setProfileOpen(true)} onPayments={() => navigate({ name: "payments" })} profileButtonRef={profileButton} profileOpen={profileOpen} />
+        <output className="muted" hidden={!!saveError} data-testid="local-save-status">{pendingSaves ? "Saving changes…" : draftGuard.dirty ? "Unsaved changes." : "Saved on this device."}</output>
+        <PwaStatus allowReload={!draftGuard.dirty && !pendingSaves && !preferenceBusy && (view.name === "home" || view.name === "portfolio")} />
+        <CloudSync hasData={data.accounts.length > 0} /><PhoneReminderSync identityId={data.identity.id} accounts={active} onManage={() => navigate({ name: "payments" })} />
         {saveError ? <p role="alert" className="err">{saveError}</p> : null}
-        {paymentPrompt ? <div className="banner info"><span>Payment reminder selected. Finish your current edit before opening reminders.</span><button className="btn ghost small" disabled={!!pendingSaves} onClick={() => { setPaymentPrompt(false); setView({ name: "payments" }); }}>Open reminders</button></div> : null}
-        <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => setView({ name: "settings" })} /> : null}
+        {paymentPrompt ? <div className="banner info"><span>Payment reminder selected. Finish your current edit before opening reminders.</span><button className="btn ghost small" disabled={!!pendingSaves} onClick={() => { setPaymentPrompt(false); navigate({ name: "payments" }); }}>Open reminders</button></div> : null}
+        <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => navigate({ name: "settings" })} /> : null}
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
-      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy} />} />
+      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
       <nav className="tabs">
         {(["home", "portfolio", "trends", "add", "settings"] as const).map((n) => (
-          <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => setView({ name: n === "add" ? "choose" : n } as View)}>
+          <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>
             {{ home: "Accounts", portfolio: "Portfolio", trends: "Trends", add: "Add", settings: "Settings" }[n]}
           </button>
         ))}
       </nav>
-    </>
+    </DraftGuardContext.Provider>
   );
 }
 

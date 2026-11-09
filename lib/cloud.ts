@@ -10,7 +10,7 @@ import { cloudPayload, fromCloudPayload } from "./cloud-payload";
 import { dataFormatVersion } from "./data-format";
 
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
-export interface Envelope { app: "drip-cloud"; v: 1 | 2 | 3; iv: string; ct: string }
+export interface Envelope { app: "drip-cloud"; v: 1 | 2 | 3 | 4; iv: string; ct: string }
 const enc = new TextEncoder();
 const b64 = (bytes: Uint8Array) => {
   let out = "";
@@ -40,7 +40,7 @@ export async function seal(data: AppData, key: CryptoKey): Promise<Envelope> {
   return { app: "drip-cloud", v, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
 }
 async function decode(envelope: Envelope, key: CryptoKey): Promise<AppData> {
-  if (envelope.app !== "drip-cloud" || ![1, 2, 3].includes(envelope.v)) throw new Error("Unsupported cloud copy. Update Drip before restoring it.");
+  if (envelope.app !== "drip-cloud" || ![1, 2, 3, 4].includes(envelope.v)) throw new Error("Unsupported cloud copy. Update Drip before restoring it.");
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(envelope.iv), additionalData: enc.encode(`drip-cloud-v${envelope.v}`) }, key, unb64(envelope.ct));
   const data = JSON.parse(new TextDecoder().decode(plain));
   if (!isAppData(data) || !data.identity) throw new Error("Invalid cloud copy.");

@@ -2,6 +2,7 @@ import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "
 import { validInvestment } from "./stock-investment";
 import { isCreditAccount, validCreditAmount, validCreditCardTerms } from "./credit-card";
 import { validMarketValuation } from "./market-valuation";
+import { validLifecycleFields } from "./account-lifecycle";
 
 export const PROVIDERS: Record<string, string> = {
   Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
@@ -30,6 +31,7 @@ export function validDate(value: unknown): value is string {
 }
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
+  if (!validLifecycleFields(account)) return false;
   if (isCreditAccount(account)) return typeof account.provider === "string" && account.provider.trim().length > 0 && account.provider.length <= 100 &&
     validCreditAmount(account.balance) && validCreditCardTerms(account.creditCard) && account.rateType === "interest" && account.ratePct === 0 &&
     account.frequency === "monthly" && validDate(account.nextPayoutDate) && Array.isArray(account.payouts) && account.payouts.length === 0 &&

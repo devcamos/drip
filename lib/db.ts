@@ -40,8 +40,8 @@ export async function clearOnboardingDraft() { await tx("readwrite", s => s.dele
 function open(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
     // Keep the existing store/ciphertext, but fence clients that cannot preserve
-    // credit cards and market metadata before their first cloud upload.
-    const r = indexedDB.open(DB, 3);
+    // archives, paid statements and position-review metadata before writing.
+    const r = indexedDB.open(DB, 4);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
     r.onerror = () => rej(new Error("Could not open local storage.", { cause: r.error }));

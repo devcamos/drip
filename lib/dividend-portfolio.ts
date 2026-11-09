@@ -2,6 +2,7 @@ import type { Account } from "./types";
 import { addMonths, accountMonthlyIncome, round2, totalBalance, weightedYield } from "./maths";
 import { isCreditAccount } from "./credit-card";
 import { validDate } from "./products";
+import { activeAccounts } from "./account-lifecycle";
 
 export type IncomePeriod = "month" | "year" | "all";
 export function dividendIncome(accounts: Account[], asOf: string, period: IncomePeriod = "all") {
@@ -11,13 +12,14 @@ export function dividendIncome(accounts: Account[], asOf: string, period: Income
   ).reduce((amount, payment) => amount + payment.amount, 0), 0));
 }
 export function dividendPortfolio(accounts: Account[], asOf: string) {
-  const holdings = accounts.filter(account => !isCreditAccount(account) && account.rateType === "dividend");
+  const incomeHistory = accounts.filter(account => !isCreditAccount(account) && account.rateType === "dividend");
+  const holdings = activeAccounts(incomeHistory);
   const monthlyEstimate = holdings.reduce((sum, holding) => sum + accountMonthlyIncome(holding), 0);
   const history = Array.from({ length: 6 }, (_, index) => {
     const month = addMonths(`${asOf.slice(0, 7)}-01`, index - 5).slice(0, 7);
-    const filtered = holdings.map(holding => ({ ...holding, payouts: holding.payouts.filter(payment => payment.date.startsWith(month)) }));
+    const filtered = incomeHistory.map(holding => ({ ...holding, payouts: holding.payouts.filter(payment => payment.date.startsWith(month)) }));
     return { month, income: dividendIncome(filtered, asOf) };
   });
   return { holdings, value: totalBalance(holdings), yieldPct: weightedYield(holdings), monthlyEstimate, annualEstimate: monthlyEstimate * 12,
-    received: dividendIncome(holdings, asOf), thisMonth: dividendIncome(holdings, asOf, "month"), thisYear: dividendIncome(holdings, asOf, "year"), history };
+    received: dividendIncome(incomeHistory, asOf), thisMonth: dividendIncome(incomeHistory, asOf, "month"), thisYear: dividendIncome(incomeHistory, asOf, "year"), history };
 }
