@@ -42,8 +42,9 @@ import { paymentReminders, debtPaymentReminders } from "@/lib/payment-reminders"
 import { activeAccounts, archiveAccount, isArchivedAccount, restoreAccount } from "@/lib/account-lifecycle";
 import { ArchivedAccounts } from "./ArchivedAccounts";
 import { DraftGuardContext, useDraftGuardState } from "./useDraftGuard";
+import { Feedback } from "./Feedback";
 
-type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" } | { name: "archived" };
+type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" } | { name: "archived" } | { name: "feedback" };
 type Verifier = { salt: string; hash: string };
 
 const today = () => M.ymd(new Date());
@@ -293,6 +294,9 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   case "payments":
     body = <PaymentNotifications accounts={data.accounts} identityId={data.identity.id} onOpen={id => navigate({ name: "detail", id })} />;
     break;
+  case "feedback":
+    body = <Feedback onBack={() => navigate({ name: "home" })} />;
+    break;
   case "archived":
     body = <ArchivedAccounts accounts={archived} onBack={() => navigate({ name: "settings" })}
       onRestore={id => update(d => ({ ...d, accounts: d.accounts.map(account => account.id === id ? restoreAccount(account) : account) }))}
@@ -329,7 +333,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => navigate({ name: "settings" })} /> : null}
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
-      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
+      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
       <nav className="tabs">
         {(["home", "portfolio", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>

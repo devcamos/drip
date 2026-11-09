@@ -8,6 +8,10 @@ test("portfolio and reminders work on saved encrypted accounts at mobile and des
   await legacyAccount(page, "incometest", [account("stock", "Trading212", 3000, 5, "dividend", "Realty Income"), account("fund", "Vanguard", 6000, 4, "dividend", "Global dividend fund"), account("cash", "Zopa", 2000, 4.5, "interest")]);
   await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();
   await expect(page.getByTestId("dividend-income-total")).toHaveText("£25.00");
+  const stock = page.getByRole("button", { name: "Open Realty Income" });
+  const fund = page.getByRole("button", { name: "Open Global dividend fund" });
+  await expect(stock).toContainText("5%"); await expect(stock).toContainText("£150.00");
+  await expect(fund).toContainText("4%"); await expect(fund).toContainText("£240.00");
   const directory = process.env.DRIP_UI_CAPTURE;
   if (directory) await mkdir(directory, { recursive: true });
   for (const width of [390, 1280, 320]) {
