@@ -25,6 +25,11 @@ export function deploymentProblems(env) {
   const problems = [];
   if (env.DRIP_CLOUD_E2E === "1") problems.push("Local cloud-test mode must never be enabled on a Vercel deployment.");
   for (const key of ["DATABASE_URL", "BETTER_AUTH_SECRET"]) if (!env[key]?.trim()) problems.push(`${key} is missing.`);
+  if (env.DRIP_PUSH_REQUIRED === "1") {
+    for (const key of ["DRIP_PUSH_PUBLIC_KEY", "DRIP_PUSH_PRIVATE_KEY", "DRIP_PUSH_STORAGE_KEY", "CRON_SECRET"]) {
+      if (!env[key]?.trim()) problems.push(`${key} is missing for required phone reminders.`);
+    }
+  }
   const authURL = authBaseURL(env);
   if (!authURL) problems.push("BETTER_AUTH_URL is missing.");
   if (!["preview", "production"].includes(env.VERCEL_ENV ?? "")) problems.push("VERCEL_ENV must identify Preview or Production.");

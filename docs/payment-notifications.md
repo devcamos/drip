@@ -5,6 +5,13 @@ Estimates use saved balances and annual yields, and are labelled separately.
 The bell and Settings open payment reminders for all earning cash and dividend
 accounts. Logging income never automatically changes an account balance.
 
+Credit-card statement repayments now appear separately in Today, overdue
+statements and the calendar. Their entered due date is a one-off obligation,
+not an inferred recurring statement. Marking a statement paid suppresses its
+reminder without changing the recorded debt or adding income; it can be reopened.
+Editing the next statement date starts a new reminder. Archived accounts do not
+produce reminders, while their received-income history is retained.
+
 The bell also includes a [twelve-month expected payment calendar](payment-calendar.md),
 derived from each earning account's next date and frequency. Daily payments are
 grouped by month; editing a schedule recalculates future dates without adding
@@ -29,6 +36,9 @@ In the existing Drip Vercel project, configure only the approved environment:
 - `DRIP_PUSH_PUBLIC_KEY` / `DRIP_PUSH_PRIVATE_KEY`: matching P-256 VAPID pair.
 - `DRIP_PUSH_STORAGE_KEY`: separate random 32-byte base64url encryption key.
 - `CRON_SECRET`: random bearer secret, at least32characters.
+- `DRIP_PUSH_REQUIRED=1`: opt a deployment into the complete-configuration
+  preflight gate. Set this only with all four values above; missing values fail
+  the build instead of silently shipping an unavailable phone capability.
 
 Do not regenerate the storage key during routine builds: existing subscriptions
 need the same key. Keep private values server-only and out of logs/source.

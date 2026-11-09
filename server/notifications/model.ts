@@ -21,7 +21,7 @@ export const subscriptionSchema = z.object({
 const date = z.string().refine(value => validDate(value) && Number(value.slice(0, 4)) >= 100);
 export const scheduleSchema = z.object({
   timeZone: z.string().max(100).refine(value => { try { new Intl.DateTimeFormat("en-GB", { timeZone: value }); return true; } catch { return false; } }),
-  plans: z.array(z.object({ anchor: date, frequency: z.enum(["daily", "monthly", "quarterly", "annually"]), skipDate: date.optional() }).strict()).max(500),
+  plans: z.array(z.object({ anchor: date, frequency: z.enum(["daily", "monthly", "quarterly", "annually"]), skipDate: date.optional(), once: z.literal(true).optional() }).strict()).max(500),
 }).strict();
 export const registrationSchema = z.object({ subscription: subscriptionSchema, schedule: scheduleSchema }).strict();
 export type PushSubscription = z.infer<typeof subscriptionSchema>;

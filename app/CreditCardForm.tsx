@@ -5,6 +5,7 @@ import type { Account } from "@/lib/types";
 import { creditCardDraft, creditCardWarnings, validateCreditCardDraft } from "@/lib/credit-card";
 import { normaliseColour } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
+import { useUnsavedDraft } from "./useDraftGuard";
 
 type Draft = ReturnType<typeof creditCardDraft>;
 type Props = Readonly<{ existing?: Account; onSave: (account: Account) => Promise<boolean> | boolean | void; onCancel: () => void }>;
@@ -20,6 +21,7 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const form = useRef<HTMLFormElement>(null);
+  useUnsavedDraft({ provider, label, colour, draft });
   const fields: { key: keyof Draft; label: string; hint: string }[] = [
     { key: "balance", label: "Amount owed (£)", hint: "The balance on your latest credit card statement." },
     { key: "apr", label: "APR (%)", hint: "Use the rate from your provider, including 0% offers." },
@@ -34,6 +36,7 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
     frequency: "monthly", reinvestIncome: false, payouts: [], events: existing?.events ?? [],
     createdAt: existing?.createdAt ?? new Date().toISOString(), ...result.value,
   } : undefined;
+  if (candidate && existing?.creditCard?.statementPaid && candidate.nextPayoutDate === existing.nextPayoutDate) candidate.creditCard = { ...candidate.creditCard!, statementPaid: true };
   const warnings = candidate ? creditCardWarnings(candidate) : [];
 
   return <>

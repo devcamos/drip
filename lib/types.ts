@@ -18,7 +18,7 @@ export interface StockInvestment {
 }
 
 /** Statement figures only. A planned payment never changes the recorded debt. */
-export interface CreditCardTerms { apr: number; minimumPayment: number; plannedPayment?: number }
+export interface CreditCardTerms { apr: number; minimumPayment: number; plannedPayment?: number; statementPaid?: true }
 /** An explicitly applied estimate retains the provider balance used for income. */
 export interface MarketValuation {
   priceUSD: number;
@@ -30,6 +30,8 @@ export interface MarketValuation {
 
 export interface Account {
   id: string;
+  archivedAt?: string; // retained history, excluded from active balances and predictions
+  positionReviewRequired?: true; // cash movement is not an inferred buy/sell transaction
   provider: string;      // e.g. "Zopa"
   label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   holdingName?: string; // stock/fund identity: portable with the encrypted financial record

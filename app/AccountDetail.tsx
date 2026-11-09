@@ -9,6 +9,7 @@ import { StockInvestmentSummary } from "./StockInvestment";
 import { isCreditAccount } from "@/lib/credit-card";
 import { CreditCardDetail } from "./CreditCardDetail";
 import { StockPrice } from "./stocks/StockPrice";
+import { useUnsavedDraft } from "./useDraftGuard";
 const today = () => M.ymd(new Date());
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
@@ -17,12 +18,13 @@ const eventStyle = {
   topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
   set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
 };
-type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
+type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onArchive?: () => void | Promise<boolean>; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
 
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(""); const [value, setValue] = useState(""); const [date, setDate] = useState(today());
+  const resetDraft = useUnsavedDraft({ value, date }, mode !== null && value !== "");
   const labels = { topup: "Top up", withdraw: "Withdraw", set: "Update balance" };
   const descriptions = {
     topup: "Adds money to your balance and records a deposit. This isn't income.",
@@ -30,9 +32,10 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
     set: "Enter the balance shown by your provider. This replaces your balance and updates predictions. The difference isn't recorded as income.",
   };
   const n = Number(value);
-  const valid = value.trim() !== "" && Number.isFinite(n) && (mode === "set" ? n >= 0 : M.round2(n) > 0) && validDate(date);
+  const futureDate = validDate(date) && date > today();
+  const valid = value.trim() !== "" && Number.isFinite(n) && (mode === "set" ? n >= 0 : M.round2(n) > 0) && validDate(date) && !futureDate;
   return <>
-    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { setMode(action); setValue(action === "set" ? String(a.balance) : ""); setError(""); }}>{labels[action]}</button>)}</div>
+    <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { if (mode && value && !confirm("Discard this unsaved balance entry?")) return; const nextValue = action === "set" ? String(a.balance) : ""; resetDraft({ value: nextValue, date }); setMode(action); setValue(nextValue); setError(""); }}>{labels[action]}</button>)}</div>
     {mode && <form className="panel" aria-label={labels[mode]} onSubmit={async event => {
       event.preventDefault(); if (!valid) return;
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
@@ -48,7 +51,9 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
       finally { setBusy(false); }
     }}>
       <h2 style={{ marginTop: 0 }}>{labels[mode]}</h2><p className="muted">{descriptions[mode]}</p>
-      <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input disabled={busy} id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input disabled={busy} id="balance-date" type="date" aria-label="date" value={date} onChange={e => setDate(e.target.value)} /></div></div>
+      <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input disabled={busy} id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input disabled={busy} id="balance-date" type="date" max={today()} aria-label="date" aria-invalid={futureDate} aria-describedby={futureDate ? "balance-date-error" : undefined} value={date} onChange={e => setDate(e.target.value)} /></div></div>
+      {futureDate && <p id="balance-date-error" role="alert" className="err">Use today or a past date. Future transactions cannot change your current balance.</p>}
+      {a.investment && mode !== "set" && <p className="muted">This records a cash movement, without changing your shares. Afterwards, check your share details before applying another share price.</p>}
       <div className="row-gap"><button type="submit" className="btn small" disabled={!valid || busy}>{busy ? "Saving…" : "Save"}</button><button type="button" className="btn ghost small" disabled={busy} onClick={() => setMode(null)}>Cancel</button></div>
       {error && <p role="alert" className="err">{error}</p>}
     </form>}
@@ -62,6 +67,7 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [by, setBy] = useState<"week" | "month">("month");
   const [message, setMessage] = useState("");
   const history = a.payouts.map((p, index) => ({ ...p, index })).filter(p => p.kind === "actual").toSorted((x, y) => y.date.localeCompare(x.date));
+  useUnsavedDraft({ amount, date, type }, amount !== "");
   const groups = new Map<string, number>();
   for (const p of history) {
     const period = by === "month" ? p.date.slice(0, 7) : M.weekStart(p.date);
@@ -107,8 +113,8 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   </section>;
 }
 
-export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) {
-  if (isCreditAccount(a)) return <CreditCardDetail account={a} onBack={onBack} onEdit={onEdit} onDelete={onDelete} />;
+export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange }: Props) {
+  if (isCreditAccount(a)) return <CreditCardDetail account={a} onBack={onBack} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} onChange={onChange} />;
   const events = (a.events ?? []).filter(e => e.type !== "interest").toSorted((x, y) => y.date.localeCompare(x.date));
   const legacy = M.interestHistory(a.events, "month");
   const forecast = M.projection([a], 12).at(-1)!;
@@ -120,6 +126,8 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
     <p className="muted">{a.marketValuation ? "Your saved market estimate. Dividend predictions retain your recorded income assumptions." : "Your entered balance. Predictions and recorded income never change it automatically."}</p>
+    {a.positionReviewRequired && <section className="banner warn" aria-label="Share position needs review"><span>Check your recorded shares after this cash movement. Price updates and capital return are paused until you confirm the position.</span><button className="btn ghost small" onClick={onEdit}>Update share position</button></section>}
+    {events.some(event => event.date > today()) && <p role="status" className="banner warn">An earlier entry has a future date. Check your provider's current balance and use Update balance to correct your saved figure if needed.</p>}
     {a.rateType === "dividend" && <><StockPrice key={a.id} account={a} onChange={onChange} onEdit={onEdit} onBack={onBack} /><StockInvestmentSummary account={a} onEdit={onEdit} /></>}
     <BalanceActions a={a} onChange={onChange} />
     <IncomeSummary accounts={[a]} />
@@ -137,6 +145,6 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onChange }: Props) 
     {events.length > 0 && <section className="panel"><h2 style={{ marginTop: 0 }}>Top-ups, withdrawals and updates</h2><ul className="list" data-testid="events">{events.map((e, i) => <li key={`${e.date}-${i}`}><span>{eventStyle[e.type].label}<br /><span className="muted">{fmtDate(e.date)}</span></span><b className={eventStyle[e.type].className}>{eventStyle[e.type].prefix}{M.gbp(e.amount)}</b></li>)}</ul></section>}
     {legacy.length > 0 && <details className="panel"><summary>Previous interest estimates</summary><p className="muted">Older Drip versions added these estimates to your balance. They aren&apos;t recorded income. Your saved balance has been preserved; update it using your provider&apos;s current figure.</p><ul className="list">{legacy.map(row => <li key={row.period}><span>{row.period}</span><b>{M.gbp(row.amount)}</b></li>)}</ul></details>}
     {(a.rateHistory?.length ?? 0) > 1 && <section className="panel"><h2 style={{ marginTop: 0 }}>Rate history</h2><ul className="list">{a.rateHistory!.toReversed().map(r => <li key={r.from}><span>{r.from === "0000-01-01" ? "Since added" : `From ${fmtDate(r.from)}`}</span><b>{r.ratePct}%</b></li>)}</ul></section>}
-    <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button><button className="btn danger" onClick={onDelete}>Delete</button></div>
+    <div className="row-gap"><button className="btn ghost" onClick={onEdit}>Edit</button>{onArchive && <button className="btn ghost" onClick={onArchive}>Archive account</button>}<button className="btn danger" onClick={onDelete}>Delete</button></div>
   </>;
 }

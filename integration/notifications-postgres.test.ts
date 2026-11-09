@@ -68,3 +68,15 @@ it("cleans expired endpoints, retries transient failures, and cascades deleted o
   await store.save("other", f.device, f.subscription, f.schedule, now);
   await pool.query('DELETE FROM "user" WHERE id=$1', ["other"]); expect(await store.current("other", f.device)).toBeUndefined();
 });
+
+it("persists and dispatches a one-off statement once without fabricating the next statement", async () => {
+  const f = pushFixture(), plan = { timeZone: "UTC", plans: [{ anchor: "2026-10-29", frequency: "monthly" as const, once: true as const }] };
+  await store.save("owner", f.device, f.subscription, plan, now);
+  expect((await store.current("owner", f.device))!.schedule).toEqual(plan);
+  let sends = 0;
+  await dispatchReminders(store, async () => { sends++; }, now);
+  const after = (await pool.query('SELECT next_due_day::text AS due, last_sent_day::text AS sent FROM drip_push_subscriptions WHERE device_id=$1', [f.device])).rows[0];
+  expect(sends).toBe(1); expect(after).toEqual({ due: null, sent: "2026-10-29" });
+  await dispatchReminders(store, async () => { sends++; }, new Date("2026-11-29T09:00:00Z"));
+  expect(sends).toBe(1); await store.remove("owner", f.device);
+});

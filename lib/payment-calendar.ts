@@ -1,10 +1,10 @@
 import type { Account } from "./types";
 import { addMonths, round2, ymd } from "./maths";
-import { followingDay, nextPayment, paymentReminders } from "./payment-reminders";
+import { debtPaymentReminders, followingDay, nextPayment, paymentReminders } from "./payment-reminders";
 import { validDate } from "./products";
 
-export type CalendarPayment = { account: Account; date: string; through: string; occurrences: number; amount: number };
-export type PaymentMonth = { month: string; payments: CalendarPayment[]; count: number; amount: number };
+export type CalendarPayment = { account: Account; date: string; through: string; occurrences: number; amount: number; repayment?: true };
+export type PaymentMonth = { month: string; payments: CalendarPayment[]; count: number; amount: number; repaymentAmount?: number };
 const dayMs = 86_400_000;
 const previousDay = (date: string) => ymd(new Date(Date.parse(`${date}T00:00:00Z`) - dayMs));
 
@@ -18,6 +18,7 @@ export function paymentCalendar(accounts: Account[], today: string) {
   const from = followingDay(today), until = addMonths(from, 12);
   if (!validDate(until)) return null;
   const schedules = paymentReminders(accounts, from).filter(item => Number.isFinite(item.amount) && item.amount > 0);
+  const repayments = debtPaymentReminders(accounts, today).filter(item => item.date >= from);
   const months: PaymentMonth[] = [];
   let month = from.slice(0, 7) + "-01";
   for (let index = 0; index < 13 && month < until; index++, month = addMonths(month, 1)) {
@@ -34,8 +35,11 @@ export function paymentCalendar(accounts: Account[], today: string) {
       if (!Number.isFinite(amount)) continue;
       payments.push({ account: schedule.account, date, through: daily ? through : date, occurrences, amount });
     }
+    payments.push(...repayments.filter(item => item.date >= start && item.date <= through).map(item => ({ account: item.account, date: item.date, through: item.date, occurrences: 1, amount: item.amount, repayment: true as const })));
     payments.sort((a, b) => a.date.localeCompare(b.date) || a.account.id.localeCompare(b.account.id));
-    months.push({ month: month.slice(0, 7), payments, count: payments.reduce((sum, payment) => sum + payment.occurrences, 0), amount: round2(payments.reduce((sum, payment) => sum + payment.amount, 0)) });
+    const outgoing = payments.filter(payment => payment.repayment);
+    months.push({ month: month.slice(0, 7), payments, count: payments.reduce((sum, payment) => sum + payment.occurrences, 0), amount: round2(payments.filter(payment => !payment.repayment).reduce((sum, payment) => sum + payment.amount, 0)),
+      ...(outgoing.length ? { repaymentAmount: round2(outgoing.reduce((sum, payment) => sum + payment.amount, 0)) } : {}) });
   }
   return { from, through: previousDay(until), months };
 }

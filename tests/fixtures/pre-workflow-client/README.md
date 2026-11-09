@@ -1,0 +1,1 @@
+Frozen v3 DB, backup and cloud entry points from commit198fbdf99c0996029e1aede3684541090fd60e7e. Only relative dependency paths are repointed to current shared modules. Tests specifically exercise unchanged v3 open/version-read guards; this is not a frozen whole historical client.

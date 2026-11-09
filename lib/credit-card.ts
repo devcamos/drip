@@ -1,19 +1,20 @@
 import type { Account, CreditCardTerms } from "./types";
 import { incomeBalance } from "./market-valuation";
+import { activeAccounts } from "./account-lifecycle";
 
-type Categorised = Partial<Pick<Account, "productCategory">>;
+type Categorised = Partial<Pick<Account, "productCategory" | "archivedAt">>;
 const moneyLimit = 1_000_000_000_000;
 const money = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= moneyLimit && Math.round((value + Number.EPSILON) * 100) / 100 === value;
 export const validCreditAmount = money;
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 export function isCreditAccount(account: Categorised): boolean { return account.productCategory === "credit-card"; }
-export function accountAssets<T extends Categorised>(accounts: T[]): T[] { return accounts.filter(account => !isCreditAccount(account)); }
+export function accountAssets<T extends Categorised>(accounts: T[]): T[] { return activeAccounts(accounts).filter(account => !isCreditAccount(account)); }
 
 export function validCreditCardTerms(value: unknown): value is CreditCardTerms {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const v = value as CreditCardTerms;
   return typeof v.apr === "number" && Number.isFinite(v.apr) && v.apr >= 0 && v.apr <= Number.MAX_SAFE_INTEGER && money(v.minimumPayment) &&
-    (v.plannedPayment === undefined || money(v.plannedPayment));
+    (v.plannedPayment === undefined || money(v.plannedPayment)) && (v.statementPaid === undefined || v.statementPaid === true);
 }
 
 export type CreditCardDraft = { balance: string; apr: string; minimumPayment: string; plannedPayment: string; paymentDate: string };
@@ -62,7 +63,7 @@ export function creditCardWarnings(account: Account): string[] {
 
 export function portfolioTotals(accounts: Account[]) {
   let assetPennies = 0, debtPennies = 0, annual = 0;
-  for (const account of accounts) {
+  for (const account of activeAccounts(accounts)) {
     if (isCreditAccount(account)) debtPennies += Math.round(account.balance * 100);
     else {
       assetPennies += Math.round(Math.max(account.balance, 0) * 100);

@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 import type { AppData } from "@/lib/types";
 import * as M from "@/lib/maths";
 import { IncomeSummary } from "./IncomeSummary";
+import { useUnsavedDraft } from "./useDraftGuard";
 type Assumptions = { monthlyDeposit: number; years: number };
 const ranges = ["3m", "6m", "1y", "Max", "Future"] as const;
 type Range = typeof ranges[number];
@@ -35,6 +36,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
   const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState("");
   const assumptions = data.projection ?? { monthlyDeposit: 0, years: 1 };
   const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
+  const commitProjectionDraft = useUnsavedDraft({ deposit, years });
   const fillId = useId();
   const { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path } = balanceChart(data, range, assumptions);
   const br = M.momBreakdown(data.snapshots); const growth = br ? br.growthPct : M.momGrowth(data.snapshots);
@@ -77,7 +79,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
           event.preventDefault(); if (!validDeposit || saving) return;
           setSaving(true); setSaveError("");
           try {
-            if (await onAssumptions({ monthlyDeposit: Number(deposit), years })) setEditing(false);
+            if (await onAssumptions({ monthlyDeposit: Number(deposit), years })) { commitProjectionDraft(); setEditing(false); }
             else setSaveError("Projection could not be saved. Your entries are kept; retry Save projection.");
           } catch { setSaveError("Projection could not be saved. Your entries are kept; retry Save projection."); }
           finally { setSaving(false); }

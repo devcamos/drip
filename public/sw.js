@@ -27,7 +27,7 @@ self.addEventListener('push', event => {
   if (!payload || !['payment-reminder', 'notification-test'].includes(payload.type) || !/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) return;
   const test = payload.type === 'notification-test';
   event.waitUntil(self.registration.showNotification(test ? 'Drip notification test' : 'Drip payment reminder', {
-    body: test ? 'Phone notifications are working on this device.' : 'A payment is expected today. Open Drip to check and log what arrived.',
+    body: test ? 'Phone notifications are working on this device.' : 'A payment needs your attention today. Open Drip to check.',
     tag: test ? 'drip-payment-test' : `drip-payment-${payload.date}`, icon: '/icon-192.png', badge: '/icon-192.png',
   }));
 });
