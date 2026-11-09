@@ -25,21 +25,21 @@
     "test:calendar": "npm run test:calendar:unit && npm run test:calendar:integration && npm run test:calendar:e2e"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.14",
+    "@better-auth/passkey": "1.7.18",
     "@neondatabase/serverless": "1.2.0",
-    "better-auth": "1.7.14",
+    "better-auth": "1.7.18",
     "https-proxy-agent": "9.1.0",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "web-push": "3.6.7",
-    "ws": "8.22.0",
+    "ws": "8.22.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@babel/parser": "8.0.10",
-    "@playwright/test": "^1.64.1",
+    "@babel/parser": "8.1.0",
+    "@playwright/test": "^1.65.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -50,12 +50,12 @@
     "@types/react-dom": "^19.3.0",
     "@types/web-push": "3.6.4",
     "@types/ws": "^8.18.2",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "drip-depcruise": "file:tools/depcruise",
     "fake-indexeddb": "^6.2.7",
     "jsdom": "^30.1.3",
     "typescript": "^7.0",
-    "vite": "8.3.5",
+    "vite": "8.3.6",
     "vitest": "^5.0.5"
   },
   "overrides": {
