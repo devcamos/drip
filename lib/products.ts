@@ -8,7 +8,9 @@ export const PROVIDERS: Record<string, string> = {
   Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
   Vanguard: "#96151d", Marcus: "#1d2f4f", "Lloyds Bank": "#006a4d", "Premium Bonds": "#3c6e47", Other: "#4a5070",
 };
-export const TRADING_212_HOLDINGS = ["Realty Income", "Digital Realty", "Prologis", "American Tower", "Brookfield Infrastructure", "Air Products and Chemicals"] as const;
+// Familiar examples only: inclusion is not a ranking or investment recommendation.
+export const TRADING_212_HOLDINGS = ["Realty Income", "Digital Realty", "Prologis", "American Tower", "Brookfield Infrastructure", "Air Products and Chemicals", "Coca-Cola", "PepsiCo", "Johnson & Johnson", "Procter & Gamble", "McDonald's", "AbbVie", "Chevron", "ExxonMobil", "Colgate-Palmolive", "Unilever", "British American Tobacco", "National Grid", "Tesco", "Legal & General"] as const;
+export const CREDIT_CARD_PROVIDERS = ["American Express", "Barclaycard", "Capital One", "Halifax", "HSBC", "Lloyds", "MBNA", "Monzo", "Nationwide", "NatWest", "Santander", "Tesco Bank", "Virgin Money"] as const;
 export const displayProvider = (provider: string) => provider === "Trading212" ? "Trading 212" : provider;
 type ProductDefaults = { label: string; rateType: RateType; frequency: Frequency; taxWrapper: TaxWrapper; reinvestIncome: boolean };
 export const PRODUCTS: Record<ProductCategory, ProductDefaults> = {

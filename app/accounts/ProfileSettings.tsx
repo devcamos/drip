@@ -15,13 +15,14 @@ export type ProfileSettingsProps = Readonly<{
   onAccounts: () => void;
   onSettings: () => void;
   onPayments: () => void;
+  onFeedback: () => void;
   signOut: ReactNode;
   preferenceBusy?: boolean;
   preferenceStatus?: string;
   preferenceError?: string;
 }>;
 
-export function ProfileSettings({ open, identity, counts, incomePeriod, onIncomePeriod, onClose, onAccounts, onSettings, onPayments, signOut, preferenceBusy = false, preferenceStatus, preferenceError }: ProfileSettingsProps) {
+export function ProfileSettings({ open, identity, counts, incomePeriod, onIncomePeriod, onClose, onAccounts, onSettings, onPayments, onFeedback, signOut, preferenceBusy = false, preferenceStatus, preferenceError }: ProfileSettingsProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const element = dialog.current!;
@@ -35,7 +36,7 @@ export function ProfileSettings({ open, identity, counts, incomePeriod, onIncome
     <div className={s.profileIdentity}><span className={s.profileAvatar} aria-hidden="true">{profileInitials(identity)}</span><div><small>{identity ? "Gamertag" : "Profile"}</small><strong>{identity ? formatTag(identity) : "Your profile"}</strong><span>Your accounts, in one place.</span></div></div>
     <section className={s.profileSection} aria-label="Your profile accounts"><h3>Your accounts</h3><p>Keep every holding and credit card in its own account.</p><dl className={s.profileCounts}><div><dt>Savings</dt><dd>{counts.cash}</dd></div><div><dt>Holdings</dt><dd>{counts.stocks}</dd></div><div><dt>Credit cards</dt><dd>{counts.credits}</dd></div></dl><button className={s.profileLink} onClick={onAccounts}>Manage accounts <span aria-hidden="true">↗</span></button></section>
     <section className={s.profileSection} aria-label="Profile preferences"><h3>Preferences</h3><p>Show your income outlook by default as:</p><div className={s.periodPicker} role="group" aria-label="Default income period"><button disabled={preferenceBusy} aria-pressed={incomePeriod === "month"} onClick={() => onIncomePeriod("month")}>Monthly</button><button disabled={preferenceBusy} aria-pressed={incomePeriod === "year"} onClick={() => onIncomePeriod("year")}>Yearly</button></div><small>On this device · Amounts in GBP</small>{preferenceBusy || preferenceStatus ? <p className={s.preferenceStatus} role="status">{preferenceBusy ? "Saving preference…" : preferenceStatus}</p> : null}{preferenceError ? <p className={s.preferenceError} role="alert">{preferenceError}</p> : null}</section>
-    <section className={s.profileSection} aria-label="Profile security and reminders"><button className={s.settingsRow} onClick={onSettings}><span><b>Security &amp; devices</b><small>Password, recovery codes, passkeys and devices</small></span><span aria-hidden="true">↗</span></button><button className={s.settingsRow} onClick={onPayments}><span><b>Payment reminders</b><small>Expected dates and optional phone notifications</small></span><span aria-hidden="true">↗</span></button></section>
+    <section className={s.profileSection} aria-label="Profile services"><button className={s.settingsRow} onClick={onSettings}><span><b>Security &amp; devices</b><small>Password, recovery codes, passkeys and devices</small></span><span aria-hidden="true">↗</span></button><button className={s.settingsRow} onClick={onPayments}><span><b>Payment reminders</b><small>Expected dates and optional phone notifications</small></span><span aria-hidden="true">↗</span></button><button className={s.settingsRow} onClick={onFeedback}><span><b>Give feedback</b><small>Report a problem or suggest an improvement</small></span><span aria-hidden="true">↗</span></button></section>
     <div className={s.profileSignOut}>{signOut}</div>
   </dialog>;
 }

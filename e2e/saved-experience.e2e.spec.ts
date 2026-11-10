@@ -14,7 +14,8 @@ const cards = (page: Page) => page.getByRole("region", { name: "Account cards", 
 async function addCredit(page: Page, provider: string, owed: string, minimum: string, planned: string) {
   await page.getByRole("button", { name: "Add an account", exact: true }).click();
   await page.getByRole("button", { name: /Credit card/ }).click();
-  for (const [label, value] of [["Credit card provider", provider], ["Amount owed (£)", owed], ["APR (%)", "24.9"], ["Statement minimum payment (£)", minimum], ["Planned payment (£, optional)", planned], ["Payment due date", "2027-01-20"]]) await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByLabel("Credit card provider", { exact: true }).selectOption(provider);
+  for (const [label, value] of [["Amount owed (£)", owed], ["APR (%)", "24.9"], ["Statement minimum payment (£)", minimum], ["Planned payment (£, optional)", planned], ["Payment due date", "2027-01-20"]]) await page.getByLabel(label, { exact: true }).fill(value);
   await page.getByRole("button", { name: "Add credit card", exact: true }).click();
   await expect(page.locator(".bal")).toHaveText(`£${Number(owed).toLocaleString("en-GB", { minimumFractionDigits: 2 })}`);
   await page.getByRole("button", { name: "← Accounts", exact: true }).click();

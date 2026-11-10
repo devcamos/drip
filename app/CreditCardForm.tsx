@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { Account } from "@/lib/types";
 import { creditCardDraft, creditCardWarnings, validateCreditCardDraft } from "@/lib/credit-card";
 import { normaliseColour } from "@/lib/account-colour";
+import { CREDIT_CARD_PROVIDERS } from "@/lib/products";
 import * as M from "@/lib/maths";
 import { useUnsavedDraft } from "./useDraftGuard";
 
@@ -14,6 +15,7 @@ const colours = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: 
 export function CreditCardForm({ existing, onSave, onCancel }: Props) {
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
   const [provider, setProvider] = useState(existing?.provider ?? "");
+  const [customProvider, setCustomProvider] = useState(() => !!existing?.provider && !(CREDIT_CARD_PROVIDERS as readonly string[]).includes(existing.provider));
   const [label, setLabel] = useState(existing?.label ?? "");
   const [colour, setColour] = useState(normaliseColour(existing?.colour ?? "#6b4052"));
   const [draft, setDraft] = useState<Draft>(() => existing ? creditCardDraft(existing) : { balance: "", apr: "", minimumPayment: "", plannedPayment: "", paymentDate: M.addMonths(M.ymd(new Date()), 1) });
@@ -57,7 +59,12 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
       finally { setBusy(false); }
     }}>
       <label htmlFor="credit-provider">Credit card provider</label>
-      <input disabled={busy} id="credit-provider" value={provider} maxLength={100} placeholder="e.g. Lloyds" autoComplete="off" aria-invalid={!!errors.provider} aria-describedby={errors.provider ? "credit-provider-error" : undefined} onChange={event => { setProvider(event.target.value); setErrors(previous => ({ ...previous, provider: undefined })); }} />
+      <select disabled={busy} id="credit-provider" value={customProvider ? "__other__" : provider} aria-invalid={!!errors.provider} aria-describedby={errors.provider ? "credit-provider-error" : undefined} onChange={event => { const custom = event.target.value === "__other__"; setCustomProvider(custom); setProvider(custom ? "" : event.target.value); setErrors(previous => ({ ...previous, provider: undefined })); }}>
+        <option value="">Choose a provider</option>
+        {CREDIT_CARD_PROVIDERS.map(name => <option key={name} value={name}>{name}</option>)}
+        <option value="__other__">Other provider</option>
+      </select>
+      {customProvider && <><label htmlFor="credit-provider-other">Provider name</label><input disabled={busy} id="credit-provider-other" value={provider} maxLength={100} autoComplete="off" aria-invalid={!!errors.provider} aria-describedby={errors.provider ? "credit-provider-error" : undefined} onChange={event => { setProvider(event.target.value); setErrors(previous => ({ ...previous, provider: undefined })); }} /></>}
       {errors.provider ? <p id="credit-provider-error" className="err">{errors.provider}</p> : null}
       <label htmlFor="credit-label">Nickname (optional, this device only)</label>
       <input disabled={busy} id="credit-label" value={label} maxLength={100} autoComplete="off" onChange={event => setLabel(event.target.value)} />

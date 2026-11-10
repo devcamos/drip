@@ -61,7 +61,8 @@ test("saved bookmark updates from the old worker, refreshes imported build ident
     }))).toBe(3);
     await page.getByRole("button", { name: "Add an account", exact: true }).click();
     await page.getByRole("button", { name: /Credit card/ }).click();
-    for (const [label, value] of [["Credit card provider", "Lloyds"], ["Amount owed (£)", "600"], ["APR (%)", "19.9"], ["Statement minimum payment (£)", "20"], ["Planned payment (£, optional)", "50"], ["Payment due date", "2027-01-25"]]) await page.getByLabel(label, { exact: true }).fill(value);
+    await page.getByLabel("Credit card provider", { exact: true }).selectOption("Lloyds");
+    for (const [label, value] of [["Amount owed (£)", "600"], ["APR (%)", "19.9"], ["Statement minimum payment (£)", "20"], ["Planned payment (£, optional)", "50"], ["Payment due date", "2027-01-25"]]) await page.getByLabel(label, { exact: true }).fill(value);
     await page.getByRole("button", { name: "Add credit card", exact: true }).click();
     await expect(page.getByRole("region", { name: "Credit card payment plan" })).toContainText("£50.00");
     await page.getByRole("button", { name: "← Accounts", exact: true }).click();

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { DividendPortfolio } from "../app/DividendPortfolio";
 import { PaymentNotifications } from "../app/PaymentNotifications";
@@ -19,6 +19,22 @@ it("shows received dividends, periods, holdings, empty history and empty portfol
   fireEvent.click(screen.getByRole("button", { name: "Add holding" })); expect(add).toHaveBeenCalledOnce(); expect(screen.queryByText("Cash only")).toBeNull();
   view.rerender(<DividendPortfolio accounts={[holding()]} onOpen={open} onAdd={add} />); expect(screen.getByText(/Log a dividend/)).toBeVisible();
   view.rerender(<DividendPortfolio accounts={[]} onOpen={open} onAdd={add} />); fireEvent.click(screen.getByRole("button", { name: "Add dividend holding" })); expect(add).toHaveBeenCalledTimes(2); vi.useRealTimers();
+});
+it("shows each active holding's income and excludes cash from the dividend summary", () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
+  const stock = holding({ payouts: [{ kind: "actual", date: "2026-10-01", amount: 6 }] });
+  const second = holding({ id: "second", holdingName: "Digital Realty", balance: 2400, ratePct: 4, payouts: [{ kind: "actual", date: "2026-10-02", amount: 8 }] });
+  const archived = holding({ id: "archived", archivedAt: "2026-10-01", payouts: [{ kind: "actual", date: "2026-09-01", amount: 3 }] });
+  const cash = holding({ id: "cash", rateType: "interest", productCategory: "easy-access", holdingName: undefined, payouts: [{ kind: "actual", incomeType: "dividend", date: "2026-10-01", amount: 100 }] });
+  render(<DividendPortfolio accounts={[stock, second, archived, cash]} onOpen={vi.fn()} onAdd={vi.fn()} />);
+  expect(screen.getByTestId("dividend-income-total")).toHaveTextContent("£17.00");
+  const card = screen.getByRole("button", { name: "Open Digital Realty" });
+  expect(within(card).getByText("4%")).toBeInTheDocument();
+  expect(card).toHaveTextContent("Received · all time £8.00");
+  expect(card).toHaveTextContent("Estimated monthly £8.00");
+  expect(within(card).getByText("£96.00")).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /Open / })).toHaveLength(2);
+  vi.useRealTimers();
 });
 it("lists daily cash and dividend reminders without changing balances", () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
