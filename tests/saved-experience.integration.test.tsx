@@ -18,6 +18,7 @@ import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseIdentity, rel
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 import type { AppData } from "../lib/types";
 import { AccountsHome } from "../app/accounts/AccountsHome";
+import { StockPrice } from "../app/stocks/StockPrice";
 import { portfolioTotals } from "../lib/credit-card";
 
 it("groups accounts with separate totals, collapses sections and opens the correct card", () => {
@@ -39,6 +40,53 @@ it("groups accounts with separate totals, collapses sections and opens the corre
 });
 
 const at = Date.parse("2026-11-07T12:00:00Z");
+
+it("validates saved share-price updates and preserves the holding when the rate is unavailable", async () => {
+  const holding = releaseStock();
+  const save = vi.fn();
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<StockPrice account={holding} onChange={save} onEdit={vi.fn()} onBack={vi.fn()} />);
+  const input = screen.getByLabelText("Current price per share (USD)");
+  fireEvent.change(input, { target: { value: "1e3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Update holding value" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("positive USD");
+  expect(fetcher).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "60" } });
+  fireEvent.click(screen.getByRole("button", { name: "Update holding value" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("last saved value is kept");
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("applies a dated exchange rate without changing shares or income assumptions", async () => {
+  const holding = releaseStock();
+  const save = vi.fn(async (change: (current: typeof holding) => typeof holding) => {
+    const updated = change(holding);
+    expect(updated.balance).toBe(2250);
+    expect(updated.investment).toEqual(holding.investment);
+    expect(updated.ratePct).toBe(holding.ratePct);
+    return true;
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ base: "USD", quote: "GBP", rate: 0.75, date: new Date().toISOString().slice(0, 10), source: "Frankfurter" })));
+  render(<StockPrice account={holding} onChange={save} onEdit={vi.fn()} onBack={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Current price per share (USD)"), { target: { value: "60" } });
+  fireEvent.click(screen.getByRole("button", { name: "Update holding value" }));
+  expect(await screen.findByText(/Holding value saved/)).toBeVisible();
+  expect(save).toHaveBeenCalledOnce();
+});
+
+it("lets a user hide a chart and prevents valuation without reviewed shares", () => {
+  const edit = vi.fn();
+  render(<StockPrice account={releaseStock({ positionReviewRequired: true })} onChange={vi.fn()} onEdit={edit} onBack={vi.fn()} />);
+  expect(screen.getByLabelText("Current price per share (USD)")).toBeDisabled();
+  expect(screen.getByText(/Check your share position/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Hide chart" }));
+  expect(screen.getByText("The chart is hidden.")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /Show TradingView chart/ }));
+  expect(screen.getByTitle("Realty Income delayed share-price chart")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Edit holding details" }));
+  expect(edit).toHaveBeenCalledOnce();
+});
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; };
 let otherTab: typeof db | undefined;
 async function seedOld(data = releaseData([releaseSaver(), releaseStock()]), state?: Parameters<typeof oldDb.commitCloudRestore>[1]) {

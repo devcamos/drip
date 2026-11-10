@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { convertedHolding, parseFxRate, type FxCurrency, type FxRate } from "@/lib/exchange-rates";
 import { formatShares } from "@/lib/stock-investment";
 import { gbp } from "@/lib/maths";
+import { isDecimalInput } from "@/lib/decimal-input";
 const sharePrice = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 2, maximumFractionDigits: 6 });
 
 export function CurrencyEstimate({ currency, shares }: Readonly<{ currency: FxCurrency; shares: number }>) {
@@ -14,7 +15,7 @@ export function CurrencyEstimate({ currency, shares }: Readonly<{ currency: FxCu
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
   const usable = rate && parseFxRate(rate, currency);
-  const estimate = usable ? convertedHolding(price, shares, usable.rate) : null;
+  const estimate = usable && isDecimalInput(price) ? convertedHolding(price, shares, usable.rate) : null;
   async function convert() {
     const controller = new AbortController(); pending.current?.abort(); pending.current = controller;
     setBusy(true); setError("");
@@ -34,7 +35,7 @@ export function CurrencyEstimate({ currency, shares }: Readonly<{ currency: FxCu
     <p className="muted">Enter your latest share price. Frankfurter supplies the daily exchange rate.</p>
     <label htmlFor={id}>Current price per share ({currency})</label>
     <input id={id} inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="e.g. 60.00" />
-    <button type="button" className="btn ghost" disabled={busy || !convertedHolding(price, shares, 1)} onClick={convert}>{busy ? "Getting daily rate…" : rate ? "Refresh conversion" : "Convert to GBP"}</button>
+    <button type="button" className="btn ghost" disabled={busy || !isDecimalInput(price) || !convertedHolding(price, shares, 1)} onClick={convert}>{busy ? "Getting daily rate…" : rate ? "Refresh conversion" : "Convert to GBP"}</button>
     {usable && <p className="muted">Frankfurter · Rate dated {usable.date} · {currency} to GBP</p>}
     {rate && !usable && <p role="status">This exchange rate is too old. Refresh it to calculate an estimate.</p>}
     {estimate && <output className="currency-result" aria-label="Converted holding estimate"><span>Estimated value in GBP</span><strong>{gbp(estimate.valueGBP)}</strong><span>{formatShares(shares)} shares · ≈ {sharePrice.format(estimate.perShareGBP)} per share</span></output>}

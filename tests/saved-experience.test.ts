@@ -8,6 +8,34 @@ import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
 import * as M from "../lib/maths";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseSaver, releaseStock } from "./saved-experience-fixtures";
 import { groupAccounts } from "../app/accounts/presentation";
+import { investmentInputs, parseInvestment } from "../lib/stock-investment";
+
+test("existing tiny share holdings remain editable without changing their saved values", () => {
+  const holding = { shares: 0.00000001, averagePriceGBP: 0.00000002, originalPrice: { currency: "USD" as const, averagePrice: 0.00000003 } };
+  const input = investmentInputs(holding);
+  expect(input.shares).toBe("0.00000001");
+  expect(input.averagePriceGBP).toBe("0.00000002");
+  expect(input.originalPrice).toBe("0.00000003");
+  expect(parseInvestment(input)).toEqual(holding);
+});
+
+test("the smallest representable positive holding survives editing", () => {
+  const holding = { shares: Number.MIN_VALUE, averagePriceGBP: 1 };
+  const input = investmentInputs(holding);
+  expect(input.shares).not.toContain("e");
+  expect(parseInvestment(input)).toEqual(holding);
+});
+
+test("zero share holdings remain zero and do not acquire a foreign price on edit", () => {
+  const holding = { shares: 0, averagePriceGBP: 0 };
+  expect(parseInvestment(investmentInputs(holding))).toEqual(holding);
+});
+
+test("manual scientific-notation entries are rejected even when a stored small number can be edited", () => {
+  const input = investmentInputs({ shares: 0.0000001, averagePriceGBP: 1 });
+  expect(parseInvestment(input)).toEqual({ shares: 0.0000001, averagePriceGBP: 1 });
+  expect(parseInvestment({ ...input, shares: "1e-7" })).toBeNull();
+});
 
 test("groups recorded cash, investments, debt and unclassified products without mixing balances", () => {
   const accounts = [releaseSaver({ balance: 0.1 }), releaseSaver({ id: "cash-2", balance: 0.2 }), releaseStock(), releaseDebt(), releaseSaver({ id: "other", productCategory: "other", balance: 5 })];

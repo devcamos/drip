@@ -56,6 +56,18 @@ integration-heavy. UI rendering, actual crypto/storage and HTTP/library wiring
 are not relabelled as pure units to obtain a prettier percentage. The report
 shows the actual distribution separately from new-feature targets.
 
+### Coverage gates
+
+CI requires at least 90% lines, statements, functions and branches across the
+app, measured with the combined Vitest projects. Browser tests verify journeys
+but do not contribute to that instrumented coverage figure. It also runs
+`npm run test:unit:coverage`, requiring 90% for each measure across the pure
+business-logic and validation inventory in `vitest.unit-coverage.config.mts`.
+Review and update that inventory when adding or moving domain logic. Storage,
+encryption, network, browser and authentication implementations belong to the
+whole-app gate; their exclusion from the domain figure does not imply that
+unit tests cover the entire application.
+
 | Project | Purpose | Datastore/dependencies |
 | --- | --- | --- |
 | `unit` | Isolated domain/validation/control logic | Node-only; fixed clock; external I/O mocked; no global DOM/IndexedDB fixture |

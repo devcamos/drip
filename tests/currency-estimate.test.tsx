@@ -13,6 +13,16 @@ afterEach(() => vi.useRealTimers());
 function open() { fireEvent.click(screen.getByText("Convert a share price to GBP")); }
 function price(value: string) { fireEvent.change(screen.getByLabelText("Current price per share (USD)"), { target: { value } }); }
 
+it("rejects non-decimal share-price input without fetching or showing a misleading estimate", () => {
+  render(<CurrencyEstimate currency="USD" shares={2} />); open();
+  for (const value of ["0x10", "0b10", "1e2", "+2"]) {
+    price(value); expect(screen.getByRole("button", { name: "Convert to GBP" })).toBeDisabled();
+    expect(screen.queryByLabelText("Converted holding estimate")).toBeNull();
+  }
+  expect(fetcher).not.toHaveBeenCalled();
+  price(".50"); expect(screen.getByRole("button", { name: "Convert to GBP" })).toBeEnabled();
+});
+
 it("converts only after user input, labels source/date, recomputes shares locally and keeps the recorded investment unchanged", async () => {
   const account = { id: "synthetic-stock", balance: 1155.28, ratePct: 5.7, investment: { shares: 10, averagePriceGBP: 44.99, originalPrice: { currency: "USD", averagePrice: 60.41 } } } as Account;
   const before = structuredClone(account);
