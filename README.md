@@ -11,6 +11,7 @@ Drip is a local-first personal finance tracker and installable PWA. It brings sa
 - Record credit-card APR, minimum and planned payments. Reminders do not make payments or change the amount owed.
 - View trends and projections. Figures are estimates, not financial advice or confirmed provider payments.
 - Install Drip on a supported phone or desktop and opt in to payment reminders. iPhone push notifications require the Home Screen app and notification permission.
+- Send feedback from Profile & settings. Messages are readable by the Drip team and authorised agents; do not include credentials or financial figures.
 
 Balances and rates are entered by the user. Drip does not connect to banks, execute trades or fetch live share prices. Where supported, manually entered share prices can be converted using Frankfurter reference exchange rates; the result is an estimate.
 
@@ -50,6 +51,7 @@ For the architecture and trust boundaries, see [Architecture](docs/architecture.
 - [Encrypted sync, account workflows and compatibility](docs/account-workflows.md)
 - [Device management](docs/device-management.md) and [guided recovery](docs/guided-recovery.md)
 - [Payment calendar](docs/payment-calendar.md) and [phone notifications](docs/payment-notifications.md)
+- [Feedback inbox and agent triage](docs/feedback.md)
 - [Exchange rates](docs/exchange-rates.md) and [investment statistics](docs/dividend-investment-stats.md)
 - [Regression policy and test layers](docs/testing/regression-policy.md)
 - [UI screenshots](docs/screenshots/)

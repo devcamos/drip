@@ -102,6 +102,18 @@
       "browser": [
         "e2e/account-workflows.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "feedback-inbox",
+      "unit": [
+        "tests/feedback.test.ts"
+      ],
+      "integration": [
+        "tests/feedback.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/feedback.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -728,6 +740,25 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "feedback-inbox",
+      "name": "Private feedback submission and database triage",
+      "sources": [
+        "app/Feedback.tsx",
+        "app/api/feedback/route.ts",
+        "lib/feedback.ts",
+        "server/feedback/api.ts",
+        "server/feedback/store.ts",
+        "scripts/feedback.sql",
+        "app/feedback.module.css"
+      ],
+      "tests": [
+        "tests/feedback.test.ts",
+        "tests/feedback.integration.test.tsx",
+        "integration/feedback-postgres.test.ts",
+        "e2e/feedback.e2e.spec.ts"
+      ]
     }
   ],
   "layers": {
@@ -760,7 +791,8 @@
       "tests/credential-validation.unit.test.ts",
       "tests/device-management.unit.test.ts",
       "tests/recovery-boundaries.unit.test.ts",
-      "tests/cloud-sync.unit.test.ts"
+      "tests/cloud-sync.unit.test.ts",
+      "tests/feedback.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -829,14 +861,16 @@
       "tests/feedback-prototype.integration.test.tsx",
       "tests/profile-wallet.integration.test.tsx",
       "tests/saved-experience.integration.test.tsx",
-      "tests/account-workflows.integration.test.tsx"
+      "tests/account-workflows.integration.test.tsx",
+      "tests/feedback.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
       "integration/device-management.test.ts",
       "integration/notification-rate-limits.test.ts",
       "integration/notifications-postgres.test.ts",
-      "integration/saved-experience-http.integration.test.ts"
+      "integration/saved-experience-http.integration.test.ts",
+      "integration/feedback-postgres.test.ts"
     ],
     "browser": [
       "e2e/account-options.spec.ts",
@@ -873,7 +907,8 @@
       "e2e/feedback-prototype.e2e.spec.ts",
       "e2e/profile-wallet.e2e.spec.ts",
       "e2e/saved-experience.e2e.spec.ts",
-      "e2e/account-workflows.e2e.spec.ts"
+      "e2e/account-workflows.e2e.spec.ts",
+      "e2e/feedback.e2e.spec.ts"
     ]
   },
   "conditional": [

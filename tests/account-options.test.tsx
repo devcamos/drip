@@ -6,6 +6,11 @@ import { AccountDetail } from "../app/AccountDetail";
 import { TRADING_212_HOLDINGS } from "../lib/products";
 import { accountCardStyle, normaliseColour } from "../lib/account-colour";
 import type { Account } from "../lib/types";
+
+it("offers twenty named examples without asserting a ranking", () => {
+  expect(TRADING_212_HOLDINGS).toHaveLength(20);
+  expect(new Set(TRADING_212_HOLDINGS).size).toBe(20);
+});
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const old: Account = { id: "stock", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", label: "Private pot", balance: 1000, ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#ffeedd", payouts: [{ date: "2026-10-01", amount: 4, kind: "actual" }], events: [], createdAt: "2026-10-01" };
 

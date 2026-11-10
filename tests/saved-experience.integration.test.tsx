@@ -224,6 +224,17 @@ it("keeps a real credit-card form entry intact through validation and save failu
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(cancel).toHaveBeenCalledOnce();
 });
 
+it("offers credit-card providers without losing a custom provider on edit", async () => {
+  const existing = releaseDebt({ provider: "A local credit union" });
+  const save = vi.fn().mockResolvedValue(true);
+  render(<CreditCardForm existing={existing} onSave={save} onCancel={vi.fn()} />);
+  expect(screen.getByLabelText("Credit card provider")).toHaveValue("__other__");
+  expect(screen.getByLabelText("Provider name")).toHaveValue("A local credit union");
+  expect(screen.getByRole("option", { name: "Barclaycard" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union" })));
+});
+
 it("uses real saved accounts in profile, debt detail, owner-scoped preference and the actual sign-out encryption gate", async () => {
   const data = releaseData(releaseHoldingsAndDebts()); await seedVault(data); render(<Drip />);
   const avatar = await screen.findByRole("button", { name: /Open profile and settings/ }); fireEvent.click(avatar);

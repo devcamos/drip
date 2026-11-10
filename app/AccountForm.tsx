@@ -122,7 +122,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
           <option value="custom">Other stock or fund</option>
         </select></>}
         {(provider !== "Trading212" || customHolding) && <><label htmlFor="holding-name">Stock / fund name{provider !== "Trading212" ? " (optional)" : ""}</label><input disabled={busy} id="holding-name" value={holding} maxLength={100} onChange={e => { setHolding(e.target.value); if (provider !== "Trading212") setCustomHolding(!!e.target.value && !(TRADING_212_HOLDINGS as readonly string[]).includes(e.target.value)); }} /></>}
-        <p className="muted">Choose a holding or track the whole account. Enter your own balance, dividend yield and payment schedule below.</p>
+        <p className="muted">These are examples, not recommendations or guarantees. Choose a holding or track the whole account, then enter your own figures below.</p>
       </>}
       {category === "stocks-funds" && <label className="check-label"><input disabled={busy} type="checkbox" checked={wrapper === "stocks-shares-isa"} onChange={e => setWrapper(e.target.checked ? "stocks-shares-isa" : "none")} />Held in a Stocks &amp; Shares ISA</label>}
       <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input disabled={busy} id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={e => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />

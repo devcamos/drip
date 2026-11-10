@@ -1,6 +1,6 @@
 # Drip architecture
 
-Drip is a local-first Next.js PWA. Financial data is encrypted in the browser; the backend stores encrypted cloud copies and authentication metadata. This page describes the current implementation, not a proposed live market-price or bank integration.
+Drip is a local-first Next.js PWA. Financial data is encrypted in the browser; the backend stores encrypted cloud copies, authentication metadata and user-submitted feedback. This page describes the current implementation, not a proposed live market-price or bank integration.
 
 ## C4 level 1: system context
 
@@ -27,17 +27,21 @@ flowchart LR
     UI -->|"HTTPS authentication"| Auth
     Domain -->|"Encrypted vault envelope over HTTPS"| Cloud
     UI -->|"Opt-in reminder schedule"| Notify
+    UI -->|"Explicit feedback message"| Feedback
     UI -->|"Public currency pair"| Exchange
     subgraph Vercel["Vercel · Next.js application"]
         Auth["Better Auth + device routes"]
         Cloud["Cloud vault API"]
         Notify["Notification API + dispatch"]
+        Feedback["Authenticated feedback API"]
         Exchange["Exchange-rate API"]
         Cron["Production daily cron"] --> Notify
     end
     Auth --> DB[("Neon Postgres")]
     Cloud --> DB
     Notify --> DB
+    Feedback --> DB
+    Agent["Authorised triage agent"] -->|"Queries feedback when invoked"| DB
     Notify -->|"Generic Web Push"| Push["Push provider"]
     Push --> Worker
     Exchange --> FX["Frankfurter"]
@@ -57,26 +61,31 @@ flowchart TB
         Vault --> Local[("IndexedDB ciphertext and metadata")]
         Vault --> Sync["Cloud sync<br/>lib/cloud"]
         View --> Schedule["Reminder schedule<br/>lib/payment-reminders"]
+        View --> FeedbackUI["Feedback form<br/>app/Feedback"]
         Schedule --> Phone["Phone-reminder client<br/>lib/phone-reminders"]
     end
     subgraph Server["Server trust boundary"]
         Auth["Authentication and device limits<br/>server/auth · device-sessions"]
         API["Authenticated vault route<br/>app/api/cloud"]
         PushAPI["Reminder validation and dispatch<br/>server/notifications/"]
-        DB[("Postgres<br/>auth metadata, encrypted vaults,<br/>reminder schedules and encrypted endpoints")]
+        FeedbackAPI["Feedback validation and inbox<br/>server/feedback/"]
+        DB[("Postgres<br/>auth metadata, encrypted vaults,<br/>reminders and submitted feedback")]
         Auth --> DB
         API --> DB
         PushAPI --> DB
+        FeedbackAPI --> DB
     end
     Session --> Auth
     Sync --> API
     Phone --> PushAPI
+    FeedbackUI --> FeedbackAPI
 ```
 
 - **Keys and data:** the local vault uses AES-GCM encryption. Usable vault keys are held in page memory while unlocked; the server receives an encrypted cloud envelope, not the financial plaintext or recovery root. Authentication and reminder metadata remain server-side.
 - **Sessions and devices:** Better Auth verifies cloud sessions. Drip limits active cloud sessions to four device profiles; local unlock and cloud authentication are separate. See [session policy](session-policy.md) and [device management](device-management.md).
 - **Sync:** local data is the working copy. Cloud writes use version checks; conflicts are surfaced rather than merged automatically. A cloud restore contains only data that successfully synced.
 - **Reminders:** schedule dates, frequencies and time zone leave the encrypted vault; push endpoints are encrypted at rest. Notifications omit account names and financial values. See [payment notifications](payment-notifications.md).
+- **Feedback:** the user deliberately submits a message and chosen area. Feedback is not end-to-end encrypted and is readable by authorised reviewers; no account records are automatically attached. An authorised agent can query it when invoked. See [feedback and agent triage](feedback.md).
 - **Compatibility:** encrypted data versions and the IndexedDB schema fence older writers when needed. Review [account workflows](account-workflows.md), migrations and old-to-new upgrade evidence before changing storage or recovery.
 
 ## Verification and deployment

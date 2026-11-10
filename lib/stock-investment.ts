@@ -1,5 +1,5 @@
 import type { Account, StockInvestment } from "./types";
-import { isDecimalInput } from "./decimal-input";
+import { decimalInputValue, isDecimalInput } from "./decimal-input";
 
 export type InvestmentInputs = { enabled: boolean; shares: string; averagePriceGBP: string; currency: "GBP" | "USD" | "EUR"; originalPrice: string };
 const nonNegative = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -11,7 +11,7 @@ export function validInvestment(value: unknown): value is StockInvestment {
     (v.originalPrice === undefined || (!!v.originalPrice && ["USD", "EUR"].includes(v.originalPrice.currency) && nonNegative(v.originalPrice.averagePrice) && v.originalPrice.averagePrice <= Number.MAX_SAFE_INTEGER / 100));
 }
 export function investmentInputs(value?: StockInvestment): InvestmentInputs {
-  return { enabled: !!value, shares: value ? String(value.shares) : "", averagePriceGBP: value ? String(value.averagePriceGBP) : "", currency: value?.originalPrice?.currency ?? "GBP", originalPrice: value?.originalPrice ? String(value.originalPrice.averagePrice) : "" };
+  return { enabled: !!value, shares: value ? decimalInputValue(value.shares) : "", averagePriceGBP: value ? decimalInputValue(value.averagePriceGBP) : "", currency: value?.originalPrice?.currency ?? "GBP", originalPrice: value?.originalPrice ? decimalInputValue(value.originalPrice.averagePrice) : "" };
 }
 /** undefined means opt-out; null is invalid. Never silently turn blanks into zero. */
 export function parseInvestment(input: InvestmentInputs): StockInvestment | null | undefined {
