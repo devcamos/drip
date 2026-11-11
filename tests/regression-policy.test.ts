@@ -11,7 +11,7 @@ describe("regression evidence guard", () => {
     for (const config of [domainConfig, appConfig]) {
       expect(config.test?.coverage?.thresholds).toMatchObject({ lines: 90, statements: 90, functions: 90, branches: 90 });
     }
-    expect(domainConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["lib/maths.ts", "lib/stock-investment.ts", "server/notifications/model.ts"]));
+    expect(domainConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["lib/maths.ts", "lib/stock-investment.ts", "lib/stock-reading.ts", "server/notifications/model.ts"]));
     expect(appConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["app/**", "lib/**", "server/**"]));
   });
   it("replaces a local fixture skip with an actually passing cloud journey", () => {
