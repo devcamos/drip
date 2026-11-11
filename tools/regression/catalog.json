@@ -114,6 +114,18 @@
       "browser": [
         "e2e/feedback.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "stock-reading",
+      "unit": [
+        "tests/stock-reading.test.ts"
+      ],
+      "integration": [
+        "tests/stock-reading.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/stock-reading.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -316,7 +328,9 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
-        "tests/domain-boundaries.unit.test.ts"
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts"
       ]
     },
     {
@@ -724,7 +738,9 @@
         "e2e/saved-experience.e2e.spec.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts"
       ]
     },
     {
@@ -759,6 +775,20 @@
         "integration/feedback-postgres.test.ts",
         "e2e/feedback.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "stock-reading",
+      "name": "Reading sources for dividend holdings",
+      "sources": [
+        "lib/stock-reading.ts",
+        "app/stocks/StockReading.tsx",
+        "app/stocks/stock-reading.module.css"
+      ],
+      "tests": [
+        "tests/stock-reading.test.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts"
+      ]
     }
   ],
   "layers": {
@@ -792,7 +822,8 @@
       "tests/device-management.unit.test.ts",
       "tests/recovery-boundaries.unit.test.ts",
       "tests/cloud-sync.unit.test.ts",
-      "tests/feedback.test.ts"
+      "tests/feedback.test.ts",
+      "tests/stock-reading.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -862,7 +893,8 @@
       "tests/profile-wallet.integration.test.tsx",
       "tests/saved-experience.integration.test.tsx",
       "tests/account-workflows.integration.test.tsx",
-      "tests/feedback.integration.test.tsx"
+      "tests/feedback.integration.test.tsx",
+      "tests/stock-reading.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -908,7 +940,8 @@
       "e2e/profile-wallet.e2e.spec.ts",
       "e2e/saved-experience.e2e.spec.ts",
       "e2e/account-workflows.e2e.spec.ts",
-      "e2e/feedback.e2e.spec.ts"
+      "e2e/feedback.e2e.spec.ts",
+      "e2e/stock-reading.e2e.spec.ts"
     ]
   },
   "conditional": [

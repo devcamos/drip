@@ -10,7 +10,7 @@ const domain = [
   "credit-card", "data-format", "decimal-input", "device-policy",
   "dividend-portfolio", "exchange-rates", "identity", "market-valuation",
   "maths", "payment-calendar", "payment-reminders", "products",
-  "recovery-file", "stock-chart", "stock-investment",
+  "recovery-file", "stock-chart", "stock-investment", "stock-reading",
 ].map(name => `lib/${name}.ts`);
 
 export default defineConfig({

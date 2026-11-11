@@ -9,6 +9,7 @@ import { averagePriceLabel, formatShares, investmentReturn } from "@/lib/stock-i
 import * as M from "@/lib/maths";
 import s from "./stock-price.module.css";
 import { useUnsavedDraft } from "../useDraftGuard";
+import { StockReading } from "./StockReading";
 
 type Props = Readonly<{ account: Account; onChange: (change: (current: Account) => Account) => void | Promise<boolean>; onEdit: () => void; onBack: () => void }>;
 
@@ -103,6 +104,7 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
           {loaded ? <p role="status" className={s.frameStatus}>{frameOpened ? "Chart frame opened. Prices and availability are supplied by TradingView." : "Opening the TradingView chart frame…"}</p> : null}
           <p className={s.marketNote}>US prices may be delayed or supplied by Cboe and can differ from your broker. Chart prices are not imported automatically.</p><p className={s.marketNote}>TradingView receives your IP and the public ticker. Your account figures are not sent. You can hide the chart at any time.</p>
           {descriptor ? <a className={s.fallback} href={descriptor.externalUrl} target="_blank" rel="noopener noreferrer">Open chart on TradingView ↗</a> : null}
+          <StockReading holdingName={account.holdingName} />
         </section>
         <aside className={s.recorded} aria-labelledby="saved-holding-heading"><p className={s.eyebrow}>YOUR HOLDING · GBP</p><h3 id="saved-holding-heading">Your investment</h3>
           <div className={s.recordedValue}><span>{account.marketValuation ? "Estimated market value" : "Recorded holding value"}</span><strong>{M.gbp(account.balance)}</strong><small>{account.marketValuation ? `Price applied ${new Date(account.marketValuation.appliedAt).toLocaleDateString("en-GB")}` : "Your saved provider balance"}</small></div>
