@@ -43,9 +43,6 @@ test("the current installed shell accepts a new public fingerprint and preserves
     expect(before).not.toContain('"balance"');
     const other = await context.newPage(); await other.goto("/"); await unlock(other, code);
     await other.evaluate(() => { document.documentElement.dataset.retainedRegressionTab = "yes"; });
-    // Let the initial update check settle before publishing the next build;
-    // otherwise a focus event may be coalesced with that in-flight check.
-    await page.evaluate(async () => { const registration = await navigator.serviceWorker.ready; await registration.update(); });
     fingerprint = original.replace(/("[^"\n]*")/, value => JSON.stringify(JSON.parse(value) + "-next-regression"));
     expect(fingerprint).not.toBe(original);
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
