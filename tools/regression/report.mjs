@@ -7,6 +7,7 @@ try {
   const vitest = JSON.parse(readFileSync("regression-results/vitest.json", "utf8"));
   const browser = JSON.parse(readFileSync("regression-results/browser.json", "utf8"));
   const cloud = existsSync("regression-results/browser-cloud.json") ? JSON.parse(readFileSync("regression-results/browser-cloud.json", "utf8")) : { suites: [], errors: [{ message: "Required local cloud reporter is missing." }] };
+  const matrix = existsSync("regression-results/browser-matrix-summary.json") ? JSON.parse(readFileSync("regression-results/browser-matrix-summary.json", "utf8")) : { passed: 0, required: 4, errors: ["Required WebKit evidence is missing."] };
   if (!Array.isArray(vitest.testResults) || !Array.isArray(browser.suites) || !Array.isArray(cloud.suites)) throw new Error("Executed Vitest, browser and local cloud reporter results are required.");
   const records = [];
   const fileName = name => name.replaceAll("\\", "/").replace(resolve(".").replaceAll("\\", "/") + "/", "");
@@ -31,10 +32,11 @@ try {
   records.push(...merged.records);
   const report = { generatedAt: new Date().toISOString(), target: "70/20/10 for new feature suites; legacy coverage retained and measured", ...summarizeResults(catalog, records) };
   report.errors.push(...merged.errors);
+  report.errors.push(...matrix.errors);
   if (!vitest.success || [browser, cloud].some(reporter => (reporter.errors?.length ?? 0) > 0 || (reporter.stats?.unexpected ?? 0) > 0)) report.errors.push("A test runner reported failure, missing evidence or an unhandled error.");
   mkdirSync("regression-results", { recursive: true });
   writeFileSync("regression-results/summary.json", JSON.stringify(report, null, 2) + "\n");
-  const markdown = ["# Drip regression report", "", "Counts are executed test cases. Conditional/skipped journeys are unverified, not passes. Legacy distribution is reported honestly; new feature pyramids enforce the 70/20/10 target (±5 percentage points).", "", "| Layer | Passed | Failed | Conditional |", "| --- | ---: | ---: | ---: |", ...Object.entries(report.counts).map(([layer, counts]) => `| ${layer} | ${counts.passed} | ${counts.failed} | ${counts.skipped} |`), "", "| Feature | Result | Passed | Conditional |", "| --- | --- | ---: | ---: |", ...report.features.map(feature => `| ${feature.name} | ${feature.status} | ${feature.passed} | ${feature.skipped} |`), "", "## Conditional journeys", "", ...report.conditional.map(row => `- ${row.file}: ${row.title}`), "", "## Evidence errors", "", ...(report.errors.length ? report.errors.map(error => "- " + error) : ["None."]), ""].join("\n");
+  const markdown = ["# Drip regression report", "", "Counts are executed test cases. Conditional/skipped journeys are unverified, not passes. Legacy distribution is reported honestly; new feature pyramids enforce the 70/20/10 target (±5 percentage points).", "", "| Layer | Passed | Failed | Conditional |", "| --- | ---: | ---: | ---: |", ...Object.entries(report.counts).map(([layer, counts]) => `| ${layer} | ${counts.passed} | ${counts.failed} | ${counts.skipped} |`), "", `WebKit cross-browser journeys: ${matrix.passed}/${matrix.required} passed (reported separately from the pyramid).`, "", "| Feature | Result | Passed | Conditional |", "| --- | --- | ---: | ---: |", ...report.features.map(feature => `| ${feature.name} | ${feature.status} | ${feature.passed} | ${feature.skipped} |`), "", "## Conditional journeys", "", ...report.conditional.map(row => `- ${row.file}: ${row.title}`), "", "## Evidence errors", "", ...(report.errors.length ? report.errors.map(error => "- " + error) : ["None."]), ""].join("\n");
   writeFileSync("regression-results/summary.md", markdown);
   console.log(markdown);
   if (report.errors.length) process.exitCode = 1;

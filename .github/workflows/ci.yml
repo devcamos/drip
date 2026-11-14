@@ -20,7 +20,7 @@ jobs:
       - run: npm ci
       - name: Security audit (fails on high or critical)
         run: npm audit --audit-level=high
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - name: All-feature regression evidence, coverage, real Postgres, build and browser tests
         run: npm run test:regression
         env:
@@ -30,7 +30,9 @@ jobs:
         if: always()
         with:
           name: regression-evidence
+          retention-days: 7
           path: |
-            regression-results
+            regression-results/summary.md
+            regression-results/failure.json
+            regression-results/browser-matrix-summary.json
             coverage
-            test-results

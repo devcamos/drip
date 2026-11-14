@@ -1,18 +1,39 @@
 import { describe, expect, it } from "vitest";
 import appConfig from "../vitest.config.mjs";
 import domainConfig from "../vitest.unit-coverage.config.mjs";
+import { validateBrowserMatrix, webkitJourneys } from "../tools/regression/browser-matrix.mjs";
+import browserConfig from "../playwright.config.js";
+import webkitConfig from "../playwright.webkit.config.js";
 import { inspectTests, mergeBrowserResults, migrationStatements, sourceFile, summarizeResults, testFile, validateCatalog, validateChanges, validateTestControls, type Catalog, type TestResult } from "../tools/regression/policy.mjs";
 
 const catalog = (): Catalog => ({ version: 1, features: [{ id: "cash", name: "Cash income", sources: ["lib/cash.ts"], tests: ["tests/cash.test.ts"] }], layers: { unit: ["tests/cash.test.ts"] }, conditional: [] });
 const files = ["lib/cash.ts", "tests/cash.test.ts"];
 
 describe("regression evidence guard", () => {
+  const webkit = () => ({ suites: [{ specs: webkitJourneys.map(row => ({ ...row, tests: [{ projectName: "mobile-webkit", status: "expected", results: [{ status: "passed" }] }] })) }] });
+  it("requires every named WebKit journey to pass once in the correct project", () => {
+    expect(validateBrowserMatrix(webkit())).toEqual({ passed: 4, required: 4, errors: [] });
+  });
+  it("rejects skipped, flaky, wrong-browser and missing WebKit evidence", () => {
+    for (const mutate of [
+      (x: ReturnType<typeof webkit>) => { x.suites[0].specs[0].tests[0].results[0].status = "skipped"; },
+      (x: ReturnType<typeof webkit>) => { x.suites[0].specs[0].tests[0].status = "flaky"; },
+      (x: ReturnType<typeof webkit>) => { x.suites[0].specs[0].tests[0].projectName = "mobile-chromium"; },
+      (x: ReturnType<typeof webkit>) => { x.suites[0].specs.pop(); },
+      (x: ReturnType<typeof webkit>) => { x.suites[0].specs.push(x.suites[0].specs[0]); },
+    ]) { const evidence = webkit(); mutate(evidence); expect(validateBrowserMatrix(evidence).errors.length).toBeGreaterThan(0); }
+    expect(validateBrowserMatrix(null).errors.length).toBeGreaterThan(0);
+  });
   it("keeps both domain-unit and combined app coverage gates at 90%", () => {
     for (const config of [domainConfig, appConfig]) {
       expect(config.test?.coverage?.thresholds).toMatchObject({ lines: 90, statements: 90, functions: 90, branches: 90 });
     }
     expect(domainConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["lib/maths.ts", "lib/stock-investment.ts", "server/notifications/model.ts"]));
     expect(appConfig.test?.coverage?.include).toEqual(expect.arrayContaining(["app/**", "lib/**", "server/**"]));
+  });
+  it("does not record credential-bearing browser traces or screenshots", () => {
+    for (const config of [browserConfig, webkitConfig]) expect(config.use).toMatchObject({ trace: "off", screenshot: "off", video: "off" });
+    expect(webkitConfig.webServer).toMatchObject({ reuseExistingServer: false, env: { DATABASE_URL: "", BETTER_AUTH_SECRET: "", DRIP_CLOUD_E2E: "" } });
   });
   it("replaces a local fixture skip with an actually passing cloud journey", () => {
     const required = [{ file: "e2e/account.spec.ts", title: "signup", method: "skip" }];

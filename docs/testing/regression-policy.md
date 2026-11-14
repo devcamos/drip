@@ -13,6 +13,9 @@ cases, fourteen required browser journeys backed by local Postgres, and the
 resulting evidence report. CI also performs the security audit. There are
 no path filters that let a source change bypass the suite.
 
+The separately reported mobile-WebKit gate, fixture boundaries and safe
+failure-evidence rules are documented in [headless browser coverage](headless-browser-coverage.md).
+
 ## Feature inventory
 
 [`tools/regression/catalog.json`](../../tools/regression/catalog.json) owns the
@@ -87,8 +90,8 @@ edge cases belong in fast lower layers.
    Documentation-only changes do not need meaningless test edits.
 2. Put new test files in the appropriate catalog layer and feature. New features
    also need a primary pyramid; existing supporting regression checks remain.
-3. Keep all quality thresholds: at least 85% overall, stricter 90% logic lines/
-   functions/statements and 85% logic branches. Coverage now includes server code
+3. Keep the enforced 90% overall thresholds for lines, branches, functions and
+   statements, plus the separate domain-unit gate. Coverage includes server code
    and the deployment-config utility as well as `app`/`lib`.
 4. Do not focus a test or add skips, todos, expected failures or conditional
    exemptions. The 17 inherited conditional declarations are recorded by exact

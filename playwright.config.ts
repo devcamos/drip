@@ -5,7 +5,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
-  use: { baseURL: "http://localhost:4321", acceptDownloads: true, trace: "retain-on-failure" },
+  // Browser traces can contain entered passwords, recovery codes and vault data.
+  use: { baseURL: "http://localhost:4321", acceptDownloads: true, trace: "off", screenshot: "off", video: "off" },
   projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"],
     launchOptions: process.env.PW_CHROME ? { executablePath: process.env.PW_CHROME } : {} } }],
   webServer: { command: "npm run start -- --port 4321", url: "http://localhost:4321", reuseExistingServer: !process.env.CI },

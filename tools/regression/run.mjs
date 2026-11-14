@@ -9,7 +9,7 @@ if (process.env.VERCEL || process.env.VERCEL_ENV) throw new Error("Run the regre
 const base = process.env.REGRESSION_BASE ?? (process.env.CI ? undefined : "origin/main");
 if (!base) throw new Error("CI must specify its exact regression comparison commit.");
 mkdirSync("regression-results", { recursive: true });
-for (const name of ["vitest.json", "browser.json", "browser-cloud.json", "summary.json", "summary.md", "failure.json"]) rmSync("regression-results/" + name, { force: true });
+for (const name of ["vitest.json", "browser.json", "browser-cloud.json", "browser-webkit.json", "browser-matrix-summary.json", "summary.json", "summary.md", "failure.json"]) rmSync("regression-results/" + name, { force: true });
 const env = { ...process.env, DRIP_TEST_DATABASE_URL: database, PLAYWRIGHT_JSON_OUTPUT_FILE: "regression-results/browser.json" };
 // Next's browser fixture is deliberately local-only. Real account HTTP/SQL
 // contracts configure their own disposable connection inside Vitest.
@@ -25,6 +25,7 @@ const stages = [
   ["npm", ["run", "build"]],
   [process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--reporter=list,json"]],
   [process.execPath, ["tools/regression/cloud.mjs"]],
+  [process.execPath, ["tools/regression/webkit.mjs"]],
   [process.execPath, ["tools/regression/report.mjs"]],
 ];
 for (const [command, args] of stages) {
