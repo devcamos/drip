@@ -36,6 +36,17 @@ test("the current installed shell accepts a new public fingerprint and preserves
   });
   await new Promise<void>(resolve => proxy.listen(4338, "127.0.0.1", resolve));
   try {
+    await page.addInitScript(() => {
+      const events: string[] = [];
+      (window as unknown as { workerCheckDiagnostics: string[] }).workerCheckDiagnostics = events;
+      const originalUpdate = ServiceWorkerRegistration.prototype.update;
+      ServiceWorkerRegistration.prototype.update = function () {
+        events.push("called");
+        const result = originalUpdate.call(this);
+        void result.then(() => events.push("resolved"), () => events.push("rejected"));
+        return result;
+      };
+    });
     const code = await legacyAccount(page, "pwa_regression", [calendarAccount({ balance: 1234.56 })]);
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -48,7 +59,7 @@ test("the current installed shell accepts a new public fingerprint and preserves
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     try { await expect(page.getByRole("button", { name: "Reload update" })).toBeVisible({ timeout: 30_000 }); }
     catch (error) {
-      const worker = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return { online: navigator.onLine, visibility: document.visibilityState, installing: r?.installing?.state, waiting: r?.waiting?.state, active: r?.active?.state }; });
+      const worker = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return { online: navigator.onLine, visibility: document.visibilityState, installing: r?.installing?.state, waiting: r?.waiting?.state, active: r?.active?.state, checks: (window as unknown as { workerCheckDiagnostics: string[] }).workerCheckDiagnostics }; });
       console.error("Synthetic PWA update diagnostics", JSON.stringify({ workerRequests, worker }));
       throw error;
     }
