@@ -9,7 +9,7 @@ The [regression catalogue](../../tools/regression/catalog.json) maps the complet
 | Sign-in, sign-up, recovery | `auth-screens`, `password-login`, `original-recovery` and real-database cloud journeys | `auth-screens` checks navigation, history and password clearing. |
 | Accounts and dividend holdings | `saved-experience`, `account-wallet`, `stock-investment` | `stock-investment` exercises editing, encrypted reload and backup restoration. |
 | Credit cards and payments | `account-workflows`, `saved-experience`, `payment-calendar` | Chromium only; WebKit remains a gap. |
-| Feedback | `feedback` and real-Postgres feedback tests | `feedback` uses a synthetic identity and an intercepted response; it does not verify hosted submission. |
+| Feedback | `feedback` and real-Postgres feedback tests | `feedback` uses a synthetic identity and an intercepted response, with the service worker disabled to allow interception; it does not verify hosted submission or service-worker interaction. |
 | Saved app and update | `pwa-current-update`, `worker-safety` | `pwa-current-update` checks the current shell, public fingerprint and offline encrypted data. |
 | Cloud sync and devices | `recovery`, `four-device-signin`, `password-race` in disposable local Postgres | Chromium only; hosted and WebKit cloud flows remain gaps. |
 

@@ -3,6 +3,10 @@ import { legacyAccount } from "./legacy-account-helpers";
 import { releaseSaver } from "../tests/saved-experience-fixtures";
 import { mkdir } from "node:fs/promises";
 
+// This contract test intercepts the synthetic request. A service worker can
+// take ownership of it before Playwright's route handler, especially in WebKit.
+test.use({ serviceWorkers: "block" });
+
 test("a signed-in user can send a clearly disclosed feedback message and receive a reference", async ({ page }) => {
   await legacyAccount(page, "feedback_demo", [releaseSaver()]);
   // Synthetic cloud metadata and intercepted transport: database persistence is verified separately by real Postgres tests.

@@ -22,7 +22,9 @@ test("the current installed shell accepts a new public fingerprint and preserves
   // to exercise an older compiled client or a physical Home Screen app.
   const original = await (await page.request.get("http://localhost:4321/sw-build.js")).text();
   let fingerprint = original;
+  const workerRequests: string[] = [];
   const proxy = createServer((incoming, outgoing) => {
+    if (incoming.url === "/sw.js" || incoming.url === "/sw-build.js") workerRequests.push(incoming.url);
     if (incoming.url === "/sw-build.js") {
       outgoing.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-store" });
       outgoing.end(fingerprint); return;
@@ -41,10 +43,18 @@ test("the current installed shell accepts a new public fingerprint and preserves
     expect(before).not.toContain('"balance"');
     const other = await context.newPage(); await other.goto("/"); await unlock(other, code);
     await other.evaluate(() => { document.documentElement.dataset.retainedRegressionTab = "yes"; });
+    // Let the initial update check settle before publishing the next build;
+    // otherwise a focus event may be coalesced with that in-flight check.
+    await page.evaluate(async () => { const registration = await navigator.serviceWorker.ready; await registration.update(); });
     fingerprint = original.replace(/("[^"\n]*")/, value => JSON.stringify(JSON.parse(value) + "-next-regression"));
     expect(fingerprint).not.toBe(original);
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(page.getByRole("button", { name: "Reload update" })).toBeVisible({ timeout: 30_000 });
+    try { await expect(page.getByRole("button", { name: "Reload update" })).toBeVisible({ timeout: 30_000 }); }
+    catch (error) {
+      const worker = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return { online: navigator.onLine, visibility: document.visibilityState, installing: r?.installing?.state, waiting: r?.waiting?.state, active: r?.active?.state }; });
+      console.error("Synthetic PWA update diagnostics", JSON.stringify({ workerRequests, worker }));
+      throw error;
+    }
     await expect(page.getByRole("region", { name: "Account cards", exact: true })).toContainText("£1,234.56");
     expect(await encryptedRecords(page)).toBe(before);
     await page.getByRole("button", { name: "Reload update" }).click(); await unlock(page, code);
