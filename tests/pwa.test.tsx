@@ -94,8 +94,26 @@ it("deduplicates foreground checks while an update request is already pending", 
   await act(async () => { window.dispatchEvent(new Event("focus")); window.dispatchEvent(new Event("pageshow")); });
   expect(registration.update).toHaveBeenCalledTimes(1);
   await act(async () => { finish(); });
-  await act(async () => { window.dispatchEvent(new Event("focus")); });
   expect(registration.update).toHaveBeenCalledTimes(2);
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(registration.update).toHaveBeenCalledTimes(3);
+});
+
+it("retries a queued foreground check when the browser never resolves the previous check", async () => {
+  vi.useFakeTimers();
+  let finish!: () => void;
+  const registration = Object.assign(new EventTarget(), { waiting: null, update: vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; })).mockResolvedValue(undefined) });
+  const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: {} });
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
+  const view = render(<PwaStatus />);
+  await act(async () => {});
+  await act(async () => { window.dispatchEvent(new Event("focus")); window.dispatchEvent(new Event("pageshow")); });
+  expect(registration.update).toHaveBeenCalledTimes(1);
+  await act(async () => { vi.advanceTimersByTime(5_000); });
+  expect(registration.update).toHaveBeenCalledTimes(2);
+  await act(async () => { finish(); });
+  expect(registration.update).toHaveBeenCalledTimes(2);
+  view.unmount();
 });
 
 it("explicitly reloads when another tab has already activated the offered update", () => {

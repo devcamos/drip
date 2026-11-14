@@ -17,12 +17,22 @@ export function PwaStatus({ allowReload = true }: Readonly<{ allowReload?: boole
     let active = true; let reloading = false;
     const changed = () => { if (active && reloadAllowed.current && !reloading) { reloading = true; location.reload(); } };
     let registration: ServiceWorkerRegistration | undefined;
-    let checking = false;
+    let checking = false; let queued = false;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
     const check = () => {
-      if (!active || !registration || !navigator.onLine || checking) return;
+      if (!active || !registration || !navigator.onLine) return;
+      if (checking) { queued = true; return; }
       checking = true;
-      // Offline/failed checks leave the installed app and its saved data intact.
-      void registration.update().catch(() => {}).finally(() => { checking = false; });
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true; clearTimeout(deadline); deadline = undefined; checking = false;
+        if (active && queued) { queued = false; check(); }
+      };
+      // Some browsers leave update() pending. Keep foreground checks from being
+      // lost forever; a late completion cannot finish a newer check twice.
+      deadline = setTimeout(finish, 5_000);
+      void registration.update().catch(() => {}).finally(finish);
     };
     const online = () => { setOffline(!navigator.onLine); if (navigator.onLine) check(); };
     const visible = () => { if (document.visibilityState === "visible") check(); };
@@ -47,7 +57,7 @@ export function PwaStatus({ allowReload = true }: Readonly<{ allowReload?: boole
     const accept = () => navigator.serviceWorker.addEventListener("controllerchange", changed, { once: true });
     window.addEventListener("drip-accept-update", accept);
     return () => {
-      active = false; clearInterval(interval);
+      active = false; clearInterval(interval); clearTimeout(deadline);
       window.removeEventListener("online", online); window.removeEventListener("offline", online);
       window.removeEventListener("pageshow", check); window.removeEventListener("focus", check);
       document.removeEventListener("visibilitychange", visible);

@@ -23,9 +23,9 @@ const stages = [
   ["npm", ["run", "test:unit:coverage"]],
   [process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--coverage", "--reporter=default", "--reporter=json", "--outputFile.json=regression-results/vitest.json"]],
   ["npm", ["run", "build"]],
+  [process.execPath, ["tools/regression/webkit.mjs"]],
   [process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--reporter=list,json"]],
   [process.execPath, ["tools/regression/cloud.mjs"]],
-  [process.execPath, ["tools/regression/webkit.mjs"]],
   [process.execPath, ["tools/regression/report.mjs"]],
 ];
 for (const [command, args] of stages) {
