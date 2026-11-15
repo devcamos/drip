@@ -111,11 +111,19 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const [preferenceError, setPreferenceError] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState("");
   const preferenceSequence = useRef(0);
+  const preferenceOwner = useRef<string | undefined>(undefined);
   const preferenceWrites = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     const owner = data?.identity?.id;
     const sequence = ++preferenceSequence.current;
-    setProfileOpen(false); setIncomePeriod("month"); setPreferenceBusy(false); setPreferenceStatus(""); setPreferenceError("");
+    if (preferenceOwner.current !== owner) {
+      // Close only when switching away from an already-loaded owner. Closing on
+      // the first undefined → id assignment races with a click on the header
+      // that just became visible in this same render.
+      if (preferenceOwner.current !== undefined) setProfileOpen(false);
+      preferenceOwner.current = owner;
+      setIncomePeriod("month"); setPreferenceBusy(false); setPreferenceStatus(""); setPreferenceError("");
+    }
     if (!owner) return;
     void readIncomePeriod(owner).then(period => { if (sequence === preferenceSequence.current) setIncomePeriod(period); }).catch(() => { if (sequence === preferenceSequence.current) setPreferenceError("Could not read your display preference. Monthly view is available; retry your choice."); });
     return () => { preferenceSequence.current++; };
