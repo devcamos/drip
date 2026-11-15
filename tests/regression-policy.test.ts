@@ -142,6 +142,7 @@ describe("regression evidence guard", () => {
     expect(ci).toContain("if: ${{ !cancelled() }}");
     expect(ci).toMatch(/actions\/upload-artifact@v7/);
     expect(ci).toContain("node tools/regression/playwright-summary.mjs");
+    expect(readFileSync("tools/regression/playwright-summary.d.mts", "utf8")).toContain("export function renderPlaywrightSummary");
   });
   it("formats Playwright counts in the Vitest summary style", () => {
     const report = (rows: { file: string, status: "expected" | "unexpected" | "flaky" | "skipped" }[]) => ({
