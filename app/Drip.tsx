@@ -334,7 +334,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
       <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
-      <nav className="tabs">
+      <nav className="tabs" aria-label="Main">
         {(["home", "portfolio", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>
             {{ home: "Accounts", portfolio: "Portfolio", trends: "Trends", add: "Add", settings: "Settings" }[n]}
@@ -421,8 +421,8 @@ function LockScreen({ credentialId, verifier, onUnlock }: Readonly<{ credentialI
     <main><h1>Drip is locked 🔒</h1>
       <div className="panel">
         <button className="btn" onClick={tryPasskey}>Unlock with Face ID / passkey</button>
-        <label>Or use your recovery code</label>
-        <input aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
+        <label htmlFor="unlock-recovery-code">Or use your recovery code</label>
+        <input id="unlock-recovery-code" aria-label="Unlock recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
         <div className="row-gap"><button className="btn ghost" disabled={!code} onClick={async () => { try { if (await C.checkCode(await resolveRecoveryCode(code), verifier)) onUnlock(); else setErr("That isn't your recovery code."); } catch (e) { setErr((e as Error).message); } }}>Unlock with code</button></div>
         {err && <p className="err">{err}</p>}
       </div>
@@ -464,7 +464,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
       <p className="muted">Last backup: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleString("en-GB") : "never"}</p>
       <div className="panel"><h2 style={{ marginTop: 0 }}>Export</h2>
         <p className="muted">An exported file includes this device&apos;s nicknames. Keep the file private.</p>
-        <label>Recovery code</label><input aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
+        <label htmlFor="export-recovery-code">Recovery code</label><input id="export-recovery-code" aria-label="Export recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" />
         <div className="row-gap"><button className="btn" disabled={busy || !code} onClick={async () => {
           setBusy(true); setMsg(null);
           try {
@@ -504,8 +504,8 @@ function Restore({ onRestored }: Readonly<{ onRestored: (d: AppData, code: strin
   const [file, setFile] = useState<File | null>(null); const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   return (
     <>
-      <label>Backup file</label><input type="file" aria-label="Backup file" accept="application/json,.json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      <label>Recovery code</label><input aria-label="Restore recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
+      <label htmlFor="restore-backup-file">Backup file</label><input id="restore-backup-file" type="file" aria-label="Backup file" accept="application/json,.json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+      <label htmlFor="restore-recovery-code">Recovery code</label><input id="restore-recovery-code" aria-label="Restore recovery code" value={code} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} />
       <div className="row-gap"><button className="btn" disabled={!file || !code || busy} onClick={async () => {
         setBusy(true); setErr("");
         try {

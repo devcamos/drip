@@ -136,6 +136,38 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
 });
 
+test("app lock re-locks after 5 minutes hidden", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
+  await onboard(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
+  await page.getByText("Advanced: file backups & app lock").click();
+  await page.getByRole("button", { name: "Turn on app lock" }).click();
+  await expect(page.getByText("App lock is on.")).toBeVisible();
+
+  const t0 = new Date("2026-11-15T12:00:00Z");
+  const hide = () => page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  const show = () => page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.setFixedTime(t0);
+  await hide();
+  await page.clock.setFixedTime(new Date(t0.getTime() + 60_000));
+  await show();
+  await expect(page.getByRole("heading", { name: "Drip is locked 🔒", exact: true })).toHaveCount(0);
+
+  await hide();
+  await page.clock.setFixedTime(new Date(t0.getTime() + 60_000 + 5 * 60_000 + 1_000));
+  await show();
+  await expect(page.getByRole("heading", { name: "Drip is locked 🔒", exact: true })).toBeVisible();
+});
+
 test("app-lock passkey uses the gamertag as its user name and the account id as user id", async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");

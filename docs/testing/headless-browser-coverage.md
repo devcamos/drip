@@ -7,7 +7,7 @@ The [regression catalogue](../../tools/regression/catalog.json) maps the complet
 | Critical area | Existing evidence | Additional mobile WebKit gate |
 | --- | --- | --- |
 | Sign-in, sign-up, recovery | `auth-screens`, `password-login`, `original-recovery` and real-database cloud journeys | `auth-screens` checks navigation, history and password clearing. |
-| Accounts and dividend holdings | `saved-experience`, `account-wallet`, `stock-investment` | `stock-investment` exercises editing, encrypted reload and backup restoration. |
+| Accounts and dividend holdings | `saved-experience`, `account-wallet`, `stock-investment`, `rate-change` | `stock-investment` exercises editing, encrypted reload and backup restoration. `rate-change` edits a rate with an effective date and checks the rate history list. |
 | Credit cards and payments | `account-workflows`, `saved-experience`, `payment-calendar` | Chromium only; WebKit remains a gap. |
 | Feedback | `feedback` and real-Postgres feedback tests | `feedback` uses a synthetic identity and an intercepted response, with the service worker disabled to allow interception; it does not verify hosted submission or service-worker interaction. |
 | Saved app and update | `pwa-current-update`, `worker-safety` | `pwa-current-update` checks the current shell, public fingerprint and offline encrypted data. |
