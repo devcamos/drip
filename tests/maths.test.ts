@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import * as M from "../lib/maths";
 import type { Account } from "../lib/types";
 
@@ -79,5 +79,25 @@ describe("maths", () => {
   it("formats GBP and rounds", () => {
     expect(M.gbp(17.5)).toBe("£17.50");
     expect(M.round2(1.005)).toBe(1.01);
+  });
+});
+
+describe("today follows the UK calendar (#78)", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  it("uses the UK date during British Summer Time and GMT", () => {
+    expect(M.localToday(new Date("2026-06-30T23:30:00Z"))).toBe("2026-07-01");
+    expect(M.localToday(new Date("2026-06-30T22:59:59Z"))).toBe("2026-06-30");
+    expect(M.localToday(new Date("2026-12-31T23:30:00Z"))).toBe("2026-12-31");
+    expect(M.localToday(new Date("2027-01-01T00:00:00Z"))).toBe("2027-01-01");
+    expect(M.monthKey(new Date("2026-07-31T23:30:00Z"))).toBe("2026-08");
+  });
+  it("accepts a top-up dated today at 00:30 BST and files it in the UK month", () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-06-30T23:30:00Z"));
+    const a = M.applyTopUp(acct({ balance: 100, events: [] }), 5, "2026-07-01");
+    expect(a.events).toEqual([{ type: "topup", date: "2026-07-01", amount: 5 }]);
+    expect(() => M.applyTopUp(a, 5, "2026-07-02")).toThrow(/today or a past date/);
+    const snaps = M.upsertSnapshot([], [a], new Date());
+    expect(snaps).toEqual([expect.objectContaining({ month: "2026-07", deposits: 5 })]);
+    expect(M.recordedIncome([acct({ payouts: [{ date: "2026-07-01", amount: 3, kind: "actual", incomeType: "interest" }] })])).toBe(3);
   });
 });

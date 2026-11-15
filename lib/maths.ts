@@ -62,7 +62,7 @@ export function momGrowth(snaps: Snapshot[]): number | null {
 
 type ForecastAccount = IncomeAccount & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
 /** Monthly forecast only: never writes estimates into saved accounts or recorded income. */
-export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = ymd(new Date())) {
+export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = localToday()) {
   const total = totalBalance(accts);
   const holdings = accountAssets(accts).map(a => ({ account: a, balance: Math.max(a.balance, 0), incomeBasis: Math.max(incomeBalance(a), 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
   const out: { month: number; balance: number; income: number }[] = [];
@@ -87,7 +87,7 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
 }
 
 /** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
-export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = ymd(new Date())): number {
+export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = localToday()): number {
   return accts.filter(account => !isCreditAccount(account)).reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
 }
 
@@ -106,7 +106,17 @@ export function recordIncome(a: Account, amount: number, date: string, incomeTyp
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const ymd = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-export const monthKey = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+/** Drip's calendar is UK time: "today" and the current month follow Europe/London, including British Summer Time. */
+export const CALENDAR_TIME_ZONE = "Europe/London";
+const calendarFormat = new Intl.DateTimeFormat("en-CA", { timeZone: CALENDAR_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+/** Today's date (YYYY-MM-DD) on the UK calendar. Date arithmetic elsewhere stays on UTC midnights via `ymd`. */
+export function localToday(now = new Date()): string {
+  const parts = calendarFormat.formatToParts(now);
+  const part = (type: string) => parts.find((value) => value.type === type)!.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+/** Calendar month (YYYY-MM) of an instant on the UK calendar. */
+export const monthKey = (d: Date) => localToday(d).slice(0, 7);
 
 /** Add months, clamping to month end (31 Jan + 1 = 28/29 Feb). */
 export function addMonths(date: string, n: number): string {
@@ -202,7 +212,7 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
 function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
-  if (!validDate(date) || date > ymd(new Date())) throw new Error("Use today or a past date for an actual balance change.");
+  if (!validDate(date) || date > localToday()) throw new Error("Use today or a past date for an actual balance change.");
   const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
   const transfer = type === "topup" || type === "withdraw";
   const review = transfer && priced.investment ? { positionReviewRequired: true as const } : {};

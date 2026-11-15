@@ -18,7 +18,7 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
   const [customProvider, setCustomProvider] = useState(() => !!existing?.provider && !(CREDIT_CARD_PROVIDERS as readonly string[]).includes(existing.provider));
   const [label, setLabel] = useState(existing?.label ?? "");
   const [colour, setColour] = useState(normaliseColour(existing?.colour ?? "#6b4052"));
-  const [draft, setDraft] = useState<Draft>(() => existing ? creditCardDraft(existing) : { balance: "", apr: "", minimumPayment: "", plannedPayment: "", paymentDate: M.addMonths(M.ymd(new Date()), 1) });
+  const [draft, setDraft] = useState<Draft>(() => existing ? creditCardDraft(existing) : { balance: "", apr: "", minimumPayment: "", plannedPayment: "", paymentDate: M.addMonths(M.localToday(), 1) });
   const [errors, setErrors] = useState<Partial<Record<keyof Draft | "provider", string>>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,7 +53,7 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
       setBusy(true);
       try {
         const next = existing && checked.value.balance !== existing.balance
-          ? M.applySetBalance({ ...candidate, balance: existing.balance }, checked.value.balance, M.ymd(new Date())) : candidate;
+          ? M.applySetBalance({ ...candidate, balance: existing.balance }, checked.value.balance, M.localToday()) : candidate;
         if (await onSave(next) === false) setMessage("Could not save this credit card. Your saved figures are unchanged; keep Drip open and retry.");
       } catch { setMessage("Could not save this credit card. Your saved figures are unchanged; keep Drip open and retry."); }
       finally { setBusy(false); }

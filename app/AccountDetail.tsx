@@ -11,7 +11,7 @@ import { CreditCardDetail } from "./CreditCardDetail";
 import { StockPrice } from "./stocks/StockPrice";
 import { StockReading } from "./stocks/StockReading";
 import { useUnsavedDraft } from "./useDraftGuard";
-const today = () => M.ymd(new Date());
+const today = () => M.localToday();
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
 const balanceChange = { topup: M.applyTopUp, withdraw: M.applyWithdraw, set: M.applySetBalance };
