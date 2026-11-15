@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { AccountForm } from "../app/AccountForm";
 import { AccountDetail } from "../app/AccountDetail";
-import { TRADING_212_HOLDINGS } from "../lib/products";
+import { PROVIDERS, TRADING_212_HOLDINGS } from "../lib/products";
 import { accountCardStyle, normaliseColour } from "../lib/account-colour";
 import type { Account } from "../lib/types";
 
@@ -86,4 +86,25 @@ it.each([["#ffffff", "#000000"], ["#000000", "#ffffff"], ["#777777", "#000000"],
 it("normalises legacy short hex and rejects CSS values before applying card styles", () => {
   expect(normaliseColour("#AbC")).toBe("#aabbcc");
   for (const value of ["", undefined, "red", "url(https://untrusted.example)", "#123456; color:red"]) expect(normaliseColour(value)).toBe("#b85a2a");
+});
+
+function contrast(hex: string, text: string) {
+  const lin = (n: number) => { const s = n / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lum = (value: string) => {
+    const rgb = [1, 3, 5].map(i => Number.parseInt(value.slice(i, i + 2), 16));
+    return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  };
+  const a = lum(hex), b = lum(text);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+it("keeps provider card text at least 4.5:1 against the gradient start and end", () => {
+  for (const colour of Object.values(PROVIDERS)) {
+    const style = accountCardStyle(colour);
+    const end = /rgb\((\d+), (\d+), (\d+)\)/.exec(String(style.background));
+    expect(end, colour).not.toBeNull();
+    const endHex = "#" + end!.slice(1).map(n => Number(n).toString(16).padStart(2, "0")).join("");
+    expect(contrast(colour, style.color), colour).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(endHex, style.color), colour).toBeGreaterThanOrEqual(4.5);
+  }
 });

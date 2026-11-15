@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
 import { seedVault } from "./storage-fixtures";
@@ -587,5 +588,33 @@ describe("sign-out", () => {
     await act(async () => { release(saved); });
     expect(screen.getByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
     expect(screen.queryByText("Rainy day pot")).toBeNull(); spy.mockRestore();
+  });
+});
+
+describe("accessibility polish", () => {
+  it("associates backup and restore fields with visible labels", async () => {
+    await seed({ accounts: [acct()] });
+    render(<Drip />);
+    await screen.findByRole("region", { name: "Money overview" });
+    tab("Settings"); fireEvent.click(screen.getByText("Advanced: file backups & app lock"));
+    expect(screen.getByLabelText("Recovery code", { selector: "#export-recovery-code" })).toBe(screen.getByLabelText("Export recovery code"));
+    expect(screen.getByLabelText("Backup file")).toHaveAttribute("id", "restore-backup-file");
+    expect(screen.getByLabelText("Restore recovery code")).toHaveAttribute("id", "restore-recovery-code");
+    expect(document.querySelector("label[for='export-recovery-code']")).toHaveTextContent("Recovery code");
+    expect(document.querySelector("label[for='restore-backup-file']")).toHaveTextContent("Backup file");
+    expect(document.querySelector("label[for='restore-recovery-code']")).toHaveTextContent("Recovery code");
+  });
+
+  it("keeps a labelled main tab bar and reduced-motion plus 44px tab rules", async () => {
+    await seed({ accounts: [acct()] });
+    render(<Drip />);
+    await screen.findByRole("region", { name: "Money overview" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("button", { name: "Accounts" })).toBeInTheDocument();
+    expect(within(nav).getAllByRole("button")).toHaveLength(5);
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*animation:\s*none/);
+    expect(css).toMatch(/nav\.tabs button[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/nav\.tabs[^}]*padding-bottom:\s*env\(safe-area-inset-bottom\)/);
   });
 });
