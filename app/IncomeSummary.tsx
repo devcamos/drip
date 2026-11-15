@@ -2,7 +2,7 @@ import type { Account } from "@/lib/types";
 import * as M from "@/lib/maths";
 
 export function IncomeSummary({ accounts }: Readonly<{ accounts: Account[] }>) {
-  const today = M.ymd(new Date());
+  const today = M.localToday();
   const previous = M.addMonths(today.slice(0, 7) + "-01", -1).slice(0, 7);
   return <section className="panel" aria-label="Recorded income summary">
     <h2 style={{ marginTop: 0 }}>Recorded income</h2>
