@@ -5,7 +5,8 @@ import { isArchivedAccount } from "./account-lifecycle";
 export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
-export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/** Round to pennies, half up. Reading pennies at 15 significant digits drops binary noise (2.135 × 100 is 213.49999…). */
+export const round2 = (n: number) => Math.round(Number((n * 100).toPrecision(15))) / 100;
 
 /** Expected income per month: balance × rate ÷ 12. */
 export function monthlyIncome(balance: number, ratePct: number): number {

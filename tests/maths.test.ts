@@ -81,3 +81,24 @@ describe("maths", () => {
     expect(M.round2(1.005)).toBe(1.01);
   });
 });
+
+describe("round2 rounds half-pennies up (#79)", () => {
+  it("rounds 2.135 to 2.14 and every half-penny from £0.005 to £1,000.005 up", () => {
+    expect(M.round2(2.135)).toBe(2.14);
+    expect(M.round2(4.015)).toBe(4.02);
+    expect(M.round2(1.005)).toBe(1.01);
+    expect(M.round2(1234.565)).toBe(1234.57);
+    const wrong: string[] = [];
+    for (let pennies = 0; pennies < 100_000; pennies++) {
+      const text = (pennies / 100).toFixed(2) + "5";
+      if (M.round2(Number(text)).toFixed(2) !== ((pennies + 1) / 100).toFixed(2)) wrong.push(text);
+    }
+    expect(wrong).toEqual([]);
+  });
+  it("leaves exact pennies and ordinary sums unchanged", () => {
+    expect(M.round2(0.1 + 0.2)).toBe(0.3);
+    expect(M.round2(19.99)).toBe(19.99);
+    expect(M.round2(0)).toBe(0);
+    expect(M.round2(1e9 + 0.01)).toBe(1e9 + 0.01);
+  });
+});

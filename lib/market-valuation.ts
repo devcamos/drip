@@ -3,7 +3,7 @@ import { convertedHolding, parseFxRate } from "./exchange-rates";
 import { validInvestment } from "./stock-investment";
 
 const moneyLimit = Number.MAX_SAFE_INTEGER / 100;
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundMoney = (value: number) => Math.round(Number((value * 100).toPrecision(15))) / 100; // same rule as round2 in maths.ts
 const nonNegativeMoney = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= moneyLimit;
 function calendarDay(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

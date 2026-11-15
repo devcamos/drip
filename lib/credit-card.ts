@@ -6,7 +6,7 @@ type Categorised = Partial<Pick<Account, "productCategory" | "archivedAt">>;
 const moneyLimit = 1_000_000_000_000;
 const money = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= moneyLimit && Math.round((value + Number.EPSILON) * 100) / 100 === value;
 export const validCreditAmount = money;
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundMoney = (value: number) => Math.round(Number((value * 100).toPrecision(15))) / 100; // same rule as round2 in maths.ts
 export function isCreditAccount(account: Categorised): boolean { return account.productCategory === "credit-card"; }
 export function accountAssets<T extends Categorised>(accounts: T[]): T[] { return activeAccounts(accounts).filter(account => !isCreditAccount(account)); }
 
