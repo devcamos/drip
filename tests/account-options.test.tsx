@@ -6,6 +6,7 @@ import { AccountDetail } from "../app/AccountDetail";
 import { PROVIDERS, TRADING_212_HOLDINGS } from "../lib/products";
 import { accountCardStyle, normaliseColour } from "../lib/account-colour";
 import type { Account } from "../lib/types";
+import * as M from "../lib/maths";
 
 it("offers twenty named examples without asserting a ranking", () => {
   expect(TRADING_212_HOLDINGS).toHaveLength(20);
@@ -107,4 +108,12 @@ it("keeps provider card text at least 4.5:1 against the gradient start and end",
     expect(contrast(colour, style.color), colour).toBeGreaterThanOrEqual(4.5);
     expect(contrast(endHex, style.color), colour).toBeGreaterThanOrEqual(4.5);
   }
+});
+
+it("shows day-accurate expected interest for the current month on the account screen", () => {
+  const cash: Account = { ...old, provider: "Zopa", productCategory: "easy-access", holdingName: undefined, rateType: "interest", balance: 3000, ratePct: 7, rateHistory: [{ from: "2026-01-01", ratePct: 7 }], events: [] };
+  render(<AccountDetail a={cash} onBack={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onChange={vi.fn()} />);
+  const expected = screen.getByText("Expected this month").parentElement;
+  expect(expected).toHaveTextContent(M.gbp(M.currentPeriodInterest(cash)));
+  expect(expected).not.toHaveTextContent(M.gbp(M.accountMonthlyIncome(cash)));
 });

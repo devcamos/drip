@@ -175,18 +175,21 @@ function rateOnSorted(h: RatePeriod[], date: string): number {
  * Daily-compounding accrual from `start` (inclusive) to `end` (exclusive).
  * Each day uses the rate in force that day. Top-ups and withdrawals apply on their date,
  * so interest before them uses the old balance and compounding continues from the new one.
+ * A manual balance update ("set") replaces the running balance from its date onwards.
  */
 export function accrue(opening: number, rates: number | RatePeriod[], events: Pick<BalanceEvent, "type" | "date" | "amount">[], start: string, end: string) {
   // Sorted once here: rateOn is called for every day in the period.
   const hist = sortRates(typeof rates === "number" ? [{ from: "0000-01-01", ratePct: rates }] : rates);
-  const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw") && x.date >= start && x.date < end && x.amount > 0)
+  // Array.sort is stable, so same-day events keep the order they were logged in.
+  const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw" || x.type === "set") && x.date >= start && x.date < end && (x.type === "set" ? x.amount >= 0 : x.amount > 0))
     .sort((a, b) => a.date.localeCompare(b.date));
   const open = Math.max(opening, 0);
   let bal = open, deposits = 0, withdrawals = 0, interest = 0, i = 0;
   for (let day = t(start); day < t(end); day += DAY) {
     const d = ymd(new Date(day));
     for (; i < evs.length && evs[i].date === d; i++) {
-      if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
+      if (evs[i].type === "set") bal = evs[i].amount; // a confirmed reading resets the balance; not a transfer
+      else if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
       else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
     }
     const inc = bal * (Math.max(rateOnSorted(hist, d), 0) / 100 / 365);
@@ -280,4 +283,58 @@ export function interestHistory(events: BalanceEvent[] | undefined, by: "week" |
     m.set(k, (m.get(k) ?? 0) + e.amount);
   }
   return [...m].map(([period, amount]) => ({ period, amount })).sort((x, y) => y.period.localeCompare(x.period));
+}
+
+/**
+ * Confirmed balance at the start of `date`, before that day's events.
+ * Anchors on the latest manual balance update ("set") before `date` and replays later transfers forward.
+ * Without one, it works back from the next update on or after `date` (or today's balance), reversing transfers.
+ */
+export function confirmedBalanceOn(account: Pick<Account, "balance" | "events">, date: string): number {
+  const ordered = (account.events ?? [])
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => event.type === "topup" || event.type === "withdraw" || event.type === "set")
+    .sort((a, b) => a.event.date.localeCompare(b.event.date) || a.index - b.index)
+    .map(({ event }) => event);
+  const split = ordered.findIndex((event) => event.date >= date);
+  const before = split < 0 ? ordered : ordered.slice(0, split), after = split < 0 ? [] : ordered.slice(split);
+  const anchor = before.findLastIndex((event) => event.type === "set");
+  let balance: number;
+  if (anchor >= 0) {
+    balance = before[anchor].amount;
+    for (const event of before.slice(anchor + 1)) balance += event.type === "withdraw" ? -event.amount : event.amount;
+  } else {
+    const next = after.findIndex((event) => event.type === "set");
+    const reversed = next < 0 ? after : after.slice(0, next);
+    balance = next < 0 ? account.balance : after[next].amount;
+    for (const event of reversed) balance += event.type === "withdraw" ? event.amount : -event.amount;
+  }
+  return Math.max(round2(balance), 0);
+}
+
+type AccrualAccount = IncomeAccount & Pick<Account, "events" | "rateHistory" | "createdAt" | "rateType">;
+
+/**
+ * Expected interest from `start` (inclusive) to `end` (exclusive) using daily
+ * compounding, the account's rate history, and logged top-ups or withdrawals.
+ * Dividend holdings keep the simple monthly average; they are not daily-accrued interest.
+ */
+export function expectedInterest(account: AccrualAccount, start: string, end: string): number {
+  if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
+  if (account.rateType === "dividend") return accountMonthlyIncome(account);
+  // No interest before the account was added: start from its creation day when that is later.
+  const created = /^\d{4}-\d{2}-\d{2}/.test(account.createdAt ?? "") ? account.createdAt.slice(0, 10) : "";
+  if (created > start) start = created;
+  if (start >= end) return 0;
+  return accrue(confirmedBalanceOn(account, start), migrateRates(account).rateHistory!, account.events ?? [], start, end).interest;
+}
+
+/** Expected interest for the calendar month containing `today`. */
+export function currentPeriodInterest(account: AccrualAccount, today = ymd(new Date())): number {
+  const start = `${today.slice(0, 7)}-01`;
+  return expectedInterest(account, start, addMonths(start, 1));
+}
+
+export function totalCurrentPeriodInterest(accounts: AccrualAccount[], today = ymd(new Date())): number {
+  return accounts.reduce((sum, account) => sum + currentPeriodInterest(account, today), 0);
 }
