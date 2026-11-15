@@ -8,6 +8,33 @@ export function applyWorkerUpdate(worker: ServiceWorker, listenForChange: () => 
   listenForChange(); worker.postMessage({ type: "SKIP_WAITING" });
 }
 
+export function PwaUpdateSettings() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const build = process.env.NEXT_PUBLIC_DRIP_BUILD_ID?.split("-")[0]?.slice(0, 7) || "development";
+  async function checkForUpdates() {
+    if (!("serviceWorker" in navigator)) { setMessage("Updates are not available in this browser."); return; }
+    if (!navigator.onLine) { setMessage("Connect to the internet to check for updates."); return; }
+    setBusy(true); setMessage("");
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const check = async () => {
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        if (!registration) throw new Error("No installed worker");
+        await registration.update();
+      };
+      await Promise.race([check(), new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("Timed out")), 10_000); })]);
+      setMessage("Update check requested. If an update is ready, return to Accounts to install it.");
+    } catch { setMessage("Could not check for updates. Try again when you have a connection."); }
+    finally { clearTimeout(timeout); setBusy(false); }
+  }
+  return <section className="panel"><h2>App updates</h2>
+    <p className="muted">Build {build}. Drip checks for updates when you open it.</p>
+    <button className="btn ghost" disabled={busy} onClick={() => void checkForUpdates()}>{busy ? "Checking…" : "Check for updates"}</button>
+    {message && <p role="status" className="muted">{message}</p>}
+  </section>;
+}
+
 export function PwaStatus({ allowReload = true }: Readonly<{ allowReload?: boolean }> = {}) {
   const [offline, setOffline] = useState(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);

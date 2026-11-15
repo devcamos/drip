@@ -8,7 +8,7 @@ import * as L from "@/lib/lock";
 import * as I from "@/lib/identity";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft";
 import { CloudPanel, CloudReturn, CloudSync } from "./CloudRecovery";
-import { PwaStatus } from "./PwaStatus";
+import { PwaStatus, PwaUpdateSettings } from "./PwaStatus";
 import { InstallTask, useInstallTask } from "./InstallTask";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
@@ -452,6 +452,7 @@ function Settings({ data, verifier, onBackedUp, onRestore, onLock, onCloudRestor
   return (
     <>
       <h1>Settings</h1>
+      <PwaUpdateSettings />
       <section className="panel"><h2>Payment notifications</h2><p className="muted">Expected payment dates and optional phone reminders for your income accounts.</p><button className="btn ghost" onClick={onNotifications}>Manage payment notifications</button></section>
       <p className="muted">Keep your recovery codes safe. They restore your latest synced cloud copy if you change devices or your browser is cleared.</p>
       <PasswordSetup data={data} />

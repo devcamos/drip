@@ -136,6 +136,16 @@ npm run test:regression
 docker stop drip-regression-db
 ```
 
+In GitHub Actions the `CI` workflow's `test` job starts a disposable Postgres 18
+service and supplies its loopback address. This is a real database engine with
+synthetic records, separate from Neon Preview and Production. Integration cases
+exercise real SQL constraints and concurrency; the cloud browser stage also
+exercises HTTP and authentication. If a local run fails to connect, confirm the
+container is healthy, the loopback port is available, and the expected database
+name and user match. Never solve a test connection issue by supplying a hosted
+database URL. Schema cleanup happens during normal teardown; stopping the
+disposable container removes its data.
+
 The default connection uses that loopback port/name. CI supplies
 `DRIP_TEST_DATABASE_URL` on its service port 5432 and the exact comparison SHA in
 `REGRESSION_BASE`; local runs default to `origin/main`. The runner refuses hosted
