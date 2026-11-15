@@ -1,0 +1,12 @@
+.reading { margin:20px 0; padding:22px; border:1px solid #e4d3be; border-radius:18px; background:#f8eddf; color:#241b16; }
+.reading h2 { margin:5px 0 7px; font-size:21px; letter-spacing:-.5px; }
+.reading p { margin:0; color:#6f5c50; font-size:13px; line-height:1.6; }
+.reading .eyebrow { color:#9b4c22; font-size:10px; font-weight:700; letter-spacing:1.1px; }
+.sources { display:grid; gap:9px; margin:17px 0; }
+.sources a { min-height:64px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:16px; border:1px solid #e3d3c0; border-radius:12px; background:#fffaf2; color:#241b16; text-decoration:none; }
+.sources a:focus-visible { outline:3px solid #a84f2b; outline-offset:3px; }
+.sources strong,.sources small { display:block; }
+.sources strong { font-size:14px; }
+.sources small { margin-top:4px; color:#6f5c50; font-size:12px; line-height:1.4; }
+.sources a > span:last-child { color:#a84f2b; font-size:20px; }
+.reading .note { font-size:11px; }
