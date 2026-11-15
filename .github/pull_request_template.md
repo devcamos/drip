@@ -1,7 +1,17 @@
-## 📌 Context & Motivation
-<!-- Link the Jira ticket / GitHub issue and briefly explain the business or technical motivation. -->
-- **Issue / Ticket:** # [Link]
-- **Type of Change:** 🐛 Bug Fix | ✨ Feature | 🧹 Refactor | ⚡ Performance | 🛡️ Security
+## Summary
+<!-- What changed and why. Keep it short. -->
+
+## Issue
+Closes #<issue>
+<!-- Required. One GitHub issue per PR so merge auto-closes it. Do not use this PR for a second issue. -->
+
+## Type
+<!-- Pick one and apply the matching repository label (feature, bug or planned-fix, hotfix, revert; chore may use documentation or dependencies). -->
+- [ ] feature
+- [ ] fix
+- [ ] hotfix
+- [ ] revert
+- [ ] chore
 
 ### What changed?
 <!-- Summarize the changes in bullet points, focusing on behavior rather than file lists. -->
@@ -12,7 +22,7 @@
 
 ---
 
-## 🔍 Reviewer Guidance
+## Reviewer Guidance
 <!-- Help the reviewer parse your diff quickly. -->
 - **Start reading at:** `src/path/to/core_file.ts`
 - **Key area to scrutinize:**
@@ -20,7 +30,7 @@
 
 ---
 
-## 🧪 Verification & Proof
+## Testing
 <!-- Show that this works and won't break production. -->
 - [ ] **Automated Tests:** Added / Updated unit or integration tests.
 - [ ] **Manual Testing:** Tested locally or in staging environment.
@@ -33,7 +43,7 @@
 
 ---
 
-## 🚀 Live App & Production Safety
+## Risk / rollback
 
 ### 1. Database & Breaking Changes
 - [ ] **No breaking DB migrations** (Schema changes are backward-compatible and safe for zero-downtime deployment).
