@@ -7,7 +7,7 @@ import { dataFormatVersion } from "../lib/data-format";
 import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
 import * as M from "../lib/maths";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseSaver, releaseStock } from "./saved-experience-fixtures";
-import { groupAccounts } from "../app/accounts/presentation";
+import { groupAccounts, shouldCloseProfileOnOwnerChange } from "../app/accounts/presentation";
 import { investmentInputs, parseInvestment } from "../lib/stock-investment";
 
 test("existing tiny share holdings remain editable without changing their saved values", () => {
@@ -333,3 +333,20 @@ test("combined revaluation and debt totals are order-independent and never turn 
   expect(portfolioTotals([...accounts].reverse())).toEqual(total);
   expect(M.recordedIncome(accounts)).toBe(0);
 });
+
+test("does not close the profile when an owner is first assigned", () => {
+  expect(shouldCloseProfileOnOwnerChange(undefined, "owner-a")).toBe(false);
+});
+
+test("closes the profile when the signed-in owner changes", () => {
+  expect(shouldCloseProfileOnOwnerChange("owner-a", "owner-b")).toBe(true);
+});
+
+test("leaves the profile open while the same owner stays signed in", () => {
+  expect(shouldCloseProfileOnOwnerChange("owner-a", "owner-a")).toBe(false);
+});
+
+test("closes the profile when a signed-in owner is cleared", () => {
+  expect(shouldCloseProfileOnOwnerChange("owner-a", undefined)).toBe(true);
+});
+

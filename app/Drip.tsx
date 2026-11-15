@@ -30,7 +30,7 @@ import { AccountChooser } from "./AccountChooser";
 import { AccountsHome } from "./accounts/AccountsHome";
 import { AppAccountHeader } from "./accounts/AppAccountHeader";
 import { ProfileSettings } from "./accounts/ProfileSettings";
-import { accountTitle } from "./accounts/presentation";
+import { accountTitle, shouldCloseProfileOnOwnerChange } from "./accounts/presentation";
 import { accountAssets, isCreditAccount, portfolioTotals } from "@/lib/credit-card";
 import { readIncomePeriod, saveIncomePeriod, type IncomePeriod } from "@/lib/profile-preferences";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
@@ -117,10 +117,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     const owner = data?.identity?.id;
     const sequence = ++preferenceSequence.current;
     if (preferenceOwner.current !== owner) {
-      // Close only when switching away from an already-loaded owner. Closing on
-      // the first undefined → id assignment races with a click on the header
-      // that just became visible in this same render.
-      if (preferenceOwner.current !== undefined) setProfileOpen(false);
+      if (shouldCloseProfileOnOwnerChange(preferenceOwner.current, owner)) setProfileOpen(false);
       preferenceOwner.current = owner;
       setIncomePeriod("month"); setPreferenceBusy(false); setPreferenceStatus(""); setPreferenceError("");
     }
