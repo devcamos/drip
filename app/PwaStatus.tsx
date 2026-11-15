@@ -21,7 +21,8 @@ export function PwaUpdateSettings() {
       const check = async () => {
         const registration = await navigator.serviceWorker.getRegistration("/");
         if (!registration) throw new Error("No installed worker");
-        await registration.update();
+        // An installing worker is already the newest script; see PwaStatus.
+        if (!registration.installing) await registration.update();
       };
       await Promise.race([check(), new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("Timed out")), 10_000); })]);
       setMessage("Update check requested. If an update is ready, return to Accounts to install it.");
@@ -46,7 +47,10 @@ export function PwaStatus({ allowReload = true }: Readonly<{ allowReload?: boole
     let registration: ServiceWorkerRegistration | undefined;
     let checking = false;
     const check = () => {
-      if (!active || !registration || !navigator.onLine || checking) return;
+      // A worker that is still installing already came from the newest script.
+      // WebKit can also stall every later update() for this registration when
+      // one is queued behind an in-progress install and the page then navigates.
+      if (!active || !registration || !navigator.onLine || checking || registration.installing) return;
       checking = true;
       // Offline/failed checks leave the installed app and its saved data intact.
       void registration.update().catch(() => {}).finally(() => { checking = false; });

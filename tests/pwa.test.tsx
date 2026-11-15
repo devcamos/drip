@@ -84,6 +84,21 @@ it("checks a saved tab on foreground, reconnect and interval without applying th
   expect(registration.update).toHaveBeenCalledTimes(6);
 });
 
+it("does not queue an update check behind an install that is still in progress", async () => {
+  const installing = Object.assign(new EventTarget(), { state: "installing" });
+  const registration = Object.assign(new EventTarget(), { waiting: null, installing: installing as any, update: vi.fn().mockResolvedValue(undefined) });
+  const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: null });
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaStatus />);
+  await act(async () => {});
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(registration.update).not.toHaveBeenCalled();
+  registration.installing = null;
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(registration.update).toHaveBeenCalledOnce();
+});
+
 it("deduplicates foreground checks while an update request is already pending", async () => {
   let finish!: () => void;
   const registration = Object.assign(new EventTarget(), { waiting: null, update: vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; })).mockResolvedValue(undefined) });
@@ -115,6 +130,16 @@ it("checks for updates from settings without reloading or claiming an update is 
   fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
   expect(await screen.findByRole("status")).toHaveTextContent("Update check requested");
   expect(getRegistration).toHaveBeenCalledWith("/"); expect(update).toHaveBeenCalledOnce();
+});
+
+it("does not queue a settings update check behind an install that is still in progress", async () => {
+  const update = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: vi.fn().mockResolvedValue({ update, installing: { state: "installing" } }) } });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaUpdateSettings />);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Update check requested");
+  expect(update).not.toHaveBeenCalled();
 });
 
 it("explains when a manual update check is offline or fails", async () => {
