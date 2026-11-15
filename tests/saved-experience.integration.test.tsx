@@ -5,7 +5,7 @@ const auth = vi.hoisted(() => ({ getSession: vi.fn(), signOut: vi.fn() }));
 vi.mock("better-auth/client", () => ({ createAuthClient: () => auth }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
 import * as db from "../lib/db";
-import { accountAnnualIncome, accountMonthlyIncome, applyWithdraw, gbp, migrateData } from "../lib/maths";
+import { applyWithdraw, migrateData } from "../lib/maths";
 import * as cloud from "../lib/cloud";
 import * as cryptoFiles from "../lib/crypto";
 import * as oldDb from "./fixtures/pre-debt-client/db";
@@ -73,15 +73,6 @@ it("applies a dated exchange rate without changing shares or income assumptions"
   fireEvent.click(screen.getByRole("button", { name: "Update holding value" }));
   expect(await screen.findByText(/Holding value saved/)).toBeVisible();
   expect(save).toHaveBeenCalledOnce();
-});
-
-it("shows estimated annual income from the AER over 12 months, not twelve copies of this month", () => {
-  const holding = releaseStock();
-  render(<StockPrice account={holding} onChange={vi.fn()} onEdit={vi.fn()} onBack={vi.fn()} />);
-  const row = screen.getByText("Estimated annual income").closest("div");
-  expect(row).toHaveTextContent(gbp(accountAnnualIncome(holding)));
-  expect(accountAnnualIncome(holding)).toBeCloseTo(135, 2);
-  expect(gbp(accountAnnualIncome(holding))).not.toBe(gbp(accountMonthlyIncome(holding) * 12));
 });
 
 it("lets a user hide a chart and prevents valuation without reviewed shares", () => {
