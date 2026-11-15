@@ -23,7 +23,7 @@ describe("product and income calculations", () => {
     expect(M.recordedIncome([received], "2026-09", "2026-10-18")).toBe(22.65);
     expect(M.pendingBonuses([received])).toBe(15.44);
     const updated = M.applyRateChange(M.applySetBalance(received, 3200, "2026-10-18"), 3, "2026-10-18", "2026-10-18");
-    expect(M.monthlyIncome(updated.balance, updated.ratePct)).toBe(8);
+    expect(M.monthlyIncome(updated.balance, updated.ratePct, "2026-10-18")).toBeCloseTo(M.accrue(3200, 3, [], "2026-10-01", "2026-11-01").interest, 10);
     expect(M.recordedIncome([updated], undefined, "2026-10-18")).toBe(22.65);
     expect(updated.payouts[0].amount).toBe(22.65);
     expect(() => M.recordIncome(initial, Infinity, "2026-09-30", "interest")).toThrow();
@@ -53,17 +53,27 @@ describe("product and income calculations", () => {
   it("predicts dividends without stock-price growth and only reinvests when selected", () => {
     const stocks = account({ balance: 1000, ratePct: 12, rateType: "dividend" });
     const paidOut = M.projection([stocks], 12, 0, "2026-10-18").at(-1)!;
-    expect(paidOut.balance).toBe(1000); expect(paidOut.income).toBe(120);
-    expect(M.projection([{ ...stocks, reinvestIncome: true }], 12).at(-1)!.balance).toBeCloseTo(1000 * 1.01 ** 12);
+    const paidMonths = Array.from({ length: 12 }, (_, month) => M.accrue(1000, 12, [], M.addMonths("2026-10-18", month), M.addMonths("2026-10-18", month + 1)).interest);
+    expect(paidOut.balance).toBe(1000);
+    // Each month compounds daily, then the interest is paid out so the balance stays £1,000.
+    expect(paidOut.income).toBeCloseTo(paidMonths.reduce((sum, interest) => sum + interest, 0), 8);
+    const reinvested = M.projection([{ ...stocks, reinvestIncome: true }], 12, 0, "2026-10-18").at(-1)!;
+    expect(reinvested.income).toBeCloseTo(120, 8);
+    expect(reinvested.balance).toBeCloseTo(1120, 8);
     const bonus = M.projection([{ ...stocks, bonus: { amount: 10, expectedDate: "2026-11-01" } }], 1, 0, "2026-10-18")[0];
-    expect(bonus).toMatchObject({ balance: 1000, income: 20 });
+    expect(bonus.balance).toBe(1000);
+    expect(bonus.income).toBeCloseTo(paidMonths[0] + 10, 8);
   });
   it("keeps deposits out of predicted income, allocating by starting balances", () => {
     const a = account({ balance: 1000, ratePct: 12 });
     const b = account({ balance: 1000, ratePct: 0 });
     const forecast = M.projection([a, b], 2, 200, "2026-10-18");
-    expect(forecast[0]).toEqual({ month: 1, balance: 2210, income: 10 });
-    expect(forecast[1].balance).toBeCloseTo(2421.1); expect(forecast[1].income).toBeCloseTo(21.1);
+    const first = M.accrue(1000, 12, [], "2026-10-18", "2026-11-18").interest;
+    const second = M.accrue(1000 + first + 100, 12, [], "2026-11-18", "2026-12-18").interest;
+    expect(forecast[0].balance).toBeCloseTo(2200 + first, 8);
+    expect(forecast[0].income).toBeCloseTo(first, 8);
+    expect(forecast[1].balance).toBeCloseTo(2400 + first + second, 8);
+    expect(forecast[1].income).toBeCloseTo(first + second, 8);
     expect(M.projection([], 2, 200)[1]).toEqual({ month: 2, balance: 400, income: 0 });
     expect(M.projection([account({ balance: 0 })], 1, 200)[0]).toMatchObject({ balance: 200, income: 0 });
   });

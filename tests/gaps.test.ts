@@ -12,7 +12,7 @@ describe("withdrawals", () => {
   });
   it("mid-period withdrawal accrues on the old balance before and the smaller one after", () => {
     const r = M.accrue(3000, 7.3, [{ type: "withdraw", date: "2026-10-11", amount: 1000 }], "2026-10-01", "2026-10-31");
-    const d = 0.073 / 365;
+    const d = Math.pow(1.073, 1 / 365) - 1; // daily equivalent of 7.3% AER
     expect(r.closing).toBeCloseTo((3000 * Math.pow(1 + d, 10) - 1000) * Math.pow(1 + d, 20), 8);
     expect(r.withdrawals).toBe(1000);
     expect(r.interest).toBeCloseTo(r.closing - 3000 + 1000, 8);
@@ -41,7 +41,7 @@ describe("rate history", () => {
   it("accrual uses the rate in force each day", () => {
     const h = [{ from: "2026-01-01", ratePct: 7.3 }, { from: "2026-10-11", ratePct: 3.65 }];
     const r = M.accrue(1000, h, [], "2026-10-01", "2026-10-31");
-    expect(r.closing).toBeCloseTo(1000 * Math.pow(1 + 0.073 / 365, 10) * Math.pow(1 + 0.0365 / 365, 20), 8);
+    expect(r.closing).toBeCloseTo(1000 * Math.pow(1.073, 10 / 365) * Math.pow(1.0365, 20 / 365), 8);
     expect(M.periodGrowth(1000, h, [], "2026-10-01", "2026-10-31").closing).toBeCloseTo(r.closing, 10);
   });
   it("applyRateChange records effective date; future change doesn't alter today's rate", () => {

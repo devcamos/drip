@@ -3,6 +3,7 @@ import { legacyAccount } from "./legacy-account-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { unlock } from "./vault-helpers";
+import { gbp, monthlyIncome } from "../lib/maths";
 
 test.describe.configure({ mode: "serial" });
 
@@ -14,7 +15,7 @@ async function addZopa(page: Page) {
   await page.getByPlaceholder("e.g. Rainy day pot").fill("Rainy day pot");
   await page.getByPlaceholder("3000").fill("3000");
   await page.getByPlaceholder("7").fill("7");
-  await expect(page.getByText("≈ £17.50 a month")).toBeVisible();
+  await expect(page.getByText(`≈ ${gbp(monthlyIncome(3000, 7))} estimated a month`)).toBeVisible();
   await page.getByRole("button", { name: "Save" }).click();
 }
 

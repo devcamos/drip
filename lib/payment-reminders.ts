@@ -59,7 +59,7 @@ export function paymentReminders(accounts: Account[], day: string) {
   return activeAccounts(accounts).filter(account => !isCreditAccount(account) && account.balance > 0 && account.ratePct > 0 && validDate(accountPlan(account, day).anchor)).map(account => ({
     account,
     date: nextPayment(accountPlan(account, day), day),
-    amount: payoutAmount(account),
+    amount: payoutAmount(account, day),
     logged: loggedToday(account, day),
   })).toSorted((a, b) => a.date.localeCompare(b.date) || (a.account.holdingName ?? a.account.provider).localeCompare(b.account.holdingName ?? b.account.provider));
 }

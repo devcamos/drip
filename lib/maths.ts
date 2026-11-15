@@ -7,10 +7,33 @@ import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, I
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-/** Expected income per month: balance × rate ÷ 12. */
-export function monthlyIncome(balance: number, ratePct: number): number {
+/**
+ * Days in the calendar year containing `date` (YYYY-MM-DD), using the Gregorian leap-year rule.
+ */
+export function daysInYear(date: string): number {
+  const year = +date.slice(0, 4);
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
+}
+
+/**
+ * Daily rate equivalent to an annual equivalent rate (AER): compounding every day
+ * of that year earns exactly `aer` percent, in leap years too.
+ */
+export function dailyRate(aer: number, date: string): number {
+  return aer > 0 ? Math.pow(1 + aer / 100, 1 / daysInYear(date)) - 1 : 0;
+}
+
+/** Expected income for the calendar month containing `today`, compounded daily at the AER. */
+export function monthlyIncome(balance: number, ratePct: number, today = localToday()): number {
   if (!(balance > 0) || !(ratePct > 0)) return 0;
-  return (balance * ratePct) / 100 / 12;
+  const start = `${today.slice(0, 7)}-01`;
+  return accrue(balance, ratePct, [], start, addMonths(start, 1)).interest;
+}
+
+/** Expected income over the 12 months starting at `from`, compounded daily at the AER. */
+export function annualIncome(balance: number, ratePct: number, from = localToday()): number {
+  if (!(balance > 0) || !(ratePct > 0)) return 0;
+  return accrue(balance, ratePct, [], from, addMonths(from, 12)).interest;
 }
 
 const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
@@ -18,21 +41,33 @@ type Categorised = Partial<Pick<Account, "productCategory" | "archivedAt">>;
 type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation" | "archivedAt">>;
 
 /** Price movements do not rewrite the provider balance used to estimate cash income. */
-export function accountMonthlyIncome(account: IncomeAccount): number {
-  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct);
+export function accountMonthlyIncome(account: IncomeAccount, today = localToday()): number {
+  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct, today);
 }
 
-/** Amount paid at each payout for the account's frequency. */
-export function payoutAmount(a: IncomeAccount & Pick<Account, "frequency">): number {
-  return (accountMonthlyIncome(a) * 12) / PER_YEAR[a.frequency];
+/** Expected income over the 12 months starting at `from`, excluding credit and archived accounts. */
+export function accountAnnualIncome(account: IncomeAccount, from = localToday()): number {
+  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : annualIncome(incomeBalance(account), account.ratePct, from);
+}
+
+/** Amount paid at each payout, compounded daily at the AER over that payment period. */
+export function payoutAmount(a: IncomeAccount & Pick<Account, "frequency">, today = localToday()): number {
+  if (isCreditAccount(a) || isArchivedAccount(a)) return 0;
+  const balance = incomeBalance(a);
+  if (a.frequency === "daily") {
+    const next = ymd(new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000));
+    return accrue(balance, a.ratePct, [], today, next).interest;
+  }
+  if (a.frequency === "monthly") return monthlyIncome(balance, a.ratePct, today);
+  return accrue(balance, a.ratePct, [], today, addMonths(today, a.frequency === "quarterly" ? 3 : 12)).interest;
 }
 
 export function totalBalance(accts: (Pick<Account, "balance"> & Categorised)[]): number {
   return accountAssets(accts).reduce((s, a) => s + (a.balance > 0 ? a.balance : 0), 0);
 }
 
-export function totalMonthlyIncome(accts: IncomeAccount[]): number {
-  return accts.reduce((s, a) => s + accountMonthlyIncome(a), 0);
+export function totalMonthlyIncome(accts: IncomeAccount[], today = localToday()): number {
+  return accts.reduce((s, a) => s + accountMonthlyIncome(a, today), 0);
 }
 
 /** Expected annual cash income relative to current asset values; never includes APR. */
@@ -68,10 +103,11 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
   const out: { month: number; balance: number; income: number }[] = [];
   let cash = 0, income = 0;
   for (let month = 1; month <= months; month++) {
+    const start = addMonths(today, month - 1);
     const end = addMonths(today, month);
     for (const holding of holdings) {
       const a = holding.account;
-      let earned = monthlyIncome(holding.incomeBasis, a.ratePct);
+      let earned = accrue(holding.incomeBasis, a.ratePct, [], start, end).interest;
       if (a.bonus && !holding.bonusApplied && a.bonus.expectedDate >= today && a.bonus.expectedDate <= end) {
         earned += a.bonus.amount; holding.bonusApplied = true;
       }
@@ -142,7 +178,7 @@ export function upcoming(accts: Account[], today: string, days = 31) {
   const end = ymd(new Date(Date.UTC(y, m - 1, d + days)));
   return accts
     .filter((a) => !isCreditAccount(a) && a.frequency !== "daily")
-    .map((a) => ({ account: a, date: nextPayout(a.nextPayoutDate, a.frequency, today), amount: payoutAmount(a) }))
+    .map((a) => ({ account: a, date: nextPayout(a.nextPayoutDate, a.frequency, today), amount: payoutAmount(a, today) }))
     .filter((p) => p.date <= end)
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -150,7 +186,7 @@ export function upcoming(accts: Account[], today: string, days = 31) {
 /** Insert/replace the snapshot for the current month. */
 export function upsertSnapshot(snaps: Snapshot[], accts: Account[], now: Date): Snapshot[] {
   const key = monthKey(now);
-  const snap: Snapshot = { month: key, totalBalance: round2(totalBalance(accts)), monthlyIncome: round2(totalMonthlyIncome(accts)), deposits: round2(depositsInMonth(accts, key)), withdrawals: round2(withdrawalsInMonth(accts, key)) };
+  const snap: Snapshot = { month: key, totalBalance: round2(totalBalance(accts)), monthlyIncome: round2(totalMonthlyIncome(accts, localToday(now))), deposits: round2(depositsInMonth(accts, key)), withdrawals: round2(withdrawalsInMonth(accts, key)) };
   return [...snaps.filter((s) => s.month !== key), snap].sort((a, b) => a.month.localeCompare(b.month));
 }
 
@@ -183,7 +219,8 @@ function rateOnSorted(h: RatePeriod[], date: string): number {
 
 /**
  * Daily-compounding accrual from `start` (inclusive) to `end` (exclusive).
- * Each day uses the rate in force that day. Top-ups and withdrawals apply on their date,
+ * Each day uses the rate in force that day, converted from the annual equivalent rate (AER)
+ * so a full year at a constant rate earns exactly that rate, in leap years too. Top-ups and withdrawals apply on their date,
  * so interest before them uses the old balance and compounding continues from the new one.
  * A manual balance update ("set") replaces the running balance from its date onwards.
  */
@@ -202,7 +239,7 @@ export function accrue(opening: number, rates: number | RatePeriod[], events: Pi
       else if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
       else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
     }
-    const inc = bal * (Math.max(rateOnSorted(hist, d), 0) / 100 / 365);
+    const inc = bal * dailyRate(Math.max(rateOnSorted(hist, d), 0), d);
     bal += inc; interest += inc;
   }
   return { opening: open, deposits, withdrawals, interest, closing: bal };
@@ -327,11 +364,11 @@ type AccrualAccount = IncomeAccount & Pick<Account, "events" | "rateHistory" | "
 /**
  * Expected interest from `start` (inclusive) to `end` (exclusive) using daily
  * compounding, the account's rate history, and logged top-ups or withdrawals.
- * Dividend holdings keep the simple monthly average; they are not daily-accrued interest.
+ * Dividend holdings use this month's AER daily-compounded estimate; they are not accrued from transfers or rate history.
  */
 export function expectedInterest(account: AccrualAccount, start: string, end: string): number {
   if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
-  if (account.rateType === "dividend") return accountMonthlyIncome(account);
+  if (account.rateType === "dividend") return accountMonthlyIncome(account, start);
   // No interest before the account was added: start from its creation day when that is later.
   const created = /^\d{4}-\d{2}-\d{2}/.test(account.createdAt ?? "") ? account.createdAt.slice(0, 10) : "";
   if (created > start) start = created;
@@ -340,11 +377,11 @@ export function expectedInterest(account: AccrualAccount, start: string, end: st
 }
 
 /** Expected interest for the calendar month containing `today`. */
-export function currentPeriodInterest(account: AccrualAccount, today = ymd(new Date())): number {
+export function currentPeriodInterest(account: AccrualAccount, today = localToday()): number {
   const start = `${today.slice(0, 7)}-01`;
   return expectedInterest(account, start, addMonths(start, 1));
 }
 
-export function totalCurrentPeriodInterest(accounts: AccrualAccount[], today = ymd(new Date())): number {
+export function totalCurrentPeriodInterest(accounts: AccrualAccount[], today = localToday()): number {
   return accounts.reduce((sum, account) => sum + currentPeriodInterest(account, today), 0);
 }

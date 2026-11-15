@@ -94,11 +94,11 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
     </section>
     <div className="grid">
       <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-      <div className="stat"><div className="muted">Expected this month</div><div className="v">{M.gbp(M.totalCurrentPeriodInterest(data.accounts))}</div></div>
+      <div className="stat"><div className="muted">Estimated this month</div><div className="v">{M.gbp(M.totalCurrentPeriodInterest(data.accounts))}</div></div>
       <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
       <div className="stat"><div className="muted">Balance change after logged transfers</div><div className="v">{growthLabel}</div></div>
     </div>
-    {future && <p className="muted">Predicted income over {assumptions.years} {assumptions.years === 1 ? "year" : "years"}: <b>{M.gbp(final.income)}</b>. This includes income paid out and excludes your deposits.</p>}
+    {future && <p className="muted">Estimated income over {assumptions.years} {assumptions.years === 1 ? "year" : "years"}: <b>{M.gbp(final.income)}</b>. This includes income paid out and excludes your deposits.</p>}
     <IncomeSummary accounts={data.accounts} />
     {br && <div className="panel"><h2>This month vs last</h2><ul className="list"><li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li><li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li><li><span>Other balance movement</span><b>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li><li><span>Total change</span><b>{M.gbp(br.change)}</b></li></ul><p className="muted">Other balance movement can include returns, corrections and unlogged transfers. It isn&apos;t recorded income.</p></div>}
     {growth === null && <p className="muted">Month-on-month growth appears after Drip has two months of history.</p>}

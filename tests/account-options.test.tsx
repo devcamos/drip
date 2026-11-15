@@ -113,7 +113,7 @@ it("keeps provider card text at least 4.5:1 against the gradient start and end",
 it("shows day-accurate expected interest for the current month on the account screen", () => {
   const cash: Account = { ...old, provider: "Zopa", productCategory: "easy-access", holdingName: undefined, rateType: "interest", balance: 3000, ratePct: 7, rateHistory: [{ from: "2026-01-01", ratePct: 7 }], events: [] };
   render(<AccountDetail a={cash} onBack={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onChange={vi.fn()} />);
-  const expected = screen.getByText("Expected this month").parentElement;
+  const expected = screen.getByText("Estimated this month").parentElement;
   expect(expected).toHaveTextContent(M.gbp(M.currentPeriodInterest(cash)));
-  expect(expected).not.toHaveTextContent(M.gbp(M.accountMonthlyIncome(cash)));
+  expect(expected).toHaveTextContent(M.gbp(M.accountMonthlyIncome(cash)));
 });

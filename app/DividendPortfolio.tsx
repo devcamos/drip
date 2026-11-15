@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { Account } from "@/lib/types";
 import { dividendIncome, dividendPortfolio, type IncomePeriod } from "@/lib/dividend-portfolio";
-import { gbp, accountMonthlyIncome } from "@/lib/maths";
+import { gbp, accountAnnualIncome, accountMonthlyIncome } from "@/lib/maths";
 import { displayProvider } from "@/lib/products";
 import { useCalendarDay } from "./useCalendarDay";
 import { averagePriceLabel, formatShares } from "@/lib/stock-investment";
@@ -21,7 +21,7 @@ export function DividendPortfolio({ accounts, onOpen, onAdd }: Readonly<{ accoun
         <p className="muted">Payments you have logged for your current and archived dividend holdings. Interest, bonuses, top-ups and unreceived estimates are excluded.</p>
       </section>
       <section aria-labelledby="dividend-holdings-title"><div className="wallet-heading"><h2 id="dividend-holdings-title">Your dividend holdings</h2><button className="btn ghost small" onClick={onAdd}>Add holding</button></div>
-        <ul className="portfolio-holdings">{portfolio.holdings.map(holding => <li key={holding.id}><button onClick={() => onOpen(holding.id)} aria-label={`Open ${holding.holdingName ?? displayProvider(holding.provider)}`}><span><b>{holding.holdingName ?? displayProvider(holding.provider)}</b><small>{holding.holdingName ? displayProvider(holding.provider) : "Dividend account"}</small></span><strong>{gbp(holding.balance)}</strong>{holding.investment && <small className="portfolio-position">{formatShares(holding.investment.shares)} shares · Average {averagePriceLabel(holding.investment)} · {holding.ratePct}% recorded yield</small>}{!holding.investment && <span className="holding-income">Recorded yield <b>{holding.ratePct}%</b></span>}<span className="holding-income">Received · {periodName.toLowerCase()} <b>{gbp(dividendIncome([holding], day, period))}</b></span><span className="holding-income">Estimated monthly <b>{gbp(accountMonthlyIncome(holding))}</b></span><span className="holding-income">Estimated yearly <b>{gbp(accountMonthlyIncome(holding) * 12)}</b></span></button></li>)}</ul>
+        <ul className="portfolio-holdings">{portfolio.holdings.map(holding => <li key={holding.id}><button onClick={() => onOpen(holding.id)} aria-label={`Open ${holding.holdingName ?? displayProvider(holding.provider)}`}><span><b>{holding.holdingName ?? displayProvider(holding.provider)}</b><small>{holding.holdingName ? displayProvider(holding.provider) : "Dividend account"}</small></span><strong>{gbp(holding.balance)}</strong>{holding.investment && <small className="portfolio-position">{formatShares(holding.investment.shares)} shares · Average {averagePriceLabel(holding.investment)} · {holding.ratePct}% recorded yield</small>}{!holding.investment && <span className="holding-income">Recorded yield <b>{holding.ratePct}%</b></span>}<span className="holding-income">Received · {periodName.toLowerCase()} <b>{gbp(dividendIncome([holding], day, period))}</b></span><span className="holding-income">Estimated monthly <b>{gbp(accountMonthlyIncome(holding, day))}</b></span><span className="holding-income">Estimated yearly <b>{gbp(accountAnnualIncome(holding, day))}</b></span></button></li>)}</ul>
       </section>
       <section className="grid" aria-label="Dividend portfolio figures">
         <div className="stat"><div className="muted">Portfolio value</div><div className="v">{gbp(portfolio.value)}</div></div>

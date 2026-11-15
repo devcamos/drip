@@ -3,9 +3,9 @@ import * as M from "../lib/maths";
 
 describe("top-ups", () => {
   it("mid-period top-up: old balance before, new balance after, compounding continues", () => {
-    // £3,000 at 7.3% (0.02%/day). 30-day period, £1,000 top-up on day 10.
+    // £3,000 at 7.3% AER (daily equivalent rate). 30-day period, £1,000 top-up on day 10.
     const r = M.periodGrowth(3000, 7.3, [{ date: "2026-10-11", amount: 1000 }], "2026-10-01", "2026-10-31");
-    const daily = 0.073 / 365;
+    const daily = Math.pow(1.073, 1 / 365) - 1;
     const expected = (3000 * Math.pow(1 + daily, 10) + 1000) * Math.pow(1 + daily, 20);
     expect(r.closing).toBeCloseTo(expected, 8);
     expect(r.deposits).toBe(1000);
