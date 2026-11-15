@@ -89,13 +89,45 @@ describe("day-accurate current-period interest", () => {
       events: [
         { type: "topup", date: "2026-11-10", amount: 500 },
         { type: "withdraw", date: "2026-11-20", amount: 200 },
-        { type: "set", date: "2026-11-25", amount: 2400 },
+        { type: "set", date: "2026-11-25", amount: 2300 },
       ],
     });
     expect(M.confirmedBalanceOn(a, "2026-11-01")).toBe(2000);
     expect(M.confirmedBalanceOn(a, "2026-11-10")).toBe(2000);
     expect(M.confirmedBalanceOn(a, "2026-11-11")).toBe(2500);
     expect(M.confirmedBalanceOn(a, "2026-11-21")).toBe(2300);
+  });
+
+  it("anchors the opening balance on manual balance updates and accrues from each update", () => {
+    // Updated to £1,500 on 31 Oct, then to £5,000 on 20 Nov, at 5%.
+    const a = acct({ balance: 5000, ratePct: 5, createdAt: "2026-01-01", rateHistory: [{ from: "2026-01-01", ratePct: 5 }],
+      events: [{ type: "set", date: "2026-10-31", amount: 1500 }, { type: "set", date: "2026-11-20", amount: 5000 }] });
+    expect(M.confirmedBalanceOn(a, "2026-11-01")).toBe(1500);
+    expect(M.confirmedBalanceOn(a, "2026-11-20")).toBe(1500);
+    expect(M.confirmedBalanceOn(a, "2026-11-21")).toBe(5000);
+    const daily = 0.05 / 365;
+    const expected = 1500 * ((1 + daily) ** 19 - 1) + 5000 * ((1 + daily) ** 11 - 1);
+    expect(expected).toBeCloseTo(11.448, 3);
+    expect(M.currentPeriodInterest(a, "2026-11-25")).toBeCloseTo(expected, 10);
+    // Transfers after an earlier update replay forward; a later update caps the reverse walk.
+    const mixed = acct({ balance: 900, events: [
+      { type: "set", date: "2026-10-20", amount: 1000 }, { type: "topup", date: "2026-10-25", amount: 200 },
+      { type: "withdraw", date: "2026-11-05", amount: 100 }, { type: "set", date: "2026-11-10", amount: 1050 }, { type: "withdraw", date: "2026-11-12", amount: 150 },
+    ] });
+    expect(M.confirmedBalanceOn(mixed, "2026-11-01")).toBe(1200);
+    expect(M.confirmedBalanceOn(mixed, "2026-10-01")).toBe(1000);
+    expect(M.confirmedBalanceOn(mixed, "2026-11-11")).toBe(1050);
+    expect(M.confirmedBalanceOn(mixed, "2026-12-01")).toBe(900);
+    expect(M.confirmedBalanceOn(acct({ balance: 0, events: [{ type: "set", date: "2026-10-01", amount: 10 }, { type: "withdraw", date: "2026-10-02", amount: 50 }] }), "2026-11-01")).toBe(0);
+  });
+
+  it("starts accruing on the day the account was added, not the 1st of the month", () => {
+    const added = acct({ balance: 1000, ratePct: 5, createdAt: "2026-11-10T09:30:00.000Z", rateHistory: [{ from: "2026-11-10", ratePct: 5 }], events: [] });
+    const expected = 1000 * ((1 + 0.05 / 365) ** 21 - 1);
+    expect(expected).toBeCloseTo(2.8807, 4);
+    expect(M.currentPeriodInterest(added, "2026-11-15")).toBeCloseTo(expected, 10);
+    expect(M.expectedInterest(added, "2026-10-01", "2026-11-01")).toBe(0);
+    expect(M.expectedInterest({ ...added, createdAt: "legacy" }, "2026-11-01", "2026-12-01")).toBeCloseTo(1000 * ((1 + 0.05 / 365) ** 30 - 1), 10);
   });
 
   it("uses accrue() for interest accounts in the current calendar month", () => {
