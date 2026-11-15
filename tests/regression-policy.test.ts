@@ -145,10 +145,10 @@ describe("regression evidence guard", () => {
     expect(readFileSync("tools/regression/playwright-summary.d.mts", "utf8")).toContain("export function renderPlaywrightSummary");
   });
   it("formats Playwright counts in the Vitest summary style", () => {
-    const report = (rows: { file: string, status: "expected" | "unexpected" | "flaky" | "skipped" }[]) => ({
+    const report = (rows: { file: string, title?: string, status: "expected" | "unexpected" | "flaky" | "skipped" }[]) => ({
       suites: Object.entries(Object.groupBy(rows, row => row.file)).map(([file, specs]) => ({
         file,
-        specs: (specs ?? []).map(spec => ({ file, title: spec.status, tests: [{ status: spec.status, results: [{ status: spec.status === "expected" ? "passed" : spec.status === "unexpected" ? "failed" : spec.status === "flaky" ? "passed" : "skipped" }] }] })),
+        specs: (specs ?? []).map(spec => ({ file, title: spec.title ?? spec.status, tests: [{ status: spec.status, results: [{ status: spec.status === "expected" ? "passed" : spec.status === "unexpected" ? "failed" : spec.status === "flaky" ? "passed" : "skipped" }] }] })),
       })),
     });
     expect(renderPlaywrightSummary(report([
@@ -166,5 +166,36 @@ describe("regression evidence guard", () => {
     ]))).toBe("Playwright Spec Files: ⚠️ 1 flaky · ⏭️ 1 skipped · 2 total\nPlaywright Tests: ⚠️ 1 flaky · ⏭️ 1 skipped · 2 total\n");
     expect(formatCountLine("Playwright Tests", { passed: 0, failed: 4, flaky: 0, skipped: 0, total: 4 })).toBe("Playwright Tests: ❌ 4 failed · 4 total");
     expect(summaryFromFile("does-not-exist.json")).toBe("Playwright JSON report not found.\n");
+    const chromium = report([
+      { file: "e2e/a.spec.ts", title: "local", status: "expected" },
+      { file: "e2e/b.spec.ts", title: "cloud journey", status: "skipped" },
+    ]);
+    const cloud = report([
+      { file: "b.spec.ts", title: "cloud journey", status: "expected" },
+    ]);
+    expect(renderPlaywrightSummary(chromium, cloud)).toBe([
+      "Playwright Spec Files: ✅ 2 passes · 2 total",
+      "Playwright Tests: ✅ 2 passes · 2 total",
+      "",
+      "Chromium Spec Files: ✅ 1 pass · ⏭️ 1 skipped · 2 total",
+      "Chromium Tests: ✅ 1 pass · ⏭️ 1 skipped · 2 total",
+      "Local cloud Spec Files: ✅ 1 pass · 1 total",
+      "Local cloud Tests: ✅ 1 pass · 1 total",
+      "",
+    ].join("\n"));
+    expect(renderPlaywrightSummary(report([
+      { file: "e2e/b.spec.ts", title: "cloud journey", status: "unexpected" },
+    ]), cloud)).toBe([
+      "Playwright Spec Files: ❌ 1 failed · 1 total",
+      "Playwright Tests: ❌ 1 failed · 1 total",
+      "",
+      "Chromium Spec Files: ❌ 1 failed · 1 total",
+      "Chromium Tests: ❌ 1 failed · 1 total",
+      "Local cloud Spec Files: ✅ 1 pass · 1 total",
+      "Local cloud Tests: ✅ 1 pass · 1 total",
+      "",
+    ].join("\n"));
+    expect(renderPlaywrightSummary(chromium, null)).toContain("Local cloud report not found.");
+    expect(renderPlaywrightSummary(chromium, null)).toContain("Playwright Tests: ✅ 1 pass · ⏭️ 1 skipped · 2 total");
   });
 });
