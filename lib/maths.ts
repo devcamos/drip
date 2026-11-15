@@ -225,7 +225,25 @@ export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, 
 export function applyWithdraw<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
   if (!(amount > 0)) throw new Error("Withdrawal must be more than £0");
   if (amount > a.balance + 1e-9) throw new Error("You can't withdraw more than the balance");
+  if (amount > lowestBalanceFrom(a, date) + 1e-9) throw new Error("You can't withdraw more than the balance on that date. Check the date, or log the top-up that came first.");
   return withEvent(a, a.balance - amount, "withdraw", date, amount);
+}
+
+/**
+ * Lowest running balance from the end of `date` (after that day's logged events) until the next
+ * manual balance update after it. A back-dated withdrawal must fit within this, or the history goes below zero.
+ */
+function lowestBalanceFrom(a: Pick<Account, "balance" | "events">, date: string): number {
+  let balance = confirmedBalanceOn(a, date), lowest = Infinity;
+  const ordered = (a.events ?? []).map((event, index) => ({ event, index }))
+    .filter(({ event }) => event.date >= date && (event.type === "topup" || event.type === "withdraw" || event.type === "set"))
+    .sort((x, y) => x.event.date.localeCompare(y.event.date) || x.index - y.index).map(({ event }) => event);
+  for (const event of ordered) {
+    if (event.date > date && lowest > balance) lowest = balance;
+    if (event.type === "set") { if (event.date > date) break; balance = event.amount; }
+    else balance += event.type === "topup" ? event.amount : -event.amount;
+  }
+  return Math.min(lowest, balance);
 }
 
 /** Record a rate change effective from `date`; ratePct becomes the rate in force on `today`. */

@@ -63,3 +63,31 @@ describe("rate history", () => {
     expect(d.accounts[1].ratePct).toBe(5);
   });
 });
+
+describe("back-dated withdrawals (#80)", () => {
+  const withEvents = (balance: number, events: Parameters<typeof M.applyWithdraw>[0]["events"]) => ({ balance, events });
+  it("rejects a withdrawal larger than the balance on its date, even when today's balance covers it", () => {
+    // £200 on 1 Oct, £500 top-up on 10 Oct: £700 today, but only £200 on 5 Oct.
+    const a = withEvents(700, [{ type: "topup", date: "2026-10-10", amount: 500 }]);
+    expect(() => M.applyWithdraw(a, 300, "2026-10-05")).toThrow(/balance on that date/);
+    expect(M.applyWithdraw(a, 200, "2026-10-05").balance).toBe(500);
+    expect(M.applyWithdraw(a, 300, "2026-10-10").balance).toBe(400);
+  });
+  it("rejects a withdrawal that would take a later point in the history below zero", () => {
+    // £100, −£90 on 10 Oct, +£500 on 20 Oct: £510 today. £50 on 5 Oct would leave −£40 after 10 Oct.
+    const a = withEvents(510, [{ type: "withdraw", date: "2026-10-10", amount: 90 }, { type: "topup", date: "2026-10-20", amount: 500 }]);
+    expect(() => M.applyWithdraw(a, 50, "2026-10-05")).toThrow(/balance on that date/);
+    expect(M.applyWithdraw(a, 10, "2026-10-05").balance).toBe(500);
+    expect(M.applyWithdraw(a, 510, "2026-10-21").balance).toBe(0);
+  });
+  it("counts same-day events first and stops at the next manual balance update", () => {
+    const sameDay = withEvents(500, [{ type: "topup", date: "2026-10-05", amount: 400 }]);
+    expect(M.applyWithdraw(sameDay, 500, "2026-10-05").balance).toBe(0);
+    // A later confirmed reading already reflects real withdrawals, so only the stretch before it must stay positive.
+    const reset = withEvents(1000, [{ type: "topup", date: "2026-10-10", amount: 500 }, { type: "set", date: "2026-10-15", amount: 1000 }]);
+    expect(() => M.applyWithdraw(reset, 800, "2026-10-12")).not.toThrow();
+    expect(() => M.applyWithdraw(reset, 900, "2026-10-05")).toThrow(/balance on that date/);
+    const setSameDay = withEvents(300, [{ type: "set", date: "2026-10-05", amount: 300 }]);
+    expect(M.applyWithdraw(setSameDay, 300, "2026-10-05").balance).toBe(0);
+  });
+});
