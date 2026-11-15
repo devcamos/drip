@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { applyWorkerUpdate, PwaStatus } from "../app/PwaStatus";
+import { applyWorkerUpdate, PwaStatus, PwaUpdateSettings } from "../app/PwaStatus";
 afterEach(() => { delete (navigator as any).serviceWorker; vi.useRealTimers(); });
 
 it("keeps the existing worker until the user accepts a ready update", async () => {
@@ -84,6 +84,21 @@ it("checks a saved tab on foreground, reconnect and interval without applying th
   expect(registration.update).toHaveBeenCalledTimes(6);
 });
 
+it("does not queue an update check behind an install that is still in progress", async () => {
+  const installing = Object.assign(new EventTarget(), { state: "installing" });
+  const registration = Object.assign(new EventTarget(), { waiting: null, installing: installing as any, update: vi.fn().mockResolvedValue(undefined) });
+  const sw = Object.assign(new EventTarget(), { register: vi.fn().mockResolvedValue(registration), controller: null });
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: sw });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaStatus />);
+  await act(async () => {});
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(registration.update).not.toHaveBeenCalled();
+  registration.installing = null;
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(registration.update).toHaveBeenCalledOnce();
+});
+
 it("deduplicates foreground checks while an update request is already pending", async () => {
   let finish!: () => void;
   const registration = Object.assign(new EventTarget(), { waiting: null, update: vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; })).mockResolvedValue(undefined) });
@@ -104,4 +119,49 @@ it("explicitly reloads when another tab has already activated the offered update
   applyWorkerUpdate(worker, listen, reload);
   expect(reload).toHaveBeenCalledOnce();
   expect(listen).not.toHaveBeenCalled(); expect(worker.postMessage).not.toHaveBeenCalled();
+});
+
+it("checks for updates from settings without reloading or claiming an update is installed", async () => {
+  const update = vi.fn().mockResolvedValue(undefined);
+  const getRegistration = vi.fn().mockResolvedValue({ update });
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration } });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaUpdateSettings />);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Update check requested");
+  expect(getRegistration).toHaveBeenCalledWith("/"); expect(update).toHaveBeenCalledOnce();
+});
+
+it("does not queue a settings update check behind an install that is still in progress", async () => {
+  const update = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: vi.fn().mockResolvedValue({ update, installing: { state: "installing" } }) } });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaUpdateSettings />);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Update check requested");
+  expect(update).not.toHaveBeenCalled();
+});
+
+it("explains when a manual update check is offline or fails", async () => {
+  const update = vi.fn().mockRejectedValue(new Error("failed"));
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: vi.fn().mockResolvedValue({ update }) } });
+  const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  render(<PwaUpdateSettings />);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Connect to the internet");
+  expect(update).not.toHaveBeenCalled(); online.mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Could not check for updates"));
+});
+
+it("does not leave a manual update check stuck when the browser never responds", async () => {
+  vi.useFakeTimers();
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: vi.fn().mockResolvedValue({ update: () => new Promise(() => {}) }) } });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  render(<PwaUpdateSettings />);
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  expect(screen.getByRole("status")).toHaveTextContent("Could not check for updates");
+  expect(screen.getByRole("button", { name: "Check for updates" })).toBeEnabled();
 });

@@ -54,6 +54,7 @@ For the architecture and trust boundaries, see [Architecture](docs/architecture.
 - [Feedback inbox and agent triage](docs/feedback.md)
 - [Exchange rates](docs/exchange-rates.md) and [investment statistics](docs/dividend-investment-stats.md)
 - [Regression policy and test layers](docs/testing/regression-policy.md)
+- [App updates and saved links](docs/app-updates.md)
 - [UI screenshots](docs/screenshots/)
 
 ## Licence

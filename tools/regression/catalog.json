@@ -629,7 +629,11 @@
         "vitest.integration.config.mts",
         "tools/regression/cloud.mjs",
         "tools/regression/prepare-cloud.mjs",
-        "playwright.cloud.config.ts"
+        "playwright.cloud.config.ts",
+        "playwright.webkit.config.ts",
+        "tools/regression/browser-matrix.mjs",
+        "tools/regression/browser-matrix.d.mts",
+        "tools/regression/webkit.mjs"
       ],
       "tests": [
         "tests/regression-policy.test.ts"

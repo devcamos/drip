@@ -103,7 +103,7 @@ test("add account, top up, withdraw, Trends, backup export and import", async ({
 test("app lock: passkey required on open, recovery code fallback", async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
-  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   const code = await onboard(page);
   await page.getByRole("navigation").getByRole("button", { name: "Settings" }).click();
@@ -117,8 +117,14 @@ test("app lock: passkey required on open, recovery code fallback", async ({ page
   await unlock(page, code);
   await expect(page.getByRole("region", { name: "Your accounts are empty", exact: true })).toBeVisible();
 
-  // passkey fails -> fallback to recovery code
-  await cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
+  // Explicitly simulate a cancelled passkey prompt; changing the virtual
+  // authenticator's verification flag alone does not reliably reject it.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.credentials, "get", {
+      configurable: true,
+      value: async () => { throw new DOMException("Passkey cancelled", "NotAllowedError"); },
+    });
+  });
   await page.reload();
   await unlock(page, code, "screen-lock");
   await expect(page.getByRole("heading", { name: /locked/ })).toBeVisible();

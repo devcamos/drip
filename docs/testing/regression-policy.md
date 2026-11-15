@@ -13,6 +13,9 @@ cases, fourteen required browser journeys backed by local Postgres, and the
 resulting evidence report. CI also performs the security audit. There are
 no path filters that let a source change bypass the suite.
 
+The separately reported mobile-WebKit gate, fixture boundaries and safe
+failure-evidence rules are documented in [headless browser coverage](headless-browser-coverage.md).
+
 ## Feature inventory
 
 [`tools/regression/catalog.json`](../../tools/regression/catalog.json) owns the
@@ -87,8 +90,8 @@ edge cases belong in fast lower layers.
    Documentation-only changes do not need meaningless test edits.
 2. Put new test files in the appropriate catalog layer and feature. New features
    also need a primary pyramid; existing supporting regression checks remain.
-3. Keep all quality thresholds: at least 85% overall, stricter 90% logic lines/
-   functions/statements and 85% logic branches. Coverage now includes server code
+3. Keep the enforced 90% overall thresholds for lines, branches, functions and
+   statements, plus the separate domain-unit gate. Coverage includes server code
    and the deployment-config utility as well as `app`/`lib`.
 4. Do not focus a test or add skips, todos, expected failures or conditional
    exemptions. The 17 inherited conditional declarations are recorded by exact
@@ -132,6 +135,16 @@ docker run --rm -d --name drip-regression-db \
 npm run test:regression
 docker stop drip-regression-db
 ```
+
+In GitHub Actions the `CI` workflow's `test` job starts a disposable Postgres 18
+service and supplies its loopback address. This is a real database engine with
+synthetic records, separate from Neon Preview and Production. Integration cases
+exercise real SQL constraints and concurrency; the cloud browser stage also
+exercises HTTP and authentication. If a local run fails to connect, confirm the
+container is healthy, the loopback port is available, and the expected database
+name and user match. Never solve a test connection issue by supplying a hosted
+database URL. Schema cleanup happens during normal teardown; stopping the
+disposable container removes its data.
 
 The default connection uses that loopback port/name. CI supplies
 `DRIP_TEST_DATABASE_URL` on its service port 5432 and the exact comparison SHA in

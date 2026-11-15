@@ -22,7 +22,9 @@ test("the current installed shell accepts a new public fingerprint and preserves
   // to exercise an older compiled client or a physical Home Screen app.
   const original = await (await page.request.get("http://localhost:4321/sw-build.js")).text();
   let fingerprint = original;
+  const workerRequests: string[] = [];
   const proxy = createServer((incoming, outgoing) => {
+    if (incoming.url === "/sw.js" || incoming.url === "/sw-build.js") workerRequests.push(incoming.url);
     if (incoming.url === "/sw-build.js") {
       outgoing.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-store" });
       outgoing.end(fingerprint); return;
@@ -34,6 +36,10 @@ test("the current installed shell accepts a new public fingerprint and preserves
   });
   await new Promise<void>(resolve => proxy.listen(4338, "127.0.0.1", resolve));
   try {
+    // Install the current shell before account setup reloads the page. WebKit
+    // can leave a first install stuck in "installing" when its page navigates
+    // while the new worker is starting; this journey covers a later update.
+    await page.goto("/"); await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     const code = await legacyAccount(page, "pwa_regression", [calendarAccount({ balance: 1234.56 })]);
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -44,7 +50,12 @@ test("the current installed shell accepts a new public fingerprint and preserves
     fingerprint = original.replace(/("[^"\n]*")/, value => JSON.stringify(JSON.parse(value) + "-next-regression"));
     expect(fingerprint).not.toBe(original);
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(page.getByRole("button", { name: "Reload update" })).toBeVisible({ timeout: 30_000 });
+    try { await expect(page.getByRole("button", { name: "Reload update" })).toBeVisible({ timeout: 30_000 }); }
+    catch (error) {
+      const worker = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return { online: navigator.onLine, visibility: document.visibilityState, installing: r?.installing?.state, waiting: r?.waiting?.state, active: r?.active?.state }; });
+      console.error("Synthetic PWA update diagnostics", JSON.stringify({ workerRequests, worker }));
+      throw error;
+    }
     await expect(page.getByRole("region", { name: "Account cards", exact: true })).toContainText("£1,234.56");
     expect(await encryptedRecords(page)).toBe(before);
     await page.getByRole("button", { name: "Reload update" }).click(); await unlock(page, code);
