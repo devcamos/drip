@@ -36,6 +36,10 @@ test("the current installed shell accepts a new public fingerprint and preserves
   });
   await new Promise<void>(resolve => proxy.listen(4338, "127.0.0.1", resolve));
   try {
+    // Install the current shell before account setup reloads the page. WebKit
+    // can leave a first install stuck in "installing" when its page navigates
+    // while the new worker is starting; this journey covers a later update.
+    await page.goto("/"); await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     const code = await legacyAccount(page, "pwa_regression", [calendarAccount({ balance: 1234.56 })]);
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
