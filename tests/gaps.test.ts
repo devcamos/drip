@@ -18,8 +18,9 @@ describe("withdrawals", () => {
     expect(r.interest).toBeCloseTo(r.closing - 3000 + 1000, 8);
     // a withdrawal larger than the balance is capped
     expect(M.accrue(100, 0, [{ type: "withdraw", date: "2026-10-02", amount: 500 }], "2026-10-01", "2026-10-03")).toMatchObject({ withdrawals: 100, closing: 0 });
-    // set events don't move money
-    expect(M.accrue(100, 0, [{ type: "set", date: "2026-10-02", amount: 5 }], "2026-10-01", "2026-10-03").closing).toBe(100);
+    // a set event resets the running balance but is not a deposit or withdrawal
+    expect(M.accrue(100, 0, [{ type: "set", date: "2026-10-02", amount: 5 }], "2026-10-01", "2026-10-03")).toMatchObject({ deposits: 0, withdrawals: 0, closing: 5 });
+    expect(M.accrue(100, 0, [{ type: "set", date: "2026-10-02", amount: -5 }], "2026-10-01", "2026-10-03").closing).toBe(100);
   });
   it("Trends: withdrawals are not negative growth", () => {
     const b = M.momBreakdown([{ month: "2026-09", totalBalance: 3000, monthlyIncome: 0 }, { month: "2026-10", totalBalance: 2017.5, monthlyIncome: 0, deposits: 0, withdrawals: 1000 }])!;

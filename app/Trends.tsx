@@ -94,7 +94,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
     </section>
     <div className="grid">
       <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-      <div className="stat"><div className="muted">Estimated monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
+      <div className="stat"><div className="muted">Expected this month</div><div className="v">{M.gbp(M.totalCurrentPeriodInterest(data.accounts))}</div></div>
       <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
       <div className="stat"><div className="muted">Balance change after logged transfers</div><div className="v">{growthLabel}</div></div>
     </div>

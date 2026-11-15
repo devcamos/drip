@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Trends } from "../app/Trends";
 import { emptyData } from "../lib/db";
-import { addMonths, ymd } from "../lib/maths";
+import { addMonths, gbp, totalCurrentPeriodInterest, ymd } from "../lib/maths";
+import type { Account } from "../lib/types";
 const now = ymd(new Date());
 describe("clear balance history and projections", () => {
   it("distinguishes real history, today and future estimates and saves explicit assumptions", () => {
@@ -33,4 +34,15 @@ describe("clear balance history and projections", () => {
     expect(screen.getByText("Estimated balance in 3 years")).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAccessibleName(/£7,200.00/);
   });
+  it("shows day-accurate expected interest for the current month", () => {
+    const accounts: Account[] = [{
+      id: "a1", provider: "Zopa", label: "", balance: 3000, ratePct: 7, rateType: "interest", frequency: "monthly",
+      nextPayoutDate: now, colour: "#000", payouts: [], events: [], createdAt: "2026-01-01",
+      rateHistory: [{ from: "2026-01-01", ratePct: 7 }],
+    }];
+    render(<Trends data={{ ...emptyData(), accounts }} onAssumptions={vi.fn()} />);
+    expect(screen.getByText("Expected this month")).toBeInTheDocument();
+    expect(screen.getByText(gbp(totalCurrentPeriodInterest(accounts)))).toBeInTheDocument();
+  });
+
 });
