@@ -224,4 +224,13 @@ describe("regression evidence guard", () => {
     expect(pkg.dependencies["web-push"]).toBe("4.0.0");
     expect(pkg.engines.node).toBe("24.x");
   });
+  it("keeps jsdom 31 on a Node release that satisfies its engine range", () => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+    const [major, minor] = readFileSync(".nvmrc", "utf8").trim().split(".").map(Number);
+    expect(pkg.devDependencies.jsdom).toBe("^31.0.1");
+    expect(pkg.engines.node).toBe("24.x");
+    expect((major === 22 && minor >= 22) || (major === 24 && minor >= 15) || major >= 26).toBe(true);
+    expect(readFileSync("vitest.calendar.config.mts", "utf8")).toContain('environment: "jsdom"');
+
+  });
 });
