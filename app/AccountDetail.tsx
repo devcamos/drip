@@ -9,6 +9,7 @@ import { StockInvestmentSummary } from "./StockInvestment";
 import { isCreditAccount } from "@/lib/credit-card";
 import { CreditCardDetail } from "./CreditCardDetail";
 import { StockPrice } from "./stocks/StockPrice";
+import { StockReading } from "./stocks/StockReading";
 import { useUnsavedDraft } from "./useDraftGuard";
 const today = () => M.ymd(new Date());
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -128,7 +129,7 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange
     <p className="muted">{a.marketValuation ? "Your saved market estimate. Dividend predictions retain your recorded income assumptions." : "Your entered balance. Predictions and recorded income never change it automatically."}</p>
     {a.positionReviewRequired && <section className="banner warn" aria-label="Share position needs review"><span>Check your recorded shares after this cash movement. Price updates and capital return are paused until you confirm the position.</span><button className="btn ghost small" onClick={onEdit}>Update share position</button></section>}
     {events.some(event => event.date > today()) && <p role="status" className="banner warn">An earlier entry has a future date. Check your provider's current balance and use Update balance to correct your saved figure if needed.</p>}
-    {a.rateType === "dividend" && <><StockPrice key={a.id} account={a} onChange={onChange} onEdit={onEdit} onBack={onBack} /><StockInvestmentSummary account={a} onEdit={onEdit} /></>}
+    {a.rateType === "dividend" && <><StockPrice key={a.id} account={a} onChange={onChange} onEdit={onEdit} onBack={onBack} /><StockInvestmentSummary account={a} onEdit={onEdit} /><StockReading holdingName={a.holdingName} /></>}
     <BalanceActions a={a} onChange={onChange} />
     <IncomeSummary accounts={[a]} />
     <section className="panel" aria-label="Income predictions"><h2 style={{ marginTop: 0 }}>Predictions</h2>

@@ -10,7 +10,7 @@ const base = process.env.REGRESSION_BASE ?? (process.env.CI ? undefined : "origi
 if (!base) throw new Error("CI must specify its exact regression comparison commit.");
 mkdirSync("regression-results", { recursive: true });
 for (const name of ["vitest.json", "browser.json", "browser-cloud.json", "browser-webkit.json", "browser-matrix-summary.json", "summary.json", "summary.md", "failure.json"]) rmSync("regression-results/" + name, { force: true });
-const env = { ...process.env, DRIP_TEST_DATABASE_URL: database, PLAYWRIGHT_JSON_OUTPUT_FILE: "regression-results/browser.json" };
+const env = { ...process.env, DRIP_TEST_DATABASE_URL: database, PLAYWRIGHT_JSON_OUTPUT_FILE: "regression-results/browser.json", PLAYWRIGHT_HTML_OPEN: "never" };
 // Next's browser fixture is deliberately local-only. Real account HTTP/SQL
 // contracts configure their own disposable connection inside Vitest.
 // Empty definitions also prevent Next's dotenv loader from repopulating these
@@ -24,7 +24,7 @@ const stages = [
   [process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--coverage", "--reporter=default", "--reporter=json", "--outputFile.json=regression-results/vitest.json"]],
   ["npm", ["run", "build"]],
   [process.execPath, ["tools/regression/webkit.mjs"]],
-  [process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--reporter=list,json"]],
+  [process.execPath, ["node_modules/@playwright/test/cli.js", "test", "--reporter=list,json,html"]],
   [process.execPath, ["tools/regression/cloud.mjs"]],
   [process.execPath, ["tools/regression/report.mjs"]],
 ];
