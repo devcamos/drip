@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appConfig from "../vitest.config.mjs";
 import domainConfig from "../vitest.unit-coverage.config.mjs";
@@ -129,5 +130,15 @@ describe("regression evidence guard", () => {
     expect(summarizeResults(c, good).errors).toEqual([]);
     const drift = [...cases("tests/cash.test.ts", 1), ...cases("tests/cash.integration.test.ts", 2), ...cases("e2e/cash.spec.ts", 7)];
     expect(summarizeResults(c, drift).errors.length).toBeGreaterThan(0);
+  });
+  it("publishes a Playwright HTML report from CI alongside Vitest evidence", () => {
+    expect(readFileSync("playwright.config.ts", "utf8")).toMatch(/\["html", \{ open: "never" \}\]/);
+    expect(readFileSync("tools/regression/run.mjs", "utf8")).toContain("--reporter=list,json,html");
+    const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+    expect(ci).toMatch(/name:\s*playwright-report/);
+    expect(ci).toContain("playwright-report");
+    expect(ci).toContain("test-results");
+    expect(ci).toContain("if: ${{ !cancelled() }}");
+    expect(ci).toMatch(/actions\/upload-artifact@v7/);
   });
 });
