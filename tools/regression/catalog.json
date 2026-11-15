@@ -606,6 +606,8 @@
         "tools/regression/policy.d.mts",
         "tools/regression/policy.mjs",
         "tools/regression/report.mjs",
+        "tools/regression/playwright-summary.mjs",
+        "tools/regression/playwright-summary.d.mts",
         "tools/regression/run.mjs",
         "vitest.calendar.config.mts",
         "vitest.config.mts",

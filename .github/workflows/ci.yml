@@ -34,3 +34,22 @@ jobs:
             regression-results
             coverage
             test-results
+      - name: Upload Playwright HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            playwright-report
+            test-results
+      - name: Playwright report summary
+        if: ${{ !cancelled() }}
+        run: |
+          echo "## Playwright report" >> "$GITHUB_STEP_SUMMARY"
+          node tools/regression/playwright-summary.mjs
+          {
+            echo ""
+            echo "Download the **playwright-report** artifact from this run, unzip it, and open with \`npx playwright show-report playwright-report\`."
+          } >> "$GITHUB_STEP_SUMMARY"

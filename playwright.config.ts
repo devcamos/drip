@@ -4,7 +4,7 @@ export default defineConfig({
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
-  reporter: process.env.CI ? [["github"], ["list"]] : "list",
+  reporter: process.env.CI ? [["github"], ["list"], ["html", { open: "never" }]] : "list",
   use: { baseURL: "http://localhost:4321", acceptDownloads: true, trace: "retain-on-failure" },
   projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"],
     launchOptions: process.env.PW_CHROME ? { executablePath: process.env.PW_CHROME } : {} } }],
