@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import appConfig from "../vitest.config.mjs";
 import domainConfig from "../vitest.unit-coverage.config.mjs";
 import { inspectTests, mergeBrowserResults, migrationStatements, sourceFile, summarizeResults, testFile, validateCatalog, validateChanges, validateTestControls, type Catalog, type TestResult } from "../tools/regression/policy.mjs";
+import { formatCountLine, renderPlaywrightSummary, summaryFromFile } from "../tools/regression/playwright-summary.mjs";
 
 const catalog = (): Catalog => ({ version: 1, features: [{ id: "cash", name: "Cash income", sources: ["lib/cash.ts"], tests: ["tests/cash.test.ts"] }], layers: { unit: ["tests/cash.test.ts"] }, conditional: [] });
 const files = ["lib/cash.ts", "tests/cash.test.ts"];
@@ -140,5 +141,29 @@ describe("regression evidence guard", () => {
     expect(ci).toContain("test-results");
     expect(ci).toContain("if: ${{ !cancelled() }}");
     expect(ci).toMatch(/actions\/upload-artifact@v7/);
+    expect(ci).toContain("node tools/regression/playwright-summary.mjs");
+  });
+  it("formats Playwright counts in the Vitest summary style", () => {
+    const report = (rows: { file: string, status: "expected" | "unexpected" | "flaky" | "skipped" }[]) => ({
+      suites: Object.entries(Object.groupBy(rows, row => row.file)).map(([file, specs]) => ({
+        file,
+        specs: (specs ?? []).map(spec => ({ file, title: spec.status, tests: [{ status: spec.status, results: [{ status: spec.status === "expected" ? "passed" : spec.status === "unexpected" ? "failed" : spec.status === "flaky" ? "passed" : "skipped" }] }] })),
+      })),
+    });
+    expect(renderPlaywrightSummary(report([
+      { file: "e2e/a.spec.ts", status: "expected" },
+      { file: "e2e/b.spec.ts", status: "expected" },
+    ]))).toBe("Playwright Spec Files: ✅ 2 passes · 2 total\nPlaywright Tests: ✅ 2 passes · 2 total\n");
+    expect(renderPlaywrightSummary(report([
+      { file: "e2e/a.spec.ts", status: "expected" },
+      { file: "e2e/b.spec.ts", status: "unexpected" },
+      { file: "e2e/b.spec.ts", status: "expected" },
+    ]))).toBe("Playwright Spec Files: ✅ 1 pass · ❌ 1 failed · 2 total\nPlaywright Tests: ✅ 2 passes · ❌ 1 failed · 3 total\n");
+    expect(renderPlaywrightSummary(report([
+      { file: "e2e/a.spec.ts", status: "flaky" },
+      { file: "e2e/b.spec.ts", status: "skipped" },
+    ]))).toBe("Playwright Spec Files: ⚠️ 1 flaky · ⏭️ 1 skipped · 2 total\nPlaywright Tests: ⚠️ 1 flaky · ⏭️ 1 skipped · 2 total\n");
+    expect(formatCountLine("Playwright Tests", { passed: 0, failed: 4, flaky: 0, skipped: 0, total: 4 })).toBe("Playwright Tests: ❌ 4 failed · 4 total");
+    expect(summaryFromFile("does-not-exist.json")).toBe("Playwright JSON report not found.\n");
   });
 });

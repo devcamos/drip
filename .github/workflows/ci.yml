@@ -47,10 +47,9 @@ jobs:
       - name: Playwright report summary
         if: ${{ !cancelled() }}
         run: |
+          echo "## Playwright report" >> "$GITHUB_STEP_SUMMARY"
+          node tools/regression/playwright-summary.mjs
           {
-            echo "## Playwright HTML report"
+            echo ""
             echo "Download the **playwright-report** artifact from this run, unzip it, and open with \`npx playwright show-report playwright-report\`."
-            if [ -f regression-results/browser.json ]; then
-              node -e 'const s=require("./regression-results/browser.json").stats||{}; console.log(""); console.log("Chromium suite: "+(s.expected??0)+" passed, "+(s.unexpected??0)+" failed, "+(s.flaky??0)+" flaky, "+(s.skipped??0)+" skipped.");'
-            fi
           } >> "$GITHUB_STEP_SUMMARY"
