@@ -303,7 +303,8 @@
         "tests/passkey-ui.test.tsx",
         "tests/passkey-unlock.test.ts",
         "e2e/passkey-unlock.spec.ts",
-        "tests/credential-validation.unit.test.ts"
+        "tests/credential-validation.unit.test.ts",
+        "e2e/smoke.spec.ts"
       ]
     },
     {
@@ -355,7 +356,8 @@
         "tests/saved-experience.integration.test.tsx",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "e2e/rate-change.spec.ts"
       ]
     },
     {
@@ -913,9 +915,13 @@
     "browser": [
       "e2e/account-options.spec.ts",
       "e2e/account-wallet.spec.ts",
+      "e2e/account-workflows.e2e.spec.ts",
       "e2e/auth-screens.spec.ts",
+      "e2e/credit-prototype.e2e.spec.ts",
       "e2e/device-management.spec.ts",
       "e2e/exchange-rates.spec.ts",
+      "e2e/feedback-prototype.e2e.spec.ts",
+      "e2e/feedback.e2e.spec.ts",
       "e2e/four-device-signin.spec.ts",
       "e2e/gamertag-signin.spec.ts",
       "e2e/guided-recovery.spec.ts",
@@ -930,24 +936,21 @@
       "e2e/password-race.spec.ts",
       "e2e/payment-calendar.e2e.spec.ts",
       "e2e/products.spec.ts",
+      "e2e/profile-wallet.e2e.spec.ts",
       "e2e/pwa-current-update.e2e.spec.ts",
       "e2e/pwa-update.spec.ts",
+      "e2e/rate-change.spec.ts",
       "e2e/recovery.spec.ts",
       "e2e/save-confidence.spec.ts",
+      "e2e/saved-experience.e2e.spec.ts",
       "e2e/signin-update.spec.ts",
       "e2e/signup-errors.spec.ts",
       "e2e/smoke.spec.ts",
-      "e2e/stock-investment.spec.ts",
-      "e2e/welcome-prototype.e2e.spec.ts",
-      "e2e/credit-prototype.e2e.spec.ts",
       "e2e/stock-chart.e2e.spec.ts",
+      "e2e/stock-investment.spec.ts",
+      "e2e/stock-reading.e2e.spec.ts",
       "e2e/stock-valuation.e2e.spec.ts",
-      "e2e/feedback-prototype.e2e.spec.ts",
-      "e2e/profile-wallet.e2e.spec.ts",
-      "e2e/saved-experience.e2e.spec.ts",
-      "e2e/account-workflows.e2e.spec.ts",
-      "e2e/feedback.e2e.spec.ts",
-      "e2e/stock-reading.e2e.spec.ts"
+      "e2e/welcome-prototype.e2e.spec.ts"
     ]
   },
   "conditional": [
