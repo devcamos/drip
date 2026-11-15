@@ -4,6 +4,7 @@ export const webkitJourneys = [
   { file: "feedback.e2e.spec.ts", title: "a signed-in user can send a clearly disclosed feedback message and receive a reference" },
   { file: "stock-investment.spec.ts", title: "saves fractional shares and foreign prices, preserves them after encrypted reload, and updates return without logging income" },
   { file: "pwa-current-update.e2e.spec.ts", title: "the current installed shell accepts a new public fingerprint and preserves offline accounts and another open tab" },
+  { file: "rate-change.spec.ts", title: "editing a rate with an effective date shows the rate history list" },
 ];
 
 /** Fail closed on absent, skipped, flaky, wrong-project or duplicate evidence. */

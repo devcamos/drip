@@ -14,7 +14,7 @@ const files = ["lib/cash.ts", "tests/cash.test.ts"];
 describe("regression evidence guard", () => {
   const webkit = () => ({ suites: [{ specs: webkitJourneys.map(row => ({ ...row, tests: [{ projectName: "mobile-webkit", status: "expected", results: [{ status: "passed" }] }] })) }] });
   it("requires every named WebKit journey to pass once in the correct project", () => {
-    expect(validateBrowserMatrix(webkit())).toEqual({ passed: 4, required: 4, errors: [] });
+    expect(validateBrowserMatrix(webkit())).toEqual({ passed: webkitJourneys.length, required: webkitJourneys.length, errors: [] });
   });
   it("rejects skipped, flaky, wrong-browser and missing WebKit evidence", () => {
     for (const mutate of [
