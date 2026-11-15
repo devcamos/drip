@@ -1,5 +1,5 @@
 import type { AppData, CloudState } from "./types";
-import { migrateData } from "./maths";
+import { localToday, migrateData } from "./maths";
 import { isIdentity } from "./identity";
 import { validProductFields } from "./products";
 import { checkCode, codeVerifier } from "./crypto";
@@ -117,7 +117,7 @@ export async function loadData(): Promise<AppData> {
   if (stamp !== epoch) throw new VaultLockedError();
   current(await stored());
   if (!isAppData(data)) throw new Error("Invalid local data. Your stored copy has not changed.");
-  return migrateData(data, new Date().toISOString().slice(0, 10));
+  return migrateData(data, localToday());
 }
 
 /** Unwrap only in memory. Legacy plaintext is removed only after verified encryption. */
@@ -152,7 +152,7 @@ export async function unlockLocalVault(root: string, expected?: VaultBinding): P
   const latest = await stored(); current(latest, true);
   const fresh = await decryptLocal<AppData>(latest.data as LocalEnvelope, keys);
   if (stamp !== epoch) throw new VaultLockedError();
-  return { data: migrateData(fresh, new Date().toISOString().slice(0, 10)), state: connected(latest.cloud, keys) };
+  return { data: migrateData(fresh, localToday()), state: connected(latest.cloud, keys) };
 }
 
 /** Only ciphertext and public credential metadata survive a reload or sign-out. */
@@ -287,7 +287,7 @@ export function mutateData(edit: (current: AppData) => AppData): Promise<AppData
       if (!isAppData(value)) throw new Error("Invalid local data. Your stored copy has not changed.");
       if (binding && (binding.vaultId !== local.keys.header.id || binding.generation !== before.gate?.generation || binding.identityId !== value.identity?.id)) throw new MutationBindingError();
       binding ??= { vaultId: local.keys.header.id, generation: before.gate?.generation, identityId: value.identity?.id };
-      const canonical = migrateData(value, new Date().toISOString().slice(0, 10));
+      const canonical = migrateData(value, localToday());
       if (!isAppData(canonical)) throw new Error("Invalid local data. Your stored copy has not changed.");
       const next = edit(canonical);
       if (!isAppData(next)) throw new Error("These changes contain invalid amounts. Your saved data is unchanged.");

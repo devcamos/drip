@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { reminderApi } from "../server/notifications/api";
 import type { ReminderStore } from "../server/notifications/store";
+import { pushFixture } from "./notification-fixtures";
 
 const device = "cb21a04b-9763-4bc4-a044-4b512f37d75f";
 function fixture() {
@@ -59,4 +61,19 @@ it("denies a dispatch without the configured bearer secret", async () => {
 it("reports server failures without logging raw subscription data", async () => {
   const f = fixture(); f.store.current.mockRejectedValueOnce(new Error("sensitive endpoint")); const log = vi.spyOn(console, "error").mockImplementation(() => {});
   const response = await f.api.GET(f.req("GET")); expect(response.status).toBe(503); expect(await response.text()).not.toContain("sensitive endpoint"); expect(JSON.stringify(log.mock.calls)).not.toContain("sensitive endpoint");
+});
+
+it("builds a VAPID-signed web-push 4 request with the runtime sender options", async () => {
+  const { generateRequestDetails, generateVAPIDKeys, sendNotification } = await import("web-push");
+  expect(typeof sendNotification).toBe("function");
+  expect(readFileSync("server/notifications/runtime.ts", "utf8")).toContain('import { sendNotification } from "web-push"');
+  const keys = generateVAPIDKeys();
+  const fixture = pushFixture();
+  const details = generateRequestDetails(fixture.subscription, JSON.stringify({ type: "notification-test", date: "2026-10-29" }), {
+    vapidDetails: { subject: fixture.config.subject, publicKey: keys.publicKey, privateKey: keys.privateKey },
+    TTL: 6 * 60 * 60, timeout: 10_000, urgency: "normal",
+  });
+  expect(details.method).toBe("POST");
+  expect(details.headers.Authorization).toMatch(/^vapid /i);
+  expect(details.endpoint).toBe(fixture.subscription.endpoint);
 });

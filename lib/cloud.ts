@@ -4,7 +4,7 @@ import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey, che
 import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection, type RetainedAccount } from "./db";
 import type { AppData, CloudState } from "./types";
 export type { CloudState } from "./types";
-import { migrateData } from "./maths";
+import { localToday, migrateData } from "./maths";
 import { safeFetch } from "./worker-safety";
 import { cloudPayload, fromCloudPayload } from "./cloud-payload";
 import { dataFormatVersion } from "./data-format";
@@ -47,7 +47,7 @@ async function decode(envelope: Envelope, key: CryptoKey): Promise<AppData> {
   return data;
 }
 export async function unseal(envelope: Envelope, key: CryptoKey): Promise<AppData> {
-  return migrateData(fromCloudPayload(await decode(envelope, key)), new Date().toISOString().slice(0, 10));
+  return migrateData(fromCloudPayload(await decode(envelope, key)), localToday());
 }
 export const readCloudState = () => getItem<CloudState>("cloudState");
 export async function writeCloudState(state: CloudState | undefined, expected?: { generation: string | undefined; connectionGeneration?: string }) {
@@ -135,7 +135,7 @@ export async function syncNow(): Promise<string> {
     if (session.error?.status === 429) throw new Error("Cloud sync is temporarily rate limited. Drip will retry automatically; your local data is safe.");
     if (session.error) throw new Error("Could not check cloud sign-in. Drip will retry automatically; your local data is safe.");
     if (session.data?.user.id !== state.userId) throw new Error("Sign in again to sync. Your local data is safe.");
-    const data = migrateData(snapshot, new Date().toISOString().slice(0, 10));
+    const data = migrateData(snapshot, localToday());
     if (data.identity?.id !== state.identityId) throw new Error("This local backup belongs to another account. Disconnect cloud recovery first.");
     const remote = await vault("GET", undefined, state.userId);
     if (remote.version !== state.version) throw new Error("Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.");
