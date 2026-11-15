@@ -81,3 +81,50 @@ describe("maths", () => {
     expect(M.round2(1.005)).toBe(1.01);
   });
 });
+
+describe("day-accurate current-period interest", () => {
+  it("reconstructs the opening balance by reversing later top-ups and withdrawals", () => {
+    const a = acct({
+      balance: 2300,
+      events: [
+        { type: "topup", date: "2026-11-10", amount: 500 },
+        { type: "withdraw", date: "2026-11-20", amount: 200 },
+        { type: "set", date: "2026-11-25", amount: 2400 },
+      ],
+    });
+    expect(M.confirmedBalanceOn(a, "2026-11-01")).toBe(2000);
+    expect(M.confirmedBalanceOn(a, "2026-11-10")).toBe(2000);
+    expect(M.confirmedBalanceOn(a, "2026-11-11")).toBe(2500);
+    expect(M.confirmedBalanceOn(a, "2026-11-21")).toBe(2300);
+  });
+
+  it("uses accrue() for interest accounts in the current calendar month", () => {
+    const a = acct({
+      balance: 3500,
+      ratePct: 7,
+      rateHistory: [{ from: "2026-01-01", ratePct: 7 }],
+      events: [{ type: "topup", date: "2026-11-10", amount: 500 }],
+    });
+    const expected = M.accrue(3000, 7, [{ type: "topup", date: "2026-11-10", amount: 500 }], "2026-11-01", "2026-12-01").interest;
+    expect(M.expectedInterest(a, "2026-11-01", "2026-12-01")).toBeCloseTo(expected, 10);
+    expect(M.currentPeriodInterest(a, "2026-11-15")).toBeCloseTo(expected, 10);
+    expect(M.currentPeriodInterest(a, "2026-11-15")).not.toBeCloseTo(M.accountMonthlyIncome(a), 2);
+    expect(M.totalCurrentPeriodInterest([a, acct({ id: "b", balance: 0 })], "2026-11-15")).toBeCloseTo(expected, 10);
+  });
+
+  it("follows mid-month rate changes, and skips credit, archived and dividend-average cases", () => {
+    const changing = acct({
+      balance: 1000,
+      ratePct: 10,
+      rateHistory: [{ from: "2026-01-01", ratePct: 5 }, { from: "2026-11-16", ratePct: 10 }],
+    });
+    expect(M.expectedInterest(changing, "2026-11-01", "2026-12-01")).toBeCloseTo(
+      M.accrue(1000, changing.rateHistory!, [], "2026-11-01", "2026-12-01").interest,
+      10,
+    );
+    expect(M.currentPeriodInterest(acct({ productCategory: "credit-card", creditCard: { apr: 19.9, minimumPayment: 25 } as Account["creditCard"], ratePct: 0 }), "2026-11-15")).toBe(0);
+    expect(M.currentPeriodInterest(acct({ archivedAt: "2026-10-01T00:00:00Z" }), "2026-11-15")).toBe(0);
+    const dividend = acct({ rateType: "dividend", balance: 1200, ratePct: 6 });
+    expect(M.currentPeriodInterest(dividend, "2026-11-15")).toBeCloseTo(M.accountMonthlyIncome(dividend), 10);
+  });
+});

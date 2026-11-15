@@ -281,3 +281,37 @@ export function interestHistory(events: BalanceEvent[] | undefined, by: "week" |
   }
   return [...m].map(([period, amount]) => ({ period, amount })).sort((x, y) => y.period.localeCompare(x.period));
 }
+
+/** Confirmed balance at the start of `date`, before that day's top-ups and withdrawals. */
+export function confirmedBalanceOn(account: Pick<Account, "balance" | "events">, date: string): number {
+  let balance = account.balance;
+  const later = (account.events ?? [])
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => (event.type === "topup" || event.type === "withdraw") && event.date >= date)
+    .sort((a, b) => b.event.date.localeCompare(a.event.date) || b.index - a.index);
+  for (const { event } of later) balance += event.type === "withdraw" ? event.amount : -event.amount;
+  return Math.max(round2(balance), 0);
+}
+
+type AccrualAccount = IncomeAccount & Pick<Account, "events" | "rateHistory" | "createdAt" | "rateType">;
+
+/**
+ * Expected interest from `start` (inclusive) to `end` (exclusive) using daily
+ * compounding, the account's rate history, and logged top-ups or withdrawals.
+ * Dividend holdings keep the simple monthly average; they are not daily-accrued interest.
+ */
+export function expectedInterest(account: AccrualAccount, start: string, end: string): number {
+  if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
+  if (account.rateType === "dividend") return accountMonthlyIncome(account);
+  return accrue(confirmedBalanceOn(account, start), migrateRates(account).rateHistory!, account.events ?? [], start, end).interest;
+}
+
+/** Expected interest for the calendar month containing `today`. */
+export function currentPeriodInterest(account: AccrualAccount, today = ymd(new Date())): number {
+  const start = `${today.slice(0, 7)}-01`;
+  return expectedInterest(account, start, addMonths(start, 1));
+}
+
+export function totalCurrentPeriodInterest(accounts: AccrualAccount[], today = ymd(new Date())): number {
+  return accounts.reduce((sum, account) => sum + currentPeriodInterest(account, today), 0);
+}
