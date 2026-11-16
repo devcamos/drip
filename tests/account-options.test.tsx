@@ -143,6 +143,9 @@ it("records optional past month-end balances once when adding an account, leavin
   const [latest, , oldest] = M.pastMonthEnds(M.localToday());
   change("Balance", "2500"); change("Rate", "4");
   fireEvent.click(screen.getByText("Add past balances (optional)"));
+  // Past entries mustn't be confused with today's balance field.
+  expect(screen.getAllByLabelText(/Balance/)).toHaveLength(1);
+  expect(screen.getAllByLabelText(/^Month end \d{1,2} \w+ \d{4} \(£\)$/)).toHaveLength(3);
   fireEvent.change(document.getElementById("past-balance-0")!, { target: { value: "2400" } });
   fireEvent.change(document.getElementById("past-balance-2")!, { target: { value: "-5" } });
   expect(screen.getByRole("alert")).toHaveTextContent("Past balances must be amounts of £0 or more.");
