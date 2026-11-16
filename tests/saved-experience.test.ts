@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { accountAssets, creditCardDraft, creditCardWarnings, isCreditAccount, portfolioTotals, validCreditCardTerms, validateCreditCardDraft } from "../lib/credit-card";
 import { applyMarketValuation, applyValuationTransfer, clearMarketValuation, hasValuationTransfers, incomeBalance, validMarketValuation } from "../lib/market-valuation";
 import { validProductFields } from "../lib/products";
+import { instrumentForHolding } from "../lib/stock-chart";
 import { cloudPayload } from "../lib/cloud-payload";
 import { dataFormatVersion } from "../lib/data-format";
 import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
@@ -339,3 +340,15 @@ test("combined revaluation and debt totals are order-independent and never turn 
   expect(portfolioTotals([...accounts].reverse())).toEqual(total);
   expect(M.recordedIncome(accounts)).toBe(0);
 });
+
+test("saved dividend fixtures auto-open a share-price dialog only for catalogue holdings", () => {
+  expect(instrumentForHolding(releaseStock().holdingName)).toMatchObject({ name: "Realty Income", symbol: "NYSE:O" });
+  expect(instrumentForHolding(releaseStock({ holdingName: "Digital Realty" }).holdingName)).toMatchObject({ name: "Digital Realty", symbol: "NYSE:DLR" });
+});
+
+test("cash, debt and unknown holdings have no market chart and do not auto-open a share-price dialog", () => {
+  expect(instrumentForHolding(releaseSaver().holdingName)).toBeNull();
+  expect(instrumentForHolding(releaseDebt().holdingName)).toBeNull();
+  expect(instrumentForHolding("A fund that is not in the chart catalogue")).toBeNull();
+});
+

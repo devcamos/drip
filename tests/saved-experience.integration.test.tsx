@@ -75,6 +75,15 @@ it("applies a dated exchange rate without changing shares or income assumptions"
   expect(save).toHaveBeenCalledOnce();
 });
 
+it("opens the share-price dialog as a modal on mount so Account details can uncover the saved holding", () => {
+  render(<StockPrice account={releaseStock()} onChange={vi.fn()} onEdit={vi.fn()} onBack={vi.fn()} />);
+  const dialog = screen.getByRole("dialog", { name: /Realty Income share price/ });
+  expect(dialog).toBeVisible();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Account details" }));
+  expect(screen.queryByRole("dialog", { name: /share price/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Explore share price" })).toBeVisible();
+});
+
 it("lets a user hide a chart and prevents valuation without reviewed shares", () => {
   const edit = vi.fn();
   render(<StockPrice account={releaseStock({ positionReviewRequired: true })} onChange={vi.fn()} onEdit={edit} onBack={vi.fn()} />);

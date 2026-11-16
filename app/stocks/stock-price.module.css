@@ -24,7 +24,7 @@
 .ranges { display:inline-flex; gap:4px; padding:3px; border:1px solid #decebd; border-radius:11px; background:#f2e7d7; }
 .ranges button { min-height:44px; min-width:49px; padding:7px 11px; border:0; border-radius:8px; background:none; color:#6f5c50; font-size:12px; font-weight:600; }
 .ranges button[aria-pressed="true"] { color:#241b16; background:#fffdf7; box-shadow:0 2px 4px #51311912; }
-.chartViewport { background:#fffdf8; border:1px solid #e1d3c4; border-radius:16px; }
+.chartViewport { background:#fffdf8; border:1px solid #e1d3c4; border-radius:16px; overflow:hidden; }
 .chart { display:block; width:100%; height:480px; border:0; border-radius:15px; }
 .consent { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:480px; padding:30px; text-align:center; background:radial-gradient(ellipse at 60% 10%,#f1e3d055,transparent 70%); border-radius:15px; }
 .chartIcon { display:grid; place-items:center; width:60px; height:60px; border-radius:18px; border:1px solid #e2d1be; background:#f4e6d6; color:#a84f2b; box-shadow:inset 0 1px 0 #fff; }

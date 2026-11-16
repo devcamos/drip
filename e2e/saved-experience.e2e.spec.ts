@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { legacyAccount } from "./legacy-account-helpers";
+import { showAccountDetails } from "./saved-navigation";
 import { unlock, showCloudRecovery } from "./vault-helpers";
 import { releaseHoldingsAndDebts, releaseSaver, releaseStock } from "../tests/saved-experience-fixtures";
 import { applyMarketValuation } from "../lib/market-valuation";
@@ -71,6 +72,20 @@ test("opens each saved stock chart and explicitly revalues one holding without c
   await stock.getByRole("button", { name: "Use recorded value", exact: true }).click();
   await expect(stock.getByText("Recorded value restored. Dividend income is unchanged.")).toBeVisible();
   await expect(stock).toContainText("£2,400.00");
+});
+
+test("dismissing the auto-opened share-price dialog uncovers Update balance on the saved detail", async ({ page }) => {
+  await legacyAccount(page, "stock_detail", [releaseStock()]);
+  await cards(page).getByRole("button", { name: /Open Realty Income/ }).click();
+  await expect(page.getByRole("dialog", { name: "Realty Income share price" })).toBeVisible();
+  await showAccountDetails(page);
+  await expect(page.getByRole("dialog", { name: "Realty Income share price" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Update balance", exact: true }).click();
+  await expect(page.getByRole("form", { name: "Update balance", exact: true })).toBeVisible();
+  await page.getByLabel("amount", { exact: true }).fill("1400");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("form", { name: "Update balance", exact: true })).toHaveCount(0);
+  await expect(page.locator(".bal")).toHaveText("£1,400.00");
 });
 
 test("opens the real profile, persists the owner-scoped income preference, reaches security and signs out without exposing accounts", async ({ page }) => {
