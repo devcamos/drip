@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { holding } from "./notification-fixtures";
 import { dividendIncome, dividendPortfolio } from "../lib/dividend-portfolio";
+import { accountAnnualIncome, accountMonthlyIncome, payoutAmount } from "../lib/maths";
 import { dateInZone, followingDay, loggedToday, nextPayment, nextReminder, paymentDue, paymentReminders, reminderSchedule } from "../lib/payment-reminders";
 
 it("totals received dividends by period without counting forecasts, interest, bonuses, future dates or top-ups", () => {
@@ -17,7 +18,10 @@ it("totals received dividends by period without counting forecasts, interest, bo
   expect(dividendIncome([a], "2026-10-29", "month")).toBe(4.23);
   const cash = holding({ rateType: "interest", balance: 99999, payouts: [{ kind: "actual", date: "2026-10-01", amount: 99 }] });
   const portfolio = dividendPortfolio([a, cash], "2026-10-29");
-  expect(portfolio).toMatchObject({ value: 1200, yieldPct: 5, monthlyEstimate: 5, annualEstimate: 60, received: 34.23, thisMonth: 4.23, thisYear: 24.23 });
+  expect(portfolio).toMatchObject({ value: 1200, yieldPct: 5, received: 34.23, thisMonth: 4.23, thisYear: 24.23 });
+  expect(portfolio.monthlyEstimate).toBeCloseTo(accountMonthlyIncome(a, "2026-10-29"), 10);
+  expect(portfolio.annualEstimate).toBeCloseTo(accountAnnualIncome(a, "2026-10-29"), 10);
+  expect(portfolio.annualEstimate).toBeCloseTo(60, 2);
   expect(portfolio.history).toEqual(["05", "06", "07", "08", "09", "10"].map(month => ({ month: `2026-${month}`, income: month === "09" ? 20 : month === "10" ? 4.23 : 0 })));
   expect(dividendPortfolio([], "2026-01-01")).toMatchObject({ value: 0, yieldPct: 0, received: 0 });
 });
@@ -45,7 +49,7 @@ it("compiles only earning schedules and excludes all financial labels/figures fr
   expect(loggedToday(holding({ payouts: [{ ...actual, amount: Infinity }] }), day)).toBe(false);
   const reminders = paymentReminders(accounts, day);
   expect(reminders).toHaveLength(3); expect(reminders.filter(item => item.logged)).toHaveLength(2);
-  expect(reminders.find(item => item.account.id === "cash")?.amount).toBeCloseTo(60 / 365);
+  expect(reminders.find(item => item.account.id === "cash")?.amount).toBeCloseTo(payoutAmount(daily, day), 10);
   expect(accounts[0].balance).toBe(1200);
   expect(reminderSchedule([holding({ frequency: "daily", createdAt: "", nextPayoutDate: day })], day, "UTC").plans[0].anchor).toBe(day);
 });

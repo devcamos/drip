@@ -11,15 +11,16 @@ const acct = (o: Partial<Account> = {}): Account => ({ id: "d", provider: "Money
 describe("daily interest", () => {
   it("predicts daily income without crediting the saved balance or creating payments", () => {
     const a = acct();
-    expect(M.payoutAmount(a)).toBeCloseTo(1);
-    expect(M.projection([a], 12).at(-1)!.income).toBeGreaterThan(365);
+    const today = "2026-10-15";
+    expect(M.payoutAmount(a, today)).toBeCloseTo(10000 * M.dailyRate(3.65, today), 10);
+    expect(M.projection([a], 12, 0, "2026-01-01").at(-1)!.income).toBeCloseTo(365, 2);
     expect(a.balance).toBe(10000);
     expect(a.events).toEqual([]);
     expect(a.payouts).toEqual([]);
     expect(M.recordedIncome([a])).toBe(0);
   });
   it("daily accounts: per-day amount, no payout date, skipped from upcoming", () => {
-    expect(M.payoutAmount(acct())).toBeCloseTo(1);
+    expect(M.payoutAmount(acct(), "2026-10-15")).toBeCloseTo(10000 * M.dailyRate(3.65, "2026-10-15"), 10);
     expect(M.nextPayout("2020-01-01", "daily", "2026-10-15")).toBe("2026-10-15");
     expect(M.upcoming([acct(), acct({ id: "m", frequency: "monthly", nextPayoutDate: "2026-10-20" })], "2026-10-15").map((u) => u.account.id)).toEqual(["m"]);
   });

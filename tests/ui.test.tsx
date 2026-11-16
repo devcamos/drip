@@ -10,6 +10,7 @@ import { saveData, setItem, loadData, emptyData } from "@/lib/db";
 import * as DB from "@/lib/db";
 import * as C from "@/lib/crypto";
 import type { AppData, Account } from "@/lib/types";
+import * as M from "@/lib/maths";
 import { releaseDebt } from "./saved-experience-fixtures";
 
 const signup = vi.hoisted(() => vi.fn());
@@ -263,7 +264,7 @@ describe("accounts", () => {
     fireEvent.change(screen.getByLabelText("Type"), { target: { value: "dividend" } });
     fireEvent.change(screen.getByLabelText("Paid"), { target: { value: "quarterly" } });
     type(screen.getByLabelText("Next payout date"), today);
-    expect(screen.getByText("≈ £5.00 a month")).toBeInTheDocument();
+    expect(screen.getByText(`≈ ${M.gbp(M.monthlyIncome(1200, 5))} estimated a month`)).toBeInTheDocument();
     click("Save");
 
     // The form preview also contains the provider name. Wait for saved-detail

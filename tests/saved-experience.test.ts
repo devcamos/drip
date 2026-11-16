@@ -193,6 +193,13 @@ test("cloud portability deliberately retains financial terms and strips private 
   expect(value.accounts[0]).not.toHaveProperty("label");
 });
 
+test("estimated annual holding income is the AER over 12 months, not twelve copies of this month", () => {
+  const holding = releaseStock();
+  expect(M.accountAnnualIncome(holding, "2026-01-01")).toBeCloseTo(135, 2);
+  expect(M.accountAnnualIncome(holding, "2028-01-01")).toBeCloseTo(135, 2);
+  expect(M.accountMonthlyIncome(holding, "2026-11-15") * 12).not.toBeCloseTo(135, 2);
+});
+
 test("an explicit USD price changes holding value while keeping cost, shares and annual dividend assumptions", () => {
   const source = releaseStock(), before = structuredClone(source);
   const updated = applyMarketValuation(source, price, at);

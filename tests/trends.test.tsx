@@ -41,7 +41,7 @@ describe("clear balance history and projections", () => {
       rateHistory: [{ from: "2026-01-01", ratePct: 7 }],
     }];
     render(<Trends data={{ ...emptyData(), accounts }} onAssumptions={vi.fn()} />);
-    expect(screen.getByText("Expected this month")).toBeInTheDocument();
+    expect(screen.getByText("Estimated this month")).toBeInTheDocument();
     expect(screen.getByText(gbp(totalCurrentPeriodInterest(accounts)))).toBeInTheDocument();
   });
 

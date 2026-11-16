@@ -8,23 +8,28 @@ const acct = (o: Partial<Account>): Account => ({
 });
 
 describe("maths", () => {
-  it("monthly income = balance × rate ÷ 12 (spec example)", () => {
-    expect(M.monthlyIncome(3000, 7)).toBeCloseTo(17.5, 10);
-    expect(M.monthlyIncome(3000, 4)).toBeCloseTo(10, 10);
-    expect(M.monthlyIncome(0, 7)).toBe(0);
-    expect(M.monthlyIncome(-5, 7)).toBe(0);
-    expect(M.monthlyIncome(100, 0)).toBe(0);
-    expect(M.monthlyIncome(NaN, 5)).toBe(0);
+  it("monthly income is that calendar month compounded daily at the AER", () => {
+    const october = "2026-10-15";
+    expect(M.monthlyIncome(3000, 7, october)).toBeCloseTo(M.accrue(3000, 7, [], "2026-10-01", "2026-11-01").interest, 10);
+    expect(M.monthlyIncome(3000, 4, october)).toBeCloseTo(M.accrue(3000, 4, [], "2026-10-01", "2026-11-01").interest, 10);
+    expect(M.monthlyIncome(0, 7, october)).toBe(0);
+    expect(M.monthlyIncome(-5, 7, october)).toBe(0);
+    expect(M.monthlyIncome(100, 0, october)).toBe(0);
+    expect(M.monthlyIncome(NaN, 5, october)).toBe(0);
   });
-  it("payout amount by frequency", () => {
-    expect(M.payoutAmount(acct({}))).toBeCloseTo(17.5);
-    expect(M.payoutAmount(acct({ frequency: "quarterly" }))).toBeCloseTo(52.5);
-    expect(M.payoutAmount(acct({ frequency: "annually" }))).toBeCloseTo(210);
+  it("payout amount compounds daily at the AER over the payment period", () => {
+    const today = "2026-10-15";
+    expect(M.payoutAmount(acct({}), today)).toBeCloseTo(M.monthlyIncome(3000, 7, today), 10);
+    expect(M.payoutAmount(acct({ frequency: "quarterly" }), today)).toBeCloseTo(M.accrue(3000, 7, [], today, "2027-01-15").interest, 10);
+    expect(M.payoutAmount(acct({ frequency: "annually" }), today)).toBeCloseTo(M.accrue(3000, 7, [], today, "2027-10-15").interest, 10);
+    expect(M.payoutAmount(acct({ frequency: "annually" }), today)).toBeCloseTo(210, 2);
+    expect(M.payoutAmount(acct({ frequency: "daily" }), today)).toBeCloseTo(3000 * M.dailyRate(7, today), 10);
   });
   it("totals and weighted yield", () => {
+    const today = "2026-10-15";
     const a = [acct({ balance: 3000, ratePct: 7 }), acct({ balance: 1000, ratePct: 3 })];
     expect(M.totalBalance(a)).toBe(4000);
-    expect(M.totalMonthlyIncome(a)).toBeCloseTo(17.5 + 2.5);
+    expect(M.totalMonthlyIncome(a, today)).toBeCloseTo(M.monthlyIncome(3000, 7, today) + M.monthlyIncome(1000, 3, today), 10);
     expect(M.weightedYield(a)).toBeCloseTo(6);
     expect(M.weightedYield([])).toBe(0);
     expect(M.totalBalance([acct({ balance: -10 })])).toBe(0);
@@ -38,12 +43,13 @@ describe("maths", () => {
       { month: "2026-09", totalBalance: 1000, monthlyIncome: 0 },
     ])).toBeCloseTo(10);
   });
-  it("12-month projection compounds monthly", () => {
-    const p = M.projection([acct({ balance: 1200, ratePct: 12 }), acct({ balance: -1 })]);
+  it("12-month reinvested projection compounds daily to exactly the annual rate (AER)", () => {
+    const p = M.projection([acct({ balance: 1200, ratePct: 12 }), acct({ balance: -1 })], 12, 0, "2026-01-01");
     expect(p).toHaveLength(12);
-    expect(p[0].balance).toBeCloseTo(1212);
-    expect(p[11].balance).toBeCloseTo(1200 * Math.pow(1.01, 12));
-    expect(M.projection([acct({ ratePct: -3, balance: 100 })], 1)[0].balance).toBe(100);
+    expect(p[0].balance).toBeCloseTo(1200 * Math.pow(1.12, 31 / 365));
+    expect(p[11].balance).toBeCloseTo(1344);
+    expect(p[11].income).toBeCloseTo(144);
+    expect(M.projection([acct({ ratePct: -3, balance: 100 })], 1, 0, "2026-01-01")[0].balance).toBe(100);
   });
   it("date helpers clamp month ends and roll forward", () => {
     expect(M.addMonths("2026-01-31", 1)).toBe("2026-02-28");
@@ -61,13 +67,13 @@ describe("maths", () => {
     const a = [acct({ id: "a", nextPayoutDate: "2026-10-28" }), acct({ id: "b", nextPayoutDate: "2026-10-20" }), acct({ id: "c", nextPayoutDate: "2027-01-01", frequency: "annually" })];
     const u = M.upcoming(a, "2026-10-15");
     expect(u.map((x) => x.account.id)).toEqual(["b", "a"]);
-    expect(u[0].amount).toBeCloseTo(17.5);
+    expect(u[0].amount).toBeCloseTo(M.payoutAmount(a[1], "2026-10-15"), 10);
   });
   it("snapshot upsert replaces the current month", () => {
     const now = new Date(Date.UTC(2026, 9, 15));
     let s = M.upsertSnapshot([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }], [acct({})], now);
     s = M.upsertSnapshot(s, [acct({ balance: 4000 })], now);
-    expect(s).toEqual([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }, { month: "2026-10", totalBalance: 4000, monthlyIncome: 23.33, deposits: 0, withdrawals: 0 }]);
+    expect(s).toEqual([{ month: "2026-09", totalBalance: 1, monthlyIncome: 0 }, { month: "2026-10", totalBalance: 4000, monthlyIncome: M.round2(M.monthlyIncome(4000, 7, "2026-10-15")), deposits: 0, withdrawals: 0 }]);
   });
   it("backup reminder", () => {
     const now = new Date("2026-10-15T12:00:00Z");
@@ -146,9 +152,8 @@ describe("day-accurate current-period interest", () => {
     expect(M.confirmedBalanceOn(a, "2026-11-01")).toBe(1500);
     expect(M.confirmedBalanceOn(a, "2026-11-20")).toBe(1500);
     expect(M.confirmedBalanceOn(a, "2026-11-21")).toBe(5000);
-    const daily = 0.05 / 365;
+    const daily = M.dailyRate(5, "2026-11-01");
     const expected = 1500 * ((1 + daily) ** 19 - 1) + 5000 * ((1 + daily) ** 11 - 1);
-    expect(expected).toBeCloseTo(11.448, 3);
     expect(M.currentPeriodInterest(a, "2026-11-25")).toBeCloseTo(expected, 10);
     // Transfers after an earlier update replay forward; a later update caps the reverse walk.
     const mixed = acct({ balance: 900, events: [
@@ -164,11 +169,10 @@ describe("day-accurate current-period interest", () => {
 
   it("starts accruing on the day the account was added, not the 1st of the month", () => {
     const added = acct({ balance: 1000, ratePct: 5, createdAt: "2026-11-10T09:30:00.000Z", rateHistory: [{ from: "2026-11-10", ratePct: 5 }], events: [] });
-    const expected = 1000 * ((1 + 0.05 / 365) ** 21 - 1);
-    expect(expected).toBeCloseTo(2.8807, 4);
+    const expected = 1000 * ((1 + M.dailyRate(5, "2026-11-10")) ** 21 - 1);
     expect(M.currentPeriodInterest(added, "2026-11-15")).toBeCloseTo(expected, 10);
     expect(M.expectedInterest(added, "2026-10-01", "2026-11-01")).toBe(0);
-    expect(M.expectedInterest({ ...added, createdAt: "legacy" }, "2026-11-01", "2026-12-01")).toBeCloseTo(1000 * ((1 + 0.05 / 365) ** 30 - 1), 10);
+    expect(M.expectedInterest({ ...added, createdAt: "legacy" }, "2026-11-01", "2026-12-01")).toBeCloseTo(1000 * ((1 + M.dailyRate(5, "2026-11-01")) ** 30 - 1), 10);
   });
 
   it("uses accrue() for interest accounts in the current calendar month", () => {
@@ -198,6 +202,34 @@ describe("day-accurate current-period interest", () => {
     expect(M.currentPeriodInterest(acct({ productCategory: "credit-card", creditCard: { apr: 19.9, minimumPayment: 25 } as Account["creditCard"], ratePct: 0 }), "2026-11-15")).toBe(0);
     expect(M.currentPeriodInterest(acct({ archivedAt: "2026-10-01T00:00:00Z" }), "2026-11-15")).toBe(0);
     const dividend = acct({ rateType: "dividend", balance: 1200, ratePct: 6 });
-    expect(M.currentPeriodInterest(dividend, "2026-11-15")).toBeCloseTo(M.accountMonthlyIncome(dividend), 10);
+    expect(M.currentPeriodInterest(dividend, "2026-11-15")).toBeCloseTo(M.accountMonthlyIncome(dividend, "2026-11-15"), 10);
+  });
+});
+
+describe("annual equivalent rate (AER) is not compounded twice (#77)", () => {
+  it("a full calendar year at a constant rate earns exactly that rate, in normal and leap years", () => {
+    expect(M.accrue(1000, 5, [], "2026-01-01", "2027-01-01").interest).toBeCloseTo(50, 2);
+    expect(M.accrue(1000, 5, [], "2028-01-01", "2029-01-01").interest).toBeCloseTo(50, 2);
+    expect(M.accrue(1000, 5, [], "2026-07-01", "2027-07-01").interest).toBeCloseTo(50, 2);
+  });
+  it("converts annual to daily by days in that year and ignores zero or negative rates", () => {
+    expect(Math.pow(1 + M.dailyRate(5, "2026-06-15"), 365)).toBeCloseTo(1.05, 12);
+    expect(Math.pow(1 + M.dailyRate(5, "2028-06-15"), 366)).toBeCloseTo(1.05, 12);
+    expect(M.dailyRate(5, "1900-01-01")).toBe(M.dailyRate(5, "2026-01-01"));
+    expect(M.dailyRate(5, "2000-01-01")).toBe(M.dailyRate(5, "2028-01-01"));
+    expect(M.daysInYear("1900-01-01")).toBe(365);
+    expect(M.daysInYear("2000-01-01")).toBe(366);
+    expect(M.dailyRate(0, "2026-01-01")).toBe(0);
+    expect(M.dailyRate(-1, "2026-01-01")).toBe(0);
+  });
+  it("a 12-month reinvested projection of £1,000 at 5% earns £50.00", () => {
+    const forecast = M.projection([acct({ balance: 1000, ratePct: 5 })], 12, 0, "2026-01-01").at(-1)!;
+    expect(forecast.income).toBeCloseTo(50, 2);
+    expect(forecast.balance).toBeCloseTo(1050, 2);
+    const leap = M.projection([acct({ balance: 1000, ratePct: 5 })], 12, 0, "2028-01-01").at(-1)!;
+    expect(leap.income).toBeCloseTo(50, 2);
+    expect(M.annualIncome(1000, 5, "2026-01-01")).toBeCloseTo(50, 2);
+    expect(M.annualIncome(0, 5, "2026-01-01")).toBe(0);
+    expect(M.annualIncome(100, 0, "2026-01-01")).toBe(0);
   });
 });

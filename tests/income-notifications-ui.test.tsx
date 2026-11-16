@@ -7,6 +7,7 @@ import { PhoneReminders, PhoneReminderSync } from "../app/PhoneReminders";
 import * as Phone from "../lib/phone-reminders";
 import { AccountForm } from "../app/AccountForm";
 import { holding } from "./notification-fixtures";
+import { accountMonthlyIncome, gbp } from "../lib/maths";
 vi.mock("../lib/phone-reminders", async original => ({ ...await original<typeof Phone>(), phoneCapability: vi.fn(() => "unsupported"), phoneConfiguration: vi.fn(), phoneReminderStatus: vi.fn(), enablePhoneReminders: vi.fn(), disablePhoneReminders: vi.fn(), testPhoneReminder: vi.fn(), syncPhoneReminders: vi.fn() }));
 it("shows received dividends, periods, holdings, empty history and empty portfolio", () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
@@ -31,7 +32,7 @@ it("shows each active holding's income and excludes cash from the dividend summa
   const card = screen.getByRole("button", { name: "Open Digital Realty" });
   expect(within(card).getByText("4%")).toBeInTheDocument();
   expect(card).toHaveTextContent("Received · all time £8.00");
-  expect(card).toHaveTextContent("Estimated monthly £8.00");
+  expect(card).toHaveTextContent(`Estimated monthly ${gbp(accountMonthlyIncome(second, "2026-10-29"))}`);
   expect(within(card).getByText("£96.00")).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /Open / })).toHaveLength(2);
   vi.useRealTimers();

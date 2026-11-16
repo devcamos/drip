@@ -5,8 +5,8 @@ describe("maths refactor keeps behaviour", () => {
   it("accrue uses the right rate for unsorted rate history", () => {
     const unsorted = [{ from: "2026-01-10", ratePct: 3.65 }, { from: "2026-01-01", ratePct: 0 }];
     const r = accrue(1000, unsorted, [], "2026-01-01", "2026-01-11");
-    // First 9 days at 0%, last day at 3.65% (0.01% a day).
-    expect(r.interest).toBeCloseTo(0.1, 6);
+    // First 9 days at 0%, last day at the daily equivalent of 3.65% AER.
+    expect(r.interest).toBeCloseTo(1000 * (Math.pow(1.0365, 1 / 365) - 1), 9);
     expect(rateOn(unsorted, "2026-01-05")).toBe(0);
     expect(rateOn([], "2026-01-05")).toBe(0);
   });

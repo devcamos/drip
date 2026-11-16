@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { paymentCalendar } from "../lib/payment-calendar";
-import { recordedIncome } from "../lib/maths";
+import { payoutAmount, recordedIncome, round2 } from "../lib/maths";
 import { calendarAccount as account } from "./payment-calendar-fixtures";
 
 // Pure domain tests. No React, IndexedDB, crypto, HTTP, files or real clock.
@@ -16,7 +16,8 @@ describe("payment calendar — unit (14 cases)", () => {
     expect(result.from).toBe("2026-11-01");
     expect(result.through).toBe("2027-10-31");
     expect(result.months).toHaveLength(12);
-    expect(result.months.every(month => month.count === 1 && month.amount === 17.5)).toBe(true);
+    const monthly = round2(payoutAmount(account({ balance: 3000, ratePct: 7 }), "2026-11-01"));
+    expect(result.months.every(month => month.count === 1 && month.amount === monthly)).toBe(true);
     expect(result.months.flatMap(month => month.payments).map(row => row.date)).toEqual([
       "2026-11-15", "2026-12-15", "2027-01-15", "2027-02-15", "2027-03-15", "2027-04-15",
       "2027-05-15", "2027-06-15", "2027-07-15", "2027-08-15", "2027-09-15", "2027-10-15",
@@ -43,7 +44,8 @@ describe("payment calendar — unit (14 cases)", () => {
     expect(result.months.flatMap(month => month.payments).map(row => row.date)).toEqual([
       "2026-10-31", "2027-01-31", "2027-04-30", "2027-07-31",
     ]);
-    expect(result.months.flatMap(month => month.payments).every(row => row.amount === 15)).toBe(true);
+    const quarterly = round2(payoutAmount(account({ frequency: "quarterly", nextPayoutDate: "2026-01-31" }), "2026-10-31"));
+    expect(result.months.flatMap(month => month.payments).every(row => row.amount === quarterly)).toBe(true);
   });
 
   it("restores a yearly leap-day anchor when the next leap year arrives", () => {
@@ -52,7 +54,7 @@ describe("payment calendar — unit (14 cases)", () => {
     const leap = paymentCalendar([schedule], "2027-03-01")!;
     expect(nonLeap.months.flatMap(month => month.payments).map(row => row.date)).toEqual(["2025-02-28"]);
     expect(leap.months.flatMap(month => month.payments).map(row => row.date)).toEqual(["2028-02-29"]);
-    expect(leap.months.flatMap(month => month.payments)[0].amount).toBe(60);
+    expect(leap.months.flatMap(month => month.payments)[0].amount).toBe(round2(payoutAmount(schedule, "2027-03-02")));
   });
 
   it("returns to the original monthly anchor after February clamps the date", () => {
@@ -67,15 +69,16 @@ describe("payment calendar — unit (14 cases)", () => {
     const result = paymentCalendar([daily], "2028-01-31")!;
     expect(result.months).toHaveLength(12);
     expect(result.months[0].payments).toHaveLength(1);
-    expect(result.months[0].payments[0]).toMatchObject({ date: "2028-02-01", through: "2028-02-29", occurrences: 29, amount: 2.9 });
+    const febDaily = payoutAmount(daily, "2028-02-01");
+    expect(result.months[0].payments[0]).toMatchObject({ date: "2028-02-01", through: "2028-02-29", occurrences: 29, amount: round2(febDaily * 29) });
     expect(result.months.reduce((sum, month) => sum + month.count, 0)).toBe(366);
-    expect(result.months.reduce((sum, month) => sum + month.amount, 0)).toBeCloseTo(36.6, 2);
+    expect(result.months.reduce((sum, month) => sum + month.amount, 0)).toBeCloseTo(febDaily * 366, 1);
   });
 
   it("starts daily accrual on a future creation date without charging for earlier days", () => {
     const daily = account({ frequency: "daily", balance: 3650, ratePct: 1, createdAt: "2026-11-10", nextPayoutDate: "2026-01-01" });
     const result = paymentCalendar([daily], "2026-10-31")!;
-    expect(result.months[0].payments[0]).toMatchObject({ date: "2026-11-10", through: "2026-11-30", occurrences: 21, amount: 2.1 });
+    expect(result.months[0].payments[0]).toMatchObject({ date: "2026-11-10", through: "2026-11-30", occurrences: 21, amount: round2(payoutAmount(daily, "2026-11-01") * 21) });
     expect(result.months.reduce((sum, month) => sum + month.count, 0)).toBe(356);
   });
 
@@ -110,8 +113,9 @@ describe("payment calendar — unit (14 cases)", () => {
       account({ id: "a", balance: 1000, ratePct: 4 }),
     ], "2026-10-31")!;
     expect(result.months[0].payments.map(row => row.account.id)).toEqual(["a", "b", "z"]);
-    expect(result.months[0].payments.map(row => row.amount)).toEqual([3.33, 3.33, 3.33]);
-    expect(result.months[0].amount).toBe(9.99);
+    const each = round2(payoutAmount(account({ id: "a", balance: 1000, ratePct: 4 }), "2026-11-01"));
+    expect(result.months[0].payments.map(row => row.amount)).toEqual([each, each, each]);
+    expect(result.months[0].amount).toBe(round2(each * 3));
     expect(result.months[0].count).toBe(3);
   });
 
@@ -119,10 +123,12 @@ describe("payment calendar — unit (14 cases)", () => {
     const original = account({ bonus: { amount: 999, expectedDate: "2026-11-20" }, reinvestIncome: true });
     const before = paymentCalendar([original], "2026-10-31")!;
     const updated = paymentCalendar([{ ...original, nextPayoutDate: "2026-11-20", frequency: "quarterly" }], "2026-10-31")!;
-    expect(before.months[0].amount).toBe(5);
+    const monthly = round2(payoutAmount(original, "2026-11-01"));
+    const quarterly = round2(payoutAmount({ ...original, frequency: "quarterly" }, "2026-11-01"));
+    expect(before.months[0].amount).toBe(monthly);
     const rows = updated.months.flatMap(month => month.payments);
     expect(rows.map(row => row.date)).toEqual(["2026-11-20", "2027-02-20", "2027-05-20", "2027-08-20"]);
-    expect(rows.map(row => row.amount)).toEqual([15, 15, 15, 15]);
+    expect(rows.map(row => row.amount)).toEqual([quarterly, quarterly, quarterly, quarterly]);
     expect(updated.months[1].payments).toEqual([]);
   });
 
