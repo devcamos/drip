@@ -242,19 +242,13 @@ it("offers credit-card providers without losing a custom provider on edit", asyn
   expect(screen.getByLabelText("Credit card provider")).toHaveValue("__other__");
   expect(screen.getByLabelText("Provider name")).toHaveValue("A local credit union");
   expect(screen.getByRole("option", { name: "Barclaycard" })).toBeInTheDocument();
+  // #3: credit cards share Drip's neutral palette, and the chosen colour is saved.
+  const palette = screen.getAllByRole("group", { name: "Card colour" }).find(element => element.tagName === "DIV")!;
+  expect(within(palette).getAllByRole("button").map(button => button.textContent)).toEqual(Object.keys(ACCOUNT_COLOURS));
+  fireEvent.click(within(palette).getByRole("button", { name: "Indigo" }));
+  expect(within(palette).getByRole("button", { name: "Indigo" })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union" })));
-});
-
-it("offers the shared neutral palette for credit cards and saves the chosen colour (#3)", async () => {
-  const save = vi.fn().mockResolvedValue(true);
-  render(<CreditCardForm existing={releaseDebt({ provider: "Lloyds" })} onSave={save} onCancel={vi.fn()} />);
-  const group = screen.getAllByRole("group", { name: "Card colour" }).find(element => element.tagName === "DIV")!;
-  expect(within(group).getAllByRole("button").map(button => button.textContent)).toEqual(Object.keys(ACCOUNT_COLOURS));
-  fireEvent.click(within(group).getByRole("button", { name: "Indigo" }));
-  expect(within(group).getByRole("button", { name: "Indigo" })).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ colour: ACCOUNT_COLOURS.Indigo })));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union", colour: ACCOUNT_COLOURS.Indigo })));
 });
 
 function ClickProfileAsSoonAsItAppears({ children }: { children: ReactNode }) {
