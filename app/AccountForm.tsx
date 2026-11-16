@@ -2,14 +2,14 @@
 import { useState } from "react";
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "@/lib/types";
 import { PRODUCTS, PROVIDERS, TRADING_212_HOLDINGS, displayProvider, validDate } from "@/lib/products";
-import { accountCardStyle, normaliseColour } from "@/lib/account-colour";
+import { ACCOUNT_COLOURS, accountCardStyle, normaliseColour } from "@/lib/account-colour";
 import * as M from "@/lib/maths";
 import { investmentInputs, parseInvestment } from "@/lib/stock-investment";
 import { StockInvestmentFields } from "./StockInvestment";
 import { useUnsavedDraft } from "./useDraftGuard";
 const today = () => M.localToday();
 const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
-const colourChoices = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
+const colourChoices = ACCOUNT_COLOURS;
 function customProviderName(provider?: string) {
   if (!provider || Object.hasOwn(PROVIDERS, provider)) return "";
   return provider;
@@ -132,7 +132,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       <label htmlFor="account-nickname">Nickname (optional, never synced to cloud)</label><input disabled={busy} id="account-nickname" aria-label="Nickname" value={label} maxLength={40} onChange={e => setLabel(e.target.value)} placeholder="e.g. Rainy day pot" />
       <fieldset className="account-colours"><legend>Account colour</legend>
         <div className="colour-choices">{Object.entries(colourChoices).map(([name, value]) => <button disabled={busy} key={name} type="button" className="colour-swatch" aria-label={`${name} account colour`} aria-pressed={colour === value} title={name} style={{ backgroundColor: value }} onClick={() => { setColour(value); setColourChosen(true); }} />)}</div>
-        <div className="colour-custom"><label htmlFor="account-colour">Custom account colour</label><input disabled={busy} id="account-colour" type="color" value={colour} onChange={e => { setColour(e.target.value); setColourChosen(true); }} /><button disabled={busy} type="button" className="btn ghost small" onClick={() => { setColour(normaliseColour(PROVIDERS[name] ?? PROVIDERS.Other)); setColourChosen(false); }}>Use provider colour</button></div>
+        <div className="colour-custom"><label htmlFor="account-colour">Custom account colour</label><input disabled={busy} id="account-colour" type="color" value={colour} onChange={e => { setColour(e.target.value); setColourChosen(true); }} /><button disabled={busy} type="button" className="btn ghost small" onClick={() => { setColour(normaliseColour(PROVIDERS[name] ?? PROVIDERS.Other)); setColourChosen(false); }}>Use default colour</button></div>
         <div className="card colour-preview" style={accountCardStyle(colour)} aria-label="Account card preview"><span className="prov">{displayProvider(name) || "Your account"}</span><div className="meta">{category === "stocks-funds" && holding.trim() ? holding.trim() : PRODUCTS[category].label}</div></div>
       </fieldset>
       <div className="grid">

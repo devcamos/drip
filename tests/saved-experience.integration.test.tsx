@@ -21,6 +21,7 @@ import type { AppData } from "../lib/types";
 import { AccountsHome } from "../app/accounts/AccountsHome";
 import { StockPrice } from "../app/stocks/StockPrice";
 import { portfolioTotals } from "../lib/credit-card";
+import { ACCOUNT_COLOURS } from "../lib/account-colour";
 
 it("groups accounts with separate totals, collapses sections and opens the correct card", () => {
   const accounts = releaseHoldingsAndDebts();
@@ -243,6 +244,17 @@ it("offers credit-card providers without losing a custom provider on edit", asyn
   expect(screen.getByRole("option", { name: "Barclaycard" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union" })));
+});
+
+it("offers the shared neutral palette for credit cards and saves the chosen colour (#3)", async () => {
+  const save = vi.fn().mockResolvedValue(true);
+  render(<CreditCardForm existing={releaseDebt({ provider: "Lloyds" })} onSave={save} onCancel={vi.fn()} />);
+  const group = screen.getAllByRole("group", { name: "Card colour" }).find(element => element.tagName === "DIV")!;
+  expect(within(group).getAllByRole("button").map(button => button.textContent)).toEqual(Object.keys(ACCOUNT_COLOURS));
+  fireEvent.click(within(group).getByRole("button", { name: "Indigo" }));
+  expect(within(group).getByRole("button", { name: "Indigo" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ colour: ACCOUNT_COLOURS.Indigo })));
 });
 
 function ClickProfileAsSoonAsItAppears({ children }: { children: ReactNode }) {

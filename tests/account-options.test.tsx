@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 import { AccountForm } from "../app/AccountForm";
 import { AccountDetail } from "../app/AccountDetail";
 import { PROVIDERS, TRADING_212_HOLDINGS } from "../lib/products";
-import { accountCardStyle, normaliseColour } from "../lib/account-colour";
+import { ACCOUNT_COLOURS, accountCardStyle, normaliseColour } from "../lib/account-colour";
 import type { Account } from "../lib/types";
 import * as M from "../lib/maths";
 
@@ -64,8 +64,8 @@ it("preserves a chosen colour through ordinary edits and provider changes, and a
   expect(screen.getByLabelText("Custom account colour")).toHaveValue("#767676");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
   expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ colour: "#767676", holdingName: "Realty Income" }));
-  fireEvent.click(screen.getByRole("button", { name: "Use provider colour" }));
-  expect(screen.getByLabelText("Custom account colour")).toHaveValue("#006a4d");
+  fireEvent.click(screen.getByRole("button", { name: "Use default colour" }));
+  expect(screen.getByLabelText("Custom account colour")).toHaveValue(ACCOUNT_COLOURS.Plum);
 });
 
 it("keeps old whole-portfolio Trading 212 accounts editable without requiring an individual stock", () => {
@@ -99,8 +99,28 @@ function contrast(hex: string, text: string) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-it("keeps provider card text at least 4.5:1 against the gradient start and end", () => {
-  for (const colour of Object.values(PROVIDERS)) {
+it("defaults every provider to Drip's neutral palette, never a provider's approximate brand colour (#3)", () => {
+  const palette = Object.values(ACCOUNT_COLOURS) as string[];
+  const formerBrandApproximations = ["#2b2d86", "#0f7a6c", "#0f6669", "#1f6feb", "#6b2bd9", "#0c8ce9", "#96151d", "#1d2f4f", "#006a4d", "#3c6e47"];
+  for (const [provider, colour] of Object.entries(PROVIDERS)) {
+    expect(palette, provider).toContain(colour);
+    expect(formerBrandApproximations, provider).not.toContain(colour);
+  }
+  expect(new Set(palette).size).toBe(palette.length);
+});
+
+it("starts a new account on the provider's neutral default and offers every palette colour", () => {
+  render(<AccountForm onSave={vi.fn()} onCancel={vi.fn()} />);
+  expect(screen.getByLabelText("Custom account colour")).toHaveValue(PROVIDERS.Zopa);
+  change("Provider", "Vanguard");
+  expect(screen.getByLabelText("Custom account colour")).toHaveValue(ACCOUNT_COLOURS.Indigo);
+  for (const name of Object.keys(ACCOUNT_COLOURS)) expect(screen.getByRole("button", { name: `${name} account colour` })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Berry account colour" }));
+  expect(screen.getByLabelText("Custom account colour")).toHaveValue(ACCOUNT_COLOURS.Berry);
+});
+
+it("keeps provider and palette card text at least 4.5:1 against the gradient start and end", () => {
+  for (const colour of [...Object.values(PROVIDERS), ...Object.values(ACCOUNT_COLOURS)]) {
     const style = accountCardStyle(colour);
     const end = /rgb\((\d+), (\d+), (\d+)\)/.exec(String(style.background));
     expect(end, colour).not.toBeNull();
