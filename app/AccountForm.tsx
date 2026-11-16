@@ -150,7 +150,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       <label className="check-label"><input disabled={busy} type="checkbox" checked={reinvest} onChange={e => setReinvest(e.target.checked)} />Reinvest predicted income</label>
       {!existing && <details className="panel past-balances"><summary>Add past balances (optional)</summary>
         <p className="muted">Enter month-end balances from your provider&apos;s statements so Trends shows your history and month-on-month change straight away. Leave any month blank.</p>
-        {pastDates.map((date, i) => <div key={date}><label htmlFor={`past-balance-${i}`}>Balance on {new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })} £</label><input disabled={busy} id={`past-balance-${i}`} inputMode="decimal" value={pastBalances[i]} onChange={e => setPastBalances(values => values.map((v, j) => j === i ? e.target.value : v))} /></div>)}
+        {pastDates.map((date, i) => <div key={date}><label htmlFor={`past-balance-${i}`}>Month end {new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })} (£)</label><input disabled={busy} id={`past-balance-${i}`} inputMode="decimal" value={pastBalances[i]} onChange={e => setPastBalances(values => values.map((v, j) => j === i ? e.target.value : v))} /></div>)}
         {past === null && <p role="alert" className="err">Past balances must be amounts of £0 or more.</p>}
       </details>}
       <p className="muted">Your balance is the amount you enter. Keep it up to date using your provider&apos;s figures. Use the standard rate here, excluding any deferred bonus.</p>
