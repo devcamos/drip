@@ -30,7 +30,7 @@ import { AccountChooser } from "./AccountChooser";
 import { AccountsHome } from "./accounts/AccountsHome";
 import { AppAccountHeader } from "./accounts/AppAccountHeader";
 import { ProfileSettings } from "./accounts/ProfileSettings";
-import { accountTitle } from "./accounts/presentation";
+import { accountTitle, shouldCloseProfileOnOwnerChange } from "./accounts/presentation";
 import { accountAssets, isCreditAccount, portfolioTotals } from "@/lib/credit-card";
 import { readIncomePeriod, saveIncomePeriod, type IncomePeriod } from "@/lib/profile-preferences";
 import { resolveRecoveryCode } from "@/lib/recovery-codes";
@@ -111,11 +111,16 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const [preferenceError, setPreferenceError] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState("");
   const preferenceSequence = useRef(0);
+  const preferenceOwner = useRef<string | undefined>(undefined);
   const preferenceWrites = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     const owner = data?.identity?.id;
     const sequence = ++preferenceSequence.current;
-    setProfileOpen(false); setIncomePeriod("month"); setPreferenceBusy(false); setPreferenceStatus(""); setPreferenceError("");
+    if (preferenceOwner.current !== owner) {
+      if (shouldCloseProfileOnOwnerChange(preferenceOwner.current, owner)) setProfileOpen(false);
+      preferenceOwner.current = owner;
+      setIncomePeriod("month"); setPreferenceBusy(false); setPreferenceStatus(""); setPreferenceError("");
+    }
     if (!owner) return;
     void readIncomePeriod(owner).then(period => { if (sequence === preferenceSequence.current) setIncomePeriod(period); }).catch(() => { if (sequence === preferenceSequence.current) setPreferenceError("Could not read your display preference. Monthly view is available; retry your choice."); });
     return () => { preferenceSequence.current++; };

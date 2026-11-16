@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { type ReactNode, useLayoutEffect } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 const auth = vi.hoisted(() => ({ getSession: vi.fn(), signOut: vi.fn() }));
@@ -242,6 +243,35 @@ it("offers credit-card providers without losing a custom provider on edit", asyn
   expect(screen.getByRole("option", { name: "Barclaycard" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union" })));
+});
+
+function ClickProfileAsSoonAsItAppears({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => {
+    const click = () => {
+      const button = document.querySelector<HTMLButtonElement>("[aria-label*='Open profile and settings']");
+      if (button && button.getAttribute("aria-expanded") === "false" && button.dataset.openedOnce !== "true") {
+        button.dataset.openedOnce = "true";
+        button.click();
+        return true;
+      }
+      return false;
+    };
+    if (click()) return;
+    const observer = new MutationObserver(() => { if (click()) observer.disconnect(); });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+    return () => observer.disconnect();
+  }, []);
+  return children;
+}
+
+it("keeps the profile open when it is clicked as soon as the header appears", async () => {
+  await seedVault(releaseData(releaseHoldingsAndDebts()));
+  render(<ClickProfileAsSoonAsItAppears><Drip /></ClickProfileAsSoonAsItAppears>);
+  const profile = await screen.findByRole("dialog", { name: "Profile & settings" });
+  await act(async () => {});
+  expect(profile).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Open profile and settings/ })).toHaveAttribute("aria-expanded", "true");
+  expect(within(profile).getByRole("region", { name: "Your profile accounts" })).toHaveTextContent("Savings1");
 });
 
 it("uses real saved accounts in profile, debt detail, owner-scoped preference and the actual sign-out encryption gate", async () => {

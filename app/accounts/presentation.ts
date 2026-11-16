@@ -70,3 +70,7 @@ export function calendarParts(value: string): { month: string; day: string } | n
     day: new Intl.DateTimeFormat("en-GB", { day: "numeric", timeZone: "UTC" }).format(date),
   };
 }
+
+export function shouldCloseProfileOnOwnerChange(previous: string | undefined, next: string | undefined) {
+  return previous !== undefined && previous !== next;
+}
