@@ -132,7 +132,7 @@ it("records optional past month-end balances once when adding an account, leavin
   expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   fireEvent.change(document.getElementById("past-balance-2")!, { target: { value: "2000" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 2500, events: [{ type: "set", date: oldest, amount: 2000 }, { type: "set", date: latest, amount: 2400 }] }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 2500, events: [{ type: "set", date: oldest, amount: 2000 }, { type: "set", date: latest, amount: 2400 }, { type: "set", date: M.localToday(), amount: 2500 }] }));
 });
 
 it("doesn't offer past balances when editing an existing account", () => {

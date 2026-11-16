@@ -19,7 +19,7 @@ describe("month history rebuilt from the event log (#8)", () => {
   });
 
   it("uses past manual balance updates as month-end anchors, so month-on-month change appears straight away", () => {
-    const a = M.withPastBalances(account({ createdAt: "2026-11-10T00:00:00.000Z" }), [{ date: "2026-09-30", balance: 900 }, { date: "2026-10-31", balance: 1000 }]);
+    const a = M.withPastBalances(account({ createdAt: "2026-11-10T00:00:00.000Z" }), [{ date: "2026-09-30", balance: 900 }, { date: "2026-10-31", balance: 1000 }], "2026-11-10");
     const history = M.monthlyHistory([], [a], "2026-11-16");
     expect(history.map(s => [s.month, s.totalBalance])).toEqual([["2026-09", 900], ["2026-10", 1000], ["2026-11", 1200]]);
     expect(M.momBreakdown(history)).toMatchObject({ change: 200, growth: 200, growthPct: 20 });
@@ -76,12 +76,23 @@ describe("past balances entered once when adding an account (#8)", () => {
     expect(M.parsePastBalances(["1"], ["2026-02-30"])).toBeNull();
   });
 
-  it("records them as dated balance updates without changing today's balance", () => {
-    const a = account({ events: [{ type: "topup", date: "2026-11-02", amount: 200 }] });
-    expect(M.withPastBalances(a, [])).toBe(a);
-    const next = M.withPastBalances(a, [{ date: "2026-10-31", balance: 1000 }]);
+  it("records them as dated balance updates and anchors today's entered balance", () => {
+    const a = account({ events: [] });
+    expect(M.withPastBalances(a, [], "2026-11-16")).toBe(a);
+    expect(M.withPastBalances(a, [{ date: "2026-11-16", balance: 5 }], "2026-11-16")).toBe(a);
+    const next = M.withPastBalances(a, [{ date: "2026-10-31", balance: 1000 }], "2026-11-16");
     expect(next.balance).toBe(1200);
-    expect(next.events).toEqual([{ type: "set", date: "2026-10-31", amount: 1000 }, { type: "topup", date: "2026-11-02", amount: 200 }]);
-    expect(M.withPastBalances({ events: undefined }, [{ date: "2026-10-31", balance: 1 }]).events).toHaveLength(1);
+    expect(next.events).toEqual([{ type: "set", date: "2026-10-31", amount: 1000 }, { type: "set", date: "2026-11-16", amount: 1200 }]);
+    expect(M.withPastBalances({ balance: 1, events: undefined }, [{ date: "2026-10-31", balance: 1 }], "2026-11-16").events).toHaveLength(2);
+  });
+
+  it("keeps today's balance confirmed after adding a lower past balance (withdrawals and interest)", () => {
+    const today = M.localToday(), [lastMonthEnd] = M.pastMonthEnds(today, 1), created = today + "T00:00:00.000Z";
+    const a = M.withPastBalances(account({ createdAt: created }), [{ date: lastMonthEnd, balance: 1000 }], today);
+    expect(M.confirmedBalanceOn(a, M.addMonths(today, 1))).toBe(1200);
+    // Without the anchor, last month's £1,000 capped this withdrawal.
+    expect(M.applyWithdraw(a, 1100, today).balance).toBe(100);
+    const rated = M.withPastBalances(account({ ratePct: 5, createdAt: created }), [{ date: lastMonthEnd, balance: 1000 }], today);
+    expect(M.currentPeriodInterest(rated, today)).toBe(M.currentPeriodInterest(account({ ratePct: 5, createdAt: created }), today));
   });
 });

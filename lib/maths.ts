@@ -385,11 +385,16 @@ export function parsePastBalances(values: readonly string[], dates: readonly str
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Record past balances as dated manual balance updates, before any existing history. Today's balance is unchanged. */
-export function withPastBalances<A extends Pick<Account, "events">>(account: A, entries: readonly { date: string; balance: number }[]): A {
+/**
+ * Record past balances as dated manual balance updates, before any existing history.
+ * Today's entered balance is also anchored as an update on `today`, so a past reading
+ * never overrides it for withdrawals or interest from today onwards.
+ */
+export function withPastBalances<A extends Pick<Account, "balance" | "events">>(account: A, entries: readonly { date: string; balance: number }[], today: string): A {
   if (!entries.length) return account;
-  const past: BalanceEvent[] = entries.map(({ date, balance }) => ({ type: "set", date, amount: round2(balance) }));
-  return { ...account, events: [...past, ...(account.events ?? [])] };
+  const past: BalanceEvent[] = entries.filter(({ date }) => date < today).map(({ date, balance }) => ({ type: "set", date, amount: round2(balance) }));
+  if (!past.length) return account;
+  return { ...account, events: [...past, { type: "set", date: today, amount: round2(account.balance) }, ...(account.events ?? [])] };
 }
 
 /** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */

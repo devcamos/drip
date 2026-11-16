@@ -107,7 +107,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       if (base.marketValuation && (rateType !== "dividend" || base.holdingName !== existing?.holdingName || base.investment?.shares !== existing?.investment?.shares)) delete base.marketValuation;
       delete base.positionReviewRequired;
       const changed = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
-      const account = existing || !past ? changed : M.withPastBalances(changed, past);
+      const account = existing || !past ? changed : M.withPastBalances(changed, past, today());
       setBusy(true); setError("");
       try { if (await onSave(existing && M.round2(b) !== existing.balance ? M.applySetBalance({ ...account, balance: existing.balance }, b, today()) : account) === false) setError("Could not save this account. Your entry is kept. Check the message above before retrying."); }
       catch { setError("Could not save this account. Keep Drip open and retry."); }
