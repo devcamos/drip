@@ -93,10 +93,11 @@ describe("back-dated withdrawals (#80)", () => {
 });
 
 describe("back-dated withdrawal invariants across manual balance updates (ARCH-004)", () => {
-  const withEvents = (balance: number, events: NonNullable<Parameters<typeof M.applyWithdraw>[0]["events"]>) => ({ balance, events });
+  type WithdrawAccount = Parameters<typeof M.applyWithdraw>[0];
+  const withEvents = (balance: number, events: NonNullable<WithdrawAccount["events"]>) => ({ balance, events });
 
   /** Cash running balances from `fromDate` until the next later manual `set` (that set is not applied). */
-  function runningBalancesUntilNextSet(account: { balance: number; events?: { type: string; date: string; amount: number }[] }, fromDate: string) {
+  function runningBalancesUntilNextSet(account: WithdrawAccount, fromDate: string) {
     let balance = M.confirmedBalanceOn(account, fromDate);
     const balances: number[] = [];
     const ordered = [...(account.events ?? [])]
@@ -113,7 +114,7 @@ describe("back-dated withdrawal invariants across manual balance updates (ARCH-0
     return balances;
   }
 
-  function expectInvariantHolds(account: { balance: number; events?: { type: string; date: string; amount: number }[] }, fromDate: string) {
+  function expectInvariantHolds(account: WithdrawAccount, fromDate: string) {
     expect(account.balance).toBeGreaterThanOrEqual(0);
     for (const balance of runningBalancesUntilNextSet(account, fromDate)) {
       expect(balance).toBeGreaterThanOrEqual(0);
