@@ -47,7 +47,7 @@ import { Feedback } from "./Feedback";
 type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" } | { name: "archived" } | { name: "feedback" };
 type Verifier = { salt: string; hash: string };
 
-const today = () => M.ymd(new Date());
+const today = () => M.localToday();
 
 export default function Drip() {
   const installTask = useInstallTask();

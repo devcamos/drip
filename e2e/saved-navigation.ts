@@ -23,8 +23,17 @@ export async function signOutFromProfile(page: Page) {
 /** Financial actions remain on the saved detail beneath the market dialog. */
 export async function showAccountDetails(page: Page) {
   await expect(page.getByRole("heading", { name: /^(Add account|Edit account)$/ })).toHaveCount(0);
-  const market = page.getByRole("dialog", { includeHidden: true }).filter({ has: page.getByRole("button", { name: "Close share price view", exact: true, includeHidden: true }) });
+  const market = page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Close share price view", exact: true }) });
+  const explore = page.getByRole("button", { name: "Explore share price", exact: true });
+  const updateBalance = page.getByRole("button", { name: "Update balance", exact: true });
+  // Wait until the saved detail has mounted. Do not use locator.or().toBeVisible():
+  // once a configured holding opens, the market dialog and Update balance are both
+  // present, and that check fails Playwright's strict mode.
+  await expect.poll(async () => (await market.isVisible()) || (await explore.isVisible()) || (await updateBalance.isVisible())).toBe(true);
+  // Configured holdings auto-open the market dialog before paint. After it is
+  // dismissed, Explore share price stays visible and the dialog stays closed.
   if (await market.isVisible()) {
     await market.getByRole("button", { name: "Account details", exact: true }).click();
+    await expect(market).toBeHidden();
   }
 }

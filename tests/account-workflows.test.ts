@@ -11,7 +11,7 @@ import { paymentCalendar } from "../lib/payment-calendar";
 import { dataFormatVersion } from "../lib/data-format";
 import { cloudPayload } from "../lib/cloud-payload";
 import { investmentReturn } from "../lib/stock-investment";
-import { pendingBonuses, projection } from "../lib/maths";
+import { localToday, migrateData, pendingBonuses, projection } from "../lib/maths";
 import { deploymentProblems } from "../scripts/deployment-config.mjs";
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-08T12:00:00Z")); });
@@ -32,6 +32,15 @@ it("requires a share review before a cash withdrawal can be overwritten by a new
   expect(() => applyMarketValuation(account, { priceUSD: 100, fxRate: .75, fxDate: "2026-11-08" })).toThrow(/share|position/i);
 });
 
+it("treats 00:30 BST as the new UK day for saved changes, deposits and the rate in force (#78)", () => {
+  vi.setSystemTime(new Date("2026-06-30T23:30:00Z")); // 00:30 BST, 1 Jul
+  const saver = applyTopUp(releaseSaver(), 25, "2026-07-01");
+  expect(depositsInMonth([saver], "2026-07")).toBe(25);
+  expect(recordedIncome([{ ...saver, payouts: [{ date: "2026-07-01", amount: 4, kind: "actual", incomeType: "interest" }] }])).toBe(4);
+  const migrated = migrateData({ version: 1, accounts: [{ ...saver, ratePct: 4, rateHistory: [{ from: "2026-01-01", ratePct: 4 }, { from: "2026-07-01", ratePct: 3.5 }] }], snapshots: [], lastBackupAt: null }, localToday());
+  expect(migrated.accounts[0].ratePct).toBe(3.5);
+  expect(() => applyTopUp(saver, 1, "2026-07-02")).toThrow(/today or a past date/);
+});
 it("rejects an impossible actual transaction date", () => {
   expect(() => applySetBalance(releaseSaver(), 100, "2026-02-30")).toThrow(/date/i);
 });

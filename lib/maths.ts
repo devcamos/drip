@@ -5,7 +5,8 @@ import { isArchivedAccount } from "./account-lifecycle";
 export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
-export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/** Round to pennies, half up. Reading pennies at 15 significant digits drops binary noise (2.135 × 100 is 213.49999…). */
+export const round2 = (n: number) => Math.round(Number((n * 100).toPrecision(15))) / 100;
 
 /** Expected income per month: balance × rate ÷ 12. */
 export function monthlyIncome(balance: number, ratePct: number): number {
@@ -62,7 +63,7 @@ export function momGrowth(snaps: Snapshot[]): number | null {
 
 type ForecastAccount = IncomeAccount & Partial<Pick<Account, "rateType" | "reinvestIncome" | "bonus">>;
 /** Monthly forecast only: never writes estimates into saved accounts or recorded income. */
-export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = ymd(new Date())) {
+export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit = 0, today = localToday()) {
   const total = totalBalance(accts);
   const holdings = accountAssets(accts).map(a => ({ account: a, balance: Math.max(a.balance, 0), incomeBasis: Math.max(incomeBalance(a), 0), share: total > 0 ? Math.max(a.balance, 0) / total : 0, bonusApplied: false }));
   const out: { month: number; balance: number; income: number }[] = [];
@@ -87,7 +88,7 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
 }
 
 /** Actual payments only, by receipt date. Balance changes and legacy estimates are never income. */
-export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = ymd(new Date())): number {
+export function recordedIncome(accts: (Pick<Account, "payouts"> & Categorised)[], month?: string, asOf = localToday()): number {
   return accts.filter(account => !isCreditAccount(account)).reduce((sum, a) => sum + a.payouts.filter(p => p.kind === "actual" && p.date <= asOf && (!month || p.date.startsWith(month)) && Number.isFinite(p.amount) && p.amount > 0).reduce((n, p) => n + p.amount, 0), 0);
 }
 
@@ -106,7 +107,17 @@ export function recordIncome(a: Account, amount: number, date: string, incomeTyp
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const ymd = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-export const monthKey = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+/** Drip's calendar is UK time: "today" and the current month follow Europe/London, including British Summer Time. */
+export const CALENDAR_TIME_ZONE = "Europe/London";
+const calendarFormat = new Intl.DateTimeFormat("en-CA", { timeZone: CALENDAR_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+/** Today's date (YYYY-MM-DD) on the UK calendar. Date arithmetic elsewhere stays on UTC midnights via `ymd`. */
+export function localToday(now = new Date()): string {
+  const parts = calendarFormat.formatToParts(now);
+  const part = (type: string) => parts.find((value) => value.type === type)!.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+/** Calendar month (YYYY-MM) of an instant on the UK calendar. */
+export const monthKey = (d: Date) => localToday(d).slice(0, 7);
 
 /** Add months, clamping to month end (31 Jan + 1 = 28/29 Feb). */
 export function addMonths(date: string, n: number): string {
@@ -175,18 +186,21 @@ function rateOnSorted(h: RatePeriod[], date: string): number {
  * Daily-compounding accrual from `start` (inclusive) to `end` (exclusive).
  * Each day uses the rate in force that day. Top-ups and withdrawals apply on their date,
  * so interest before them uses the old balance and compounding continues from the new one.
+ * A manual balance update ("set") replaces the running balance from its date onwards.
  */
 export function accrue(opening: number, rates: number | RatePeriod[], events: Pick<BalanceEvent, "type" | "date" | "amount">[], start: string, end: string) {
   // Sorted once here: rateOn is called for every day in the period.
   const hist = sortRates(typeof rates === "number" ? [{ from: "0000-01-01", ratePct: rates }] : rates);
-  const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw") && x.date >= start && x.date < end && x.amount > 0)
+  // Array.sort is stable, so same-day events keep the order they were logged in.
+  const evs = events.filter((x) => (x.type === "topup" || x.type === "withdraw" || x.type === "set") && x.date >= start && x.date < end && (x.type === "set" ? x.amount >= 0 : x.amount > 0))
     .sort((a, b) => a.date.localeCompare(b.date));
   const open = Math.max(opening, 0);
   let bal = open, deposits = 0, withdrawals = 0, interest = 0, i = 0;
   for (let day = t(start); day < t(end); day += DAY) {
     const d = ymd(new Date(day));
     for (; i < evs.length && evs[i].date === d; i++) {
-      if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
+      if (evs[i].type === "set") bal = evs[i].amount; // a confirmed reading resets the balance; not a transfer
+      else if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
       else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
     }
     const inc = bal * (Math.max(rateOnSorted(hist, d), 0) / 100 / 365);
@@ -202,7 +216,7 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
 function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
-  if (!validDate(date) || date > ymd(new Date())) throw new Error("Use today or a past date for an actual balance change.");
+  if (!validDate(date) || date > localToday()) throw new Error("Use today or a past date for an actual balance change.");
   const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
   const transfer = type === "topup" || type === "withdraw";
   const review = transfer && priced.investment ? { positionReviewRequired: true as const } : {};
@@ -280,4 +294,58 @@ export function interestHistory(events: BalanceEvent[] | undefined, by: "week" |
     m.set(k, (m.get(k) ?? 0) + e.amount);
   }
   return [...m].map(([period, amount]) => ({ period, amount })).sort((x, y) => y.period.localeCompare(x.period));
+}
+
+/**
+ * Confirmed balance at the start of `date`, before that day's events.
+ * Anchors on the latest manual balance update ("set") before `date` and replays later transfers forward.
+ * Without one, it works back from the next update on or after `date` (or today's balance), reversing transfers.
+ */
+export function confirmedBalanceOn(account: Pick<Account, "balance" | "events">, date: string): number {
+  const ordered = (account.events ?? [])
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => event.type === "topup" || event.type === "withdraw" || event.type === "set")
+    .sort((a, b) => a.event.date.localeCompare(b.event.date) || a.index - b.index)
+    .map(({ event }) => event);
+  const split = ordered.findIndex((event) => event.date >= date);
+  const before = split < 0 ? ordered : ordered.slice(0, split), after = split < 0 ? [] : ordered.slice(split);
+  const anchor = before.findLastIndex((event) => event.type === "set");
+  let balance: number;
+  if (anchor >= 0) {
+    balance = before[anchor].amount;
+    for (const event of before.slice(anchor + 1)) balance += event.type === "withdraw" ? -event.amount : event.amount;
+  } else {
+    const next = after.findIndex((event) => event.type === "set");
+    const reversed = next < 0 ? after : after.slice(0, next);
+    balance = next < 0 ? account.balance : after[next].amount;
+    for (const event of reversed) balance += event.type === "withdraw" ? event.amount : -event.amount;
+  }
+  return Math.max(round2(balance), 0);
+}
+
+type AccrualAccount = IncomeAccount & Pick<Account, "events" | "rateHistory" | "createdAt" | "rateType">;
+
+/**
+ * Expected interest from `start` (inclusive) to `end` (exclusive) using daily
+ * compounding, the account's rate history, and logged top-ups or withdrawals.
+ * Dividend holdings keep the simple monthly average; they are not daily-accrued interest.
+ */
+export function expectedInterest(account: AccrualAccount, start: string, end: string): number {
+  if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
+  if (account.rateType === "dividend") return accountMonthlyIncome(account);
+  // No interest before the account was added: start from its creation day when that is later.
+  const created = /^\d{4}-\d{2}-\d{2}/.test(account.createdAt ?? "") ? account.createdAt.slice(0, 10) : "";
+  if (created > start) start = created;
+  if (start >= end) return 0;
+  return accrue(confirmedBalanceOn(account, start), migrateRates(account).rateHistory!, account.events ?? [], start, end).interest;
+}
+
+/** Expected interest for the calendar month containing `today`. */
+export function currentPeriodInterest(account: AccrualAccount, today = ymd(new Date())): number {
+  const start = `${today.slice(0, 7)}-01`;
+  return expectedInterest(account, start, addMonths(start, 1));
+}
+
+export function totalCurrentPeriodInterest(accounts: AccrualAccount[], today = ymd(new Date())): number {
+  return accounts.reduce((sum, account) => sum + currentPeriodInterest(account, today), 0);
 }

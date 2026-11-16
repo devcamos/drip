@@ -11,7 +11,7 @@ import { CreditCardDetail } from "./CreditCardDetail";
 import { StockPrice } from "./stocks/StockPrice";
 import { StockReading } from "./stocks/StockReading";
 import { useUnsavedDraft } from "./useDraftGuard";
-const today = () => M.ymd(new Date());
+const today = () => M.localToday();
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
 const balanceChange = { topup: M.applyTopUp, withdraw: M.applyWithdraw, set: M.applySetBalance };
@@ -135,11 +135,11 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange
     <section className="panel" aria-label="Income predictions"><h2 style={{ marginTop: 0 }}>Predictions</h2>
       <div className="grid">
         <div className="stat"><div className="muted">{a.rateType === "dividend" ? "Expected dividend yield" : "Standard interest rate"}</div><div className="v">{a.ratePct}%</div></div>
-        <div className="stat"><div className="muted">Estimated per month</div><div className="v">{M.gbp(M.accountMonthlyIncome(a))}</div></div>
+        <div className="stat"><div className="muted">Expected this month</div><div className="v">{M.gbp(M.currentPeriodInterest(a))}</div></div>
         <div className="stat"><div className="muted">{a.frequency === "daily" ? "Per day (est.)" : "Estimated next payment"}</div><div className="v">{M.gbp(M.payoutAmount(a))}</div><div className="muted">{a.frequency === "daily" ? "Daily interest / income" : fmtDate(M.nextPayout(a.nextPayoutDate, a.frequency, today()))}</div></div>
         <div className="stat"><div className="muted">Predicted income over 1 year</div><div className="v">{M.gbp(forecast.income)}</div></div>
       </div>
-      <p className="muted">Monthly and daily figures are averages using your annual rate or dividend yield. Actual payments can vary. The yearly forecast assumes current rates and {a.reinvestIncome ?? a.rateType !== "dividend" ? "monthly reinvestment" : "income paid out"}.</p>
+      <p className="muted">This month&apos;s interest uses daily compounding, your rate history and logged transfers. Payment-size figures are still averages using your annual rate or dividend yield. Actual payments can vary. The yearly forecast assumes current rates and {a.reinvestIncome ?? a.rateType !== "dividend" ? "monthly reinvestment" : "income paid out"}.</p>
       {a.bonus && <div className="panel"><h3 style={{ marginTop: 0 }}>Pending bonus · {M.gbp(a.bonus.amount)}</h3><p className="muted">Expected {fmtDate(a.bonus.expectedDate)}. Kept outside your balance and received income.</p><p className="muted">{a.bonus.expectedDate < today() ? "The expected date has passed. Edit the date or record the payment; this bonus is excluded from future predictions." : "Included once in predictions on its expected date. Update the amount from your provider when needed."}</p></div>}
     </section>
     <IncomeHistory a={a} onChange={onChange} />

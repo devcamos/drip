@@ -12,7 +12,7 @@ const dateLabel = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateSt
 const compactGBP = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 1 }).format(n);
 /** Keep chart calculations separate from controls and accessible rendering. */
 function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
-  const today = M.ymd(new Date()); const currentMonth = today.slice(0, 7);
+  const today = M.localToday(); const currentMonth = today.slice(0, 7);
   const total = M.totalBalance(data.accounts);
   const historical = data.snapshots.filter(s => s.month < currentMonth).toSorted((a, b) => a.month.localeCompare(b.month)).map(s => ({ date: M.ymd(new Date(Date.UTC(+s.month.slice(0, 4), +s.month.slice(5, 7), 0))), balance: s.totalBalance }));
   const since = M.addMonths(today, rangeMonths[range]);
@@ -94,7 +94,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
     </section>
     <div className="grid">
       <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
-      <div className="stat"><div className="muted">Estimated monthly income</div><div className="v">{M.gbp(M.totalMonthlyIncome(data.accounts))}</div></div>
+      <div className="stat"><div className="muted">Expected this month</div><div className="v">{M.gbp(M.totalCurrentPeriodInterest(data.accounts))}</div></div>
       <div className="stat"><div className="muted">Weighted yield</div><div className="v">{M.weightedYield(data.accounts).toFixed(2)}%</div></div>
       <div className="stat"><div className="muted">Balance change after logged transfers</div><div className="v">{growthLabel}</div></div>
     </div>

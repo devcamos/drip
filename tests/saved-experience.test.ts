@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { accountAssets, creditCardDraft, creditCardWarnings, isCreditAccount, portfolioTotals, validCreditCardTerms, validateCreditCardDraft } from "../lib/credit-card";
 import { applyMarketValuation, applyValuationTransfer, clearMarketValuation, hasValuationTransfers, incomeBalance, validMarketValuation } from "../lib/market-valuation";
 import { validProductFields } from "../lib/products";
+import { instrumentForHolding } from "../lib/stock-chart";
 import { cloudPayload } from "../lib/cloud-payload";
 import { dataFormatVersion } from "../lib/data-format";
 import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
@@ -236,6 +237,12 @@ test("transfers adjust a valued holding's recorded income basis while preserving
     expect(validMarketValuation(changed.marketValuation, changed)).toBe(true);
     expect(changed.events!.at(-1)!.amount).toBe(1.01);
   }
+  // Half-pennies above £1 round up too (#79): 2.135 is stored as 2.13499… in binary.
+  for (const changed of [M.applyTopUp(valued, 2.135, "2026-11-07"), M.applyWithdraw(valued, 2.135, "2026-11-07")]) {
+    expect(validMarketValuation(changed.marketValuation, changed)).toBe(true);
+    expect(changed.events!.at(-1)!.amount).toBe(2.14);
+  }
+  expect(M.applyTopUp(valued, 2.135, "2026-11-07").marketValuation?.recordedBalance).toBe(M.round2(valued.marketValuation!.recordedBalance + 2.14));
 });
 
 test("withdrawing an entire valued holding clears income and cannot restore a phantom recorded balance", () => {
@@ -348,5 +355,16 @@ test("leaves the profile open while the same owner stays signed in", () => {
 
 test("closes the profile when a signed-in owner is cleared", () => {
   expect(shouldCloseProfileOnOwnerChange("owner-a", undefined)).toBe(true);
+});
+
+test("saved dividend fixtures auto-open a share-price dialog only for catalogue holdings", () => {
+  expect(instrumentForHolding(releaseStock().holdingName)).toMatchObject({ name: "Realty Income", symbol: "NYSE:O" });
+  expect(instrumentForHolding(releaseStock({ holdingName: "Digital Realty" }).holdingName)).toMatchObject({ name: "Digital Realty", symbol: "NYSE:DLR" });
+});
+
+test("cash, debt and unknown holdings have no market chart and do not auto-open a share-price dialog", () => {
+  expect(instrumentForHolding(releaseSaver().holdingName)).toBeNull();
+  expect(instrumentForHolding(releaseDebt().holdingName)).toBeNull();
+  expect(instrumentForHolding("A fund that is not in the chart catalogue")).toBeNull();
 });
 

@@ -1,14 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { legacyAccount } from "./legacy-account-helpers";
+import { showAccountDetails } from "./saved-navigation";
 import { unlock } from "./vault-helpers";
 import { releaseDebt, releaseSaver, releaseStock } from "../tests/saved-experience-fixtures";
 
 const nav = (page: Page, name: string) => page.getByRole("navigation").getByRole("button", { name, exact: true });
 async function detail(page: Page, name: string) {
   await page.getByRole("button", { name: new RegExp(`Open ${name}`) }).click();
-  const dialog = page.getByRole("dialog", { name: /share price/ });
-  if (await dialog.isVisible()) await dialog.getByRole("button", { name: "Account details", exact: true }).click();
+  await showAccountDetails(page);
 }
 async function capture(page: Page, name: string) {
   if (!process.env.DRIP_UI_CAPTURE) return;

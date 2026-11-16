@@ -7,7 +7,7 @@ import * as M from "@/lib/maths";
 import { investmentInputs, parseInvestment } from "@/lib/stock-investment";
 import { StockInvestmentFields } from "./StockInvestment";
 import { useUnsavedDraft } from "./useDraftGuard";
-const today = () => M.ymd(new Date());
+const today = () => M.localToday();
 const payoutMonths: Record<Frequency, number> = { daily: 0, monthly: 1, quarterly: 3, annually: 12 };
 const colourChoices = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
 function customProviderName(provider?: string) {
