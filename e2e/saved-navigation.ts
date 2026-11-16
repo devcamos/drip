@@ -23,8 +23,16 @@ export async function signOutFromProfile(page: Page) {
 /** Financial actions remain on the saved detail beneath the market dialog. */
 export async function showAccountDetails(page: Page) {
   await expect(page.getByRole("heading", { name: /^(Add account|Edit account)$/ })).toHaveCount(0);
-  const market = page.getByRole("dialog", { includeHidden: true }).filter({ has: page.getByRole("button", { name: "Close share price view", exact: true, includeHidden: true }) });
+  const market = page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Close share price view", exact: true }) });
+  const explore = page.getByRole("button", { name: "Explore share price", exact: true });
+  const updateBalance = page.getByRole("button", { name: "Update balance", exact: true });
+  // Wait for the saved detail, and for StockPrice when this is a configured holding.
+  await expect(updateBalance.or(explore).or(market)).toBeVisible();
+  // Configured holdings auto-open the market dialog before paint. A one-shot
+  // isVisible() check used to lose that race on WebKit once the chart iframe
+  // started loading, leaving Update balance covered by the dialog.
   if (await market.isVisible()) {
     await market.getByRole("button", { name: "Account details", exact: true }).click();
+    await expect(market).toBeHidden();
   }
 }

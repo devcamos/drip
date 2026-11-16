@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { Account } from "@/lib/types";
 import { chartRanges, instrumentForHolding, stockChartDescriptor, validSharePriceInput, type ChartRange } from "@/lib/stock-chart";
 import { parseFxRate, type FxRate } from "@/lib/exchange-rates";
@@ -31,12 +31,14 @@ export function StockPrice({ account, onChange, onEdit, onBack }: Props) {
   const commitDraft = useUnsavedDraft({ price }, open);
   const result = investmentReturn(account);
   const original = account.marketValuation?.recordedBalance ?? account.balance;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
     if (open && element && !element.open) element.showModal();
     if (!open && element?.open) element.close();
-    if (!open) pending.current?.abort();
     return () => element?.close();
+  }, [open]);
+  useEffect(() => {
+    if (!open) pending.current?.abort();
   }, [open]);
   useEffect(() => () => pending.current?.abort(), []);
 
