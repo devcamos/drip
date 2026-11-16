@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Trends } from "../app/Trends";
 import { emptyData } from "../lib/db";
+import * as M from "../lib/maths";
+import type { Account } from "../lib/types";
 
 function enterProjection() {
   fireEvent.click(screen.getByRole("button", { name: "Edit projection" }));
@@ -48,5 +50,19 @@ describe("projection save completion", () => {
     expect(update).toHaveBeenNthCalledWith(2, { monthlyDeposit: 200, years: 3 });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Planned monthly top-up (£)")).not.toBeInTheDocument();
+  });
+});
+
+describe("rebuilt month history (#8)", () => {
+  it("shows months without a saved snapshot as rebuilt and gives a month-on-month figure", () => {
+    const today = M.localToday(); const [last, before] = M.pastMonthEnds(today, 2);
+    const account: Account = { id: "a", provider: "Zopa", label: "", balance: 1100, ratePct: 0, rateType: "interest", frequency: "monthly", nextPayoutDate: "2030-01-01", colour: "#b85a2a", payouts: [],
+      events: [{ type: "set", date: before, amount: 900 }, { type: "set", date: last, amount: 1000 }], createdAt: today + "T00:00:00.000Z" };
+    render(<Trends data={{ ...emptyData(), accounts: [account] }} onAssumptions={vi.fn()} />);
+    expect(screen.getByText(/rebuilt from your balance updates and logged transfers/)).toBeInTheDocument();
+    expect(screen.getAllByText("Rebuilt")).toHaveLength(2);
+    expect(screen.getByText("This month vs last")).toBeInTheDocument();
+    expect(screen.getByText("+10.0%")).toBeInTheDocument();
+    expect(screen.queryByText(/Month-on-month growth appears/)).not.toBeInTheDocument();
   });
 });

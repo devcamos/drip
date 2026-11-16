@@ -357,7 +357,8 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
-        "e2e/rate-change.spec.ts"
+        "e2e/rate-change.spec.ts",
+        "tests/month-history.test.ts"
       ]
     },
     {
@@ -439,7 +440,8 @@
         "tests/saved-experience.integration.test.tsx",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/month-history.test.ts"
       ]
     },
     {
@@ -831,7 +833,8 @@
       "tests/recovery-boundaries.unit.test.ts",
       "tests/cloud-sync.unit.test.ts",
       "tests/feedback.test.ts",
-      "tests/stock-reading.test.ts"
+      "tests/stock-reading.test.ts",
+      "tests/month-history.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",

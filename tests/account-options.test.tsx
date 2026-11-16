@@ -117,3 +117,22 @@ it("shows day-accurate expected interest for the current month on the account sc
   expect(expected).toHaveTextContent(M.gbp(M.currentPeriodInterest(cash)));
   expect(expected).toHaveTextContent(M.gbp(M.accountMonthlyIncome(cash)));
 });
+
+it("records optional past month-end balances once when adding an account, leaving today's balance as entered (#8)", () => {
+  const save = vi.fn(); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
+  const [latest, , oldest] = M.pastMonthEnds(M.localToday());
+  change("Balance", "2500"); change("Rate", "4");
+  fireEvent.click(screen.getByText("Add past balances (optional)"));
+  fireEvent.change(document.getElementById("past-balance-0")!, { target: { value: "2400" } });
+  fireEvent.change(document.getElementById("past-balance-2")!, { target: { value: "-5" } });
+  expect(screen.getByRole("alert")).toHaveTextContent("Past balances must be amounts of £0 or more.");
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  fireEvent.change(document.getElementById("past-balance-2")!, { target: { value: "2000" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 2500, events: [{ type: "set", date: oldest, amount: 2000 }, { type: "set", date: latest, amount: 2400 }] }));
+});
+
+it("doesn't offer past balances when editing an existing account", () => {
+  render(<AccountForm existing={old} onSave={vi.fn()} onCancel={vi.fn()} />);
+  expect(screen.queryByText("Add past balances (optional)")).not.toBeInTheDocument();
+});
