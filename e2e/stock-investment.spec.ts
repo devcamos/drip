@@ -6,6 +6,10 @@ import { unlock, showCloudRecovery } from "./vault-helpers";
 import type { Account } from "../lib/types";
 
 const stock: Account = { id: "synthetic-stock", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", label: "", balance: 1155.28, ratePct: 5.7, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#6b2d83", payouts: [{ date: "2026-10-01", amount: 5.5, kind: "actual" }], events: [], createdAt: "2026-10-01" };
+/** Isolate the third-party chart transport; this journey verifies saved holdings, not TradingView. */
+async function isolateChart(page: Page) {
+  await page.route("https://www.tradingview-widget.com/**", route => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Public chart fixture</title>" }));
+}
 async function capture(page: Page, name: string, region?: string) {
   for (const width of [390, 1280, 320]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -21,7 +25,8 @@ async function capture(page: Page, name: string, region?: string) {
 }
 test("saves fractional shares and foreign prices, preserves them after encrypted reload, and updates return without logging income", async ({ page, browser }) => {
   // Real local UI, IndexedDB encryption and calculations; synthetic legacy
-  // fixture. This test does not mock APIs or claim hosted cloud verification.
+  // fixture. This test does not mock Drip APIs or claim hosted cloud verification.
+  await isolateChart(page);
   const code = await legacyAccount(page, "dividend_demo", [stock]);
   await page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
   await showAccountDetails(page);
@@ -56,7 +61,7 @@ test("saves fractional shares and foreign prices, preserves them after encrypted
   const downloadEvent = page.waitForEvent("download");await page.getByRole("button", { name: "Export backup", exact: true }).click();const backup = await downloadEvent;
   const fresh = await browser.newContext();
   try {
-    const restored = await fresh.newPage();await restored.goto(new URL(page.url()).origin);await showCloudRecovery(restored);
+    const restored = await fresh.newPage(); await isolateChart(restored); await restored.goto(new URL(page.url()).origin);await showCloudRecovery(restored);
     await restored.getByRole("button", { name: "Restore a backup", exact: true }).click();await restored.getByLabel("Backup file", { exact: true }).setInputFiles((await backup.path())!);
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code);await restored.getByRole("button", { name: "Restore", exact: true }).click();
     await restored.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Realty Income/ }).click();
