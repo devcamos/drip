@@ -3,10 +3,17 @@ import { validInvestment } from "./stock-investment";
 import { isCreditAccount, validCreditAmount, validCreditCardTerms } from "./credit-card";
 import { validMarketValuation } from "./market-valuation";
 import { validLifecycleFields } from "./account-lifecycle";
+import { ACCOUNT_COLOURS } from "./account-colour";
 
+/**
+ * Supported providers and the default card colour for each. Defaults come from
+ * Drip's neutral palette, not provider brand colours, and no provider logos are
+ * used (#3). The assignment only keeps neighbouring cards distinct.
+ */
+const C = ACCOUNT_COLOURS;
 export const PROVIDERS: Record<string, string> = {
-  Zopa: "#2b2d86", MoneyFarm: "#0f7a6c", Moneybox: "#0f6669", Chip: "#1f6feb", Plum: "#6b2bd9", Trading212: "#0c8ce9",
-  Vanguard: "#96151d", Marcus: "#1d2f4f", "Lloyds Bank": "#006a4d", "Premium Bonds": "#3c6e47", Other: "#4a5070",
+  Zopa: C.Copper, MoneyFarm: C.Plum, Moneybox: C.Berry, Chip: C.Forest, Plum: C.Ocean, Trading212: C.Slate,
+  Vanguard: C.Indigo, Marcus: C.Teal, "Lloyds Bank": C.Plum, "Premium Bonds": C.Ocean, Other: C.Slate,
 };
 // Familiar examples only: inclusion is not a ranking or investment recommendation.
 export const TRADING_212_HOLDINGS = ["Realty Income", "Digital Realty", "Prologis", "American Tower", "Brookfield Infrastructure", "Air Products and Chemicals", "Coca-Cola", "PepsiCo", "Johnson & Johnson", "Procter & Gamble", "McDonald's", "AbbVie", "Chevron", "ExxonMobil", "Colgate-Palmolive", "Unilever", "British American Tobacco", "National Grid", "Tesco", "Legal & General"] as const;

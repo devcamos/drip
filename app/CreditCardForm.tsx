@@ -3,14 +3,14 @@
 import { useRef, useState } from "react";
 import type { Account } from "@/lib/types";
 import { creditCardDraft, creditCardWarnings, validateCreditCardDraft } from "@/lib/credit-card";
-import { normaliseColour } from "@/lib/account-colour";
+import { ACCOUNT_COLOURS, normaliseColour } from "@/lib/account-colour";
 import { CREDIT_CARD_PROVIDERS } from "@/lib/products";
 import * as M from "@/lib/maths";
 import { useUnsavedDraft } from "./useDraftGuard";
 
 type Draft = ReturnType<typeof creditCardDraft>;
 type Props = Readonly<{ existing?: Account; onSave: (account: Account) => Promise<boolean> | boolean | void; onCancel: () => void }>;
-const colours = { Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#006a4d", Plum: "#6b2d83", Slate: "#4a5070" };
+const colours = ACCOUNT_COLOURS;
 
 export function CreditCardForm({ existing, onSave, onCancel }: Props) {
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
