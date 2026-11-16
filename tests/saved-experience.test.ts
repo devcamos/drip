@@ -236,6 +236,12 @@ test("transfers adjust a valued holding's recorded income basis while preserving
     expect(validMarketValuation(changed.marketValuation, changed)).toBe(true);
     expect(changed.events!.at(-1)!.amount).toBe(1.01);
   }
+  // Half-pennies above £1 round up too (#79): 2.135 is stored as 2.13499… in binary.
+  for (const changed of [M.applyTopUp(valued, 2.135, "2026-11-07"), M.applyWithdraw(valued, 2.135, "2026-11-07")]) {
+    expect(validMarketValuation(changed.marketValuation, changed)).toBe(true);
+    expect(changed.events!.at(-1)!.amount).toBe(2.14);
+  }
+  expect(M.applyTopUp(valued, 2.135, "2026-11-07").marketValuation?.recordedBalance).toBe(M.round2(valued.marketValuation!.recordedBalance + 2.14));
 });
 
 test("withdrawing an entire valued holding clears income and cannot restore a phantom recorded balance", () => {
