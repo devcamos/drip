@@ -14,9 +14,10 @@ const compactGBP = (n: number) => new Intl.NumberFormat("en-GB", { style: "curre
 function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   const today = M.localToday(); const currentMonth = today.slice(0, 7);
   const total = M.totalBalance(data.accounts);
-  const historical = data.snapshots.filter(s => s.month < currentMonth).toSorted((a, b) => a.month.localeCompare(b.month)).map(s => ({ date: M.ymd(new Date(Date.UTC(+s.month.slice(0, 4), +s.month.slice(5, 7), 0))), balance: s.totalBalance }));
+  const history = M.monthlyHistory(data.snapshots, data.accounts, today);
+  const historical = history.filter(s => s.month < currentMonth).toSorted((a, b) => a.month.localeCompare(b.month)).map(s => ({ date: M.ymd(new Date(Date.UTC(+s.month.slice(0, 4), +s.month.slice(5, 7), 0))), balance: s.totalBalance, rebuilt: !!s.rebuilt }));
   const since = M.addMonths(today, rangeMonths[range]);
-  const actual = [...historical.filter(p => range === "Future" || range === "Max" || p.date >= since), { date: today, balance: total }];
+  const actual = [...historical.filter(p => range === "Future" || range === "Max" || p.date >= since), { date: today, balance: total, rebuilt: false }];
   const baseProjection = M.projection(data.accounts, assumptions.years * 12, assumptions.monthlyDeposit, today);
   const forecast = [{ date: today, balance: total, income: 0 }, ...baseProjection.map(p => ({ date: M.addMonths(today, p.month), balance: p.balance, income: p.income }))];
   const future = range === "Future"; const final = forecast.at(-1)!;
@@ -27,8 +28,9 @@ function balanceChart(data: AppData, range: Range, assumptions: Assumptions) {
   const maximum = Math.max(1, ...actual.map(p => p.balance), ...(future ? forecast.map(p => p.balance) : []));
   const scale = Math.pow(10, Math.floor(Math.log10(maximum))); const ceiling = Math.ceil(maximum / scale) * scale;
   const y = (value: number) => 190 - value / ceiling * 166;
-  const path = (points: typeof actual) => points.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(p.balance).toFixed(1)}`).join(" ");
-  return { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path };
+  const path = (points: { date: string; balance: number }[]) => points.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(p.balance).toFixed(1)}`).join(" ");
+  const rebuilt = history.some(s => s.rebuilt && s.month < currentMonth);
+  return { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path, history, rebuilt };
 }
 
 export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssumptions: (value: Assumptions) => boolean | Promise<boolean> }>) {
@@ -38,8 +40,8 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
   const [deposit, setDeposit] = useState(String(assumptions.monthlyDeposit)); const [years, setYears] = useState(assumptions.years);
   const commitProjectionDraft = useUnsavedDraft({ deposit, years });
   const fillId = useId();
-  const { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path } = balanceChart(data, range, assumptions);
-  const br = M.momBreakdown(data.snapshots); const growth = br ? br.growthPct : M.momGrowth(data.snapshots);
+  const { today, total, actual, forecast, future, final, start, end, x, y, ceiling, path, history, rebuilt } = balanceChart(data, range, assumptions);
+  const br = M.momBreakdown(history); const growth = br ? br.growthPct : M.momGrowth(history);
   const validDeposit = deposit.trim() !== "" && Number.isFinite(Number(deposit)) && Number(deposit) >= 0 && Number(deposit) <= 1_000_000;
   const yearLabel = `${assumptions.years} ${assumptions.years === 1 ? "year" : "years"}`;
   const heading = future ? `Estimated balance in ${yearLabel}` : "Your balance today";
@@ -72,6 +74,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
       <fieldset className="range-picker"><legend className="sr-only">Chart period</legend>{ranges.map(value => <button type="button" key={value} aria-pressed={range === value} className={range === value ? "selected" : ""} onClick={() => setRange(value)}>{value}</button>)}</fieldset>
       <div className="chart-legend"><span><i className="legend-actual" />Recorded balance</span>{future && <><span><i className="legend-projection" />Estimated balance</span><span><i className="legend-baseline" />Today’s balance + planned top-ups</span></>}</div>
       {actual.length < 2 && <p className="muted">Your history starts today. Recorded balances will build as you use Drip.</p>}
+      {rebuilt && <p className="muted">Months you didn&apos;t open Drip are rebuilt from your balance updates and logged transfers. They don&apos;t include interest you didn&apos;t record.</p>}
       {future && <>
         <p className="muted">Uses current rates or dividend yields and each account&apos;s reinvestment setting. Income is averaged monthly; future-dated pending bonuses are included once. Top-ups arrive at month end, split by today&apos;s account balances, with no withdrawals or investment price changes. Estimates are before tax and fees; actual returns can differ. Income paid out isn&apos;t added to the projected account balance.</p>
         <button className="btn ghost" disabled={saving} aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit projection</button>
@@ -90,7 +93,7 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
           {saveError && <p role="alert" className="err">{saveError}</p>}
         </form>}
       </>}
-      <details className="chart-table"><summary>View chart figures</summary><table><thead><tr><th>Date</th><th>Balance</th><th>Type</th></tr></thead><tbody>{actual.map(p => <tr key={p.date}><td>{p.date === today ? "Today" : dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Recorded</td></tr>)}{future && forecast.slice(1).map(p => <tr key={p.date}><td>{dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Estimate</td></tr>)}</tbody></table></details>
+      <details className="chart-table"><summary>View chart figures</summary><table><thead><tr><th>Date</th><th>Balance</th><th>Type</th></tr></thead><tbody>{actual.map(p => <tr key={p.date}><td>{p.date === today ? "Today" : dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>{p.rebuilt ? "Rebuilt" : "Recorded"}</td></tr>)}{future && forecast.slice(1).map(p => <tr key={p.date}><td>{dateLabel(p.date)}</td><td>{M.gbp(p.balance)}</td><td>Estimate</td></tr>)}</tbody></table></details>
     </section>
     <div className="grid">
       <div className="stat"><div className="muted">Total balance</div><div className="v">{M.gbp(total)}</div></div>
@@ -101,6 +104,6 @@ export function Trends({ data, onAssumptions }: Readonly<{ data: AppData; onAssu
     {future && <p className="muted">Estimated income over {assumptions.years} {assumptions.years === 1 ? "year" : "years"}: <b>{M.gbp(final.income)}</b>. This includes income paid out and excludes your deposits.</p>}
     <IncomeSummary accounts={data.accounts} />
     {br && <div className="panel"><h2>This month vs last</h2><ul className="list"><li><span>Top-ups (your deposits)</span><b>{M.gbp(br.deposits)}</b></li><li><span>Withdrawals</span><b>{br.withdrawals ? "−" : ""}{M.gbp(br.withdrawals)}</b></li><li><span>Other balance movement</span><b>{br.growth >= 0 ? "+" : ""}{M.gbp(br.growth)} ({br.growthPct.toFixed(2)}%)</b></li><li><span>Total change</span><b>{M.gbp(br.change)}</b></li></ul><p className="muted">Other balance movement can include returns, corrections and unlogged transfers. It isn&apos;t recorded income.</p></div>}
-    {growth === null && <p className="muted">Month-on-month growth appears after Drip has two months of history.</p>}
+    {growth === null && <p className="muted">Month-on-month growth appears once there are two months of history. Add past balances to an account to start it sooner.</p>}
   </>;
 }

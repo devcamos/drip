@@ -348,7 +348,7 @@ describe("trends", () => {
     render(<Drip />);
     await screen.findByRole("region", { name: "Your accounts are empty" });
     tab("Trends");
-    expect(screen.getByText(/appears after Drip has two months/)).toBeInTheDocument();
+    expect(screen.getByText(/appears once there are two months of history/)).toBeInTheDocument();
   });
 });
 

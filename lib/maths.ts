@@ -325,6 +325,73 @@ export function depositsInMonth(accts: (Pick<Account, "events"> & Categorised)[]
 }
 export const withdrawalsInMonth = (accts: (Pick<Account, "events"> & Categorised)[], month: string) => depositsInMonth(accts, month, "withdraw");
 
+const monthEndOf = (month: string) => ymd(new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)));
+const nextMonthStart = (month: string) => ymd(new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)));
+
+/** First day an account has history: its creation day or its earliest logged event, whichever is earlier. */
+export function historyStart(account: Pick<Account, "createdAt" | "events">): string {
+  const dates = [(account.createdAt ?? "").slice(0, 10), ...(account.events ?? []).map((event) => event.date)].filter(validDate);
+  return dates.sort((a, b) => a.localeCompare(b))[0] ?? "";
+}
+
+/**
+ * One snapshot per month, from the first recorded history to the month containing `today`.
+ * Saved snapshots win. A month without one is rebuilt from manual balance updates, logged
+ * transfers and rate history, and marked `rebuilt`. Rebuilt months are for display only:
+ * they are never saved, and unlogged growth (e.g. interest) isn't invented for them.
+ */
+export function monthlyHistory(snaps: Snapshot[], accts: Account[], today = localToday()): Snapshot[] {
+  const current = today.slice(0, 7);
+  const assets = accountAssets(accts);
+  const saved = new Map(snaps.map((snap) => [snap.month, snap]));
+  const months = [...assets.map(historyStart).filter(Boolean).map((day) => day.slice(0, 7)), ...snaps.map((snap) => snap.month)].sort((a, b) => a.localeCompare(b));
+  const out: Snapshot[] = [];
+  for (let month = months[0]; month && month <= current; month = nextMonthStart(month).slice(0, 7)) {
+    const kept = saved.get(month);
+    if (kept) { out.push(kept); continue; }
+    const live = month === current;
+    const asOf = live ? today : monthEndOf(month);
+    const open = assets.filter((account) => { const start = historyStart(account); return !!start && start <= asOf; });
+    if (!open.length) continue; // nothing recorded to rebuild from: leave the gap rather than invent £0
+    const rows = open.map((account) => {
+      const balance = Math.max(live ? account.balance : confirmedBalanceOn(account, nextMonthStart(month)), 0);
+      const income = live ? accountMonthlyIncome(account, today) : monthlyIncome(balance, rateOn(migrateRates(account).rateHistory!, asOf), asOf);
+      return { balance, income };
+    });
+    out.push({ month, totalBalance: round2(rows.reduce((sum, row) => sum + row.balance, 0)), monthlyIncome: round2(rows.reduce((sum, row) => sum + row.income, 0)),
+      deposits: round2(depositsInMonth(open, month)), withdrawals: round2(withdrawalsInMonth(open, month)), rebuilt: true });
+  }
+  return [...out, ...snaps.filter((snap) => snap.month > current)];
+}
+
+/** Month-end dates of the `count` months before `today`'s month, most recent first. */
+export function pastMonthEnds(today: string, count = 3): string[] {
+  return Array.from({ length: count }, (_, i) => monthEndOf(addMonths(`${today.slice(0, 7)}-01`, -(i + 1)).slice(0, 7)));
+}
+
+/**
+ * Optional past month-end balances typed once when adding an account. Blank entries are skipped.
+ * Returns null when any entry is not a non-negative amount, so nothing half-valid is saved.
+ */
+export function parsePastBalances(values: readonly string[], dates: readonly string[]): { date: string; balance: number }[] | null {
+  const out: { date: string; balance: number }[] = [];
+  for (const [i, raw] of values.entries()) {
+    const value = raw.trim();
+    if (!value) continue;
+    const balance = Number(value);
+    if (!Number.isFinite(balance) || balance < 0 || balance > 1e12 || !validDate(dates[i])) return null;
+    out.push({ date: dates[i], balance: round2(balance) });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Record past balances as dated manual balance updates, before any existing history. Today's balance is unchanged. */
+export function withPastBalances<A extends Pick<Account, "events">>(account: A, entries: readonly { date: string; balance: number }[]): A {
+  if (!entries.length) return account;
+  const past: BalanceEvent[] = entries.map(({ date, balance }) => ({ type: "set", date, amount: round2(balance) }));
+  return { ...account, events: [...past, ...(account.events ?? [])] };
+}
+
 /** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */
 export function momBreakdown(snaps: Snapshot[]): { change: number; deposits: number; withdrawals: number; growth: number; growthPct: number } | null {
   const pair = lastTwoSnapshots(snaps);
