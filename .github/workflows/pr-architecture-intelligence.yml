@@ -16,13 +16,13 @@ concurrency:
 
 jobs:
   review:
-    # TEST ONLY: pin to pr-intelligence#8 (00c124400fa6677aa31c0487efc573fec5d41bbd) to trial the tightened gate.
+    # TEST ONLY: pin to pr-intelligence#10 (aa3fb3f11029df01482f7d5159a9880846aaf432) to trial the PR-focused review.
     # Revert this `uses:` line to @v1 and remove `tool-ref` before merging #84, after v1 is released.
-    uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@00c124400fa6677aa31c0487efc573fec5d41bbd
+    uses: devonte-amos-apps/pr-intelligence/.github/workflows/pr-architecture-intelligence.yml@aa3fb3f11029df01482f7d5159a9880846aaf432
     with:
       rules-path: architecture-rules.json
       node-version: "24.22.1"
       dependency-cruiser-dirs: app lib server
-      tool-ref: 00c124400fa6677aa31c0487efc573fec5d41bbd
+      tool-ref: aa3fb3f11029df01482f7d5159a9880846aaf432
     secrets:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
