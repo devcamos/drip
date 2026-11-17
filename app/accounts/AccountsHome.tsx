@@ -5,7 +5,7 @@ import { formatTag, type Identity } from "@/lib/identity";
 import { accountCardStyle } from "@/lib/account-colour";
 import { gbp } from "@/lib/maths";
 import { displayProvider, productLabel } from "@/lib/products";
-import { accountDate, accountTitle, calendarParts, groupAccounts, type AccountsTotals, type CreditPlan, type IncomePeriod, type NextAccountPayment } from "./presentation";
+import { accountBadge, accountDate, accountTitle, calendarParts, groupAccounts, type AccountsTotals, type CreditPlan, type IncomePeriod, type NextAccountPayment } from "./presentation";
 import s from "./accounts.module.css";
 
 export type AccountsHomeProps = Readonly<{
@@ -46,9 +46,9 @@ export function AccountsHome({ accounts, identity, totals, creditPlans, incomePe
       <section className={s.wallet} aria-labelledby="saved-accounts-title"><div className={s.sectionHeading}><h2 id="saved-accounts-title">Your accounts <span>{String(accounts.length).padStart(2, "0")}</span></h2><button className={s.addSmall} onClick={onAdd} aria-label="Add an account">+</button></div><p id="saved-wallet-hint" className={s.sectionIntro}>Open a group to explore your accounts. Tap a card for details.</p><div className={s.cardStack} role="region" aria-label="Account cards" aria-describedby="saved-wallet-hint" tabIndex={0}>
         {groups.map(group => <details className={s.accountGroup} key={group.key} open><summary className={s.groupHeading}><span><b>{group.label}</b><small>{group.accounts.length} {group.accounts.length === 1 ? "account" : "accounts"}</small></span><strong>{gbp(group.total)}{group.key === "debt" ? " owed" : ""}</strong></summary><div className={s.groupCards}>
         {group.accounts.map(account => {
-          const plan = debts.get(account.id), title = accountTitle(account), provider = displayProvider(account.provider);
+          const plan = debts.get(account.id), title = accountTitle(account), badge = accountBadge(account), provider = displayProvider(account.provider);
           return <button key={account.id} className={`${s.accountCard} card`} style={accountCardStyle(account.colour)} onClick={() => onOpen(account.id)} aria-label={`Open ${title}, ${gbp(account.balance)}${plan ? " owed" : ""}${provider && provider !== title ? `, ${provider}` : ""}`}>
-            <span className={s.providerMark} aria-hidden="true">{title[0] || "£"}</span><span className={s.cardTitle}>{title}<small>{provider && provider !== title ? `${provider} · ` : ""}{plan ? "Credit card · Repayments" : productLabel(account)}{account.label && account.label !== title ? ` · ${account.label}` : ""}</small></span><span className={s.cardValue}>{gbp(account.balance)}<small>{plan ? "owed" : "View account +"}</small></span>
+            <span className={s.providerMark} aria-hidden="true" data-badge={badge ?? "wallet"}>{badge ?? <WalletIcon />}</span><span className={s.cardTitle}>{title}<small>{provider && provider !== title ? `${provider} · ` : ""}{plan ? "Credit card · Repayments" : productLabel(account)}{account.label && account.label !== title ? ` · ${account.label}` : ""}</small></span><span className={s.cardValue}>{gbp(account.balance)}<small>{plan ? "owed" : "View account +"}</small></span>
           </button>;
         })}</div></details>)}
       </div><p className={s.walletFoot}>Your balances. Your colours. Your corner of finance.</p>{stockCount > 0 ? <button className={s.portfolioLink} onClick={onPortfolio}><span><b>Dividend portfolio</b><small>See your total dividend income</small></span><span aria-hidden="true">↗</span></button> : null}</section>
@@ -59,4 +59,8 @@ export function AccountsHome({ accounts, identity, totals, creditPlans, incomePe
       </aside>
     </div>
   </section>;
+}
+
+function WalletIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" focusable="false"><path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-4a2 2 0 0 0 0 4h4v2a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V6" /><path d="M21 13v4" /></svg>;
 }

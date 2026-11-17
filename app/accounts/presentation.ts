@@ -55,6 +55,23 @@ export function accountTitle(account: Account): string {
   return account.holdingName?.trim() || account.label?.trim() || displayProvider(account.provider);
 }
 
+/** First letter (any script) in a string, upper-cased; digits and symbols are skipped. */
+export function firstLetter(value?: string): string | null {
+  const letter = value?.match(/\p{L}/u)?.[0];
+  return letter ? letter.toLocaleUpperCase("en-GB") : null;
+}
+
+/**
+ * Card badge: the provider's initial, then the first letter of the account name,
+ * else null so the card shows a wallet icon. "Other" is treated as no provider.
+ */
+export function accountBadge(account: Pick<Account, "provider" | "holdingName" | "label">): string | null {
+  const provider = account.provider?.trim();
+  return (provider && provider !== "Other" ? firstLetter(displayProvider(provider)) : null)
+    ?? firstLetter(account.holdingName)
+    ?? firstLetter(account.label);
+}
+
 export function accountDate(value: string): string {
   const date = new Date(`${value}T12:00:00Z`);
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
