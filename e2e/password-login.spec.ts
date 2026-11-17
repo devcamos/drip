@@ -76,7 +76,14 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     const revoked = await other.request.get("/api/auth/get-session");
     expect(revoked.status()).toBe(200); expect(await revoked.json()).toBeNull();
     await other.reload(); await login(other, handle, password, true); await expect(other.getByText("Gamertag or password is incorrect.")).toBeVisible();
+    // Opting in keeps this browser signed in across a fresh page; sign-out ends it.
+    await other.getByLabel("Keep me signed in on this device").check();
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
+    await other.reload(); await expect(other.getByText("£3,000.00").first()).toBeVisible();
+    await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toHaveCount(0);
+    other.on("dialog", dialog => dialog.accept()); await signOutFromProfile(other);
+    await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+    await other.reload(); await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   } finally { await second.close(); }
 });
 test("signup saves the original recovery codes and offers the same set later with password confirmation", async ({ page }) => {

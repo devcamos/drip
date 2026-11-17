@@ -75,11 +75,47 @@ const metadata = (value: CloudState | undefined): Metadata | undefined => value 
 } : undefined;
 const connected = (value: Metadata | undefined, keys: LocalKeys): CloudState | undefined => value ? { ...value, key: keys.cloudKey } : undefined;
 
-export async function localVaultStatus(): Promise<"new" | "migration" | "locked" | "unlocked"> {
+export async function localVaultStatus(now = Date.now()): Promise<"new" | "migration" | "locked" | "unlocked"> {
   const value = await stored();
   if (unlocked && (value.vault?.id !== unlocked.keys.header.id || value.gate?.generation !== unlocked.generation)) lockLocalVault();
+  if (!unlocked) await restoreTrustedDevice(value, now);
   if (!value.vault) return value.data || value.verifier ? "migration" : "new";
   try { current(value); return "unlocked"; } catch { return "locked"; }
+}
+/** A device the user chose to keep signed in. The keys are stored as
+ * non-extractable CryptoKeys: scripts on this origin can use them, but cannot
+ * read the key bytes. The window slides on each open and is bound to the vault
+ * and device-session generation, so sign-out, device revocation or an account
+ * switch invalidates it. */
+export const TRUSTED_DEVICE_MS = 30 * 24 * 60 * 60 * 1000;
+const TRUSTED = "trustedDevice";
+interface TrustedDevice { vaultId: string; generation?: string; dataKey: CryptoKey; cloudKey: CryptoKey; expiresAt: number }
+function validTrust(record: TrustedDevice | undefined, value: Stored, now: number): record is TrustedDevice {
+  return !!record && !!value.vault && !value.gate?.signedOut && record.vaultId === value.vault.id &&
+    record.generation === value.gate?.generation && typeof record.expiresAt === "number" && record.expiresAt > now &&
+    value.signupRecovery?.vaultId !== value.vault.id && record.dataKey instanceof CryptoKey && record.cloudKey instanceof CryptoKey;
+}
+async function restoreTrustedDevice(value: Stored, now: number) {
+  const record = await tx<TrustedDevice | undefined>("readonly", s => s.get(TRUSTED));
+  if (!record) return;
+  if (!validTrust(record, value, now)) { await forgetThisDevice(); return; }
+  const stamp = epoch;
+  // Slide the window only if the device session is unchanged at write time.
+  await guardedWrite(value, stamp, s => { s.put({ ...record, expiresAt: now + TRUSTED_DEVICE_MS }, TRUSTED); });
+  if (stamp !== epoch || unlocked) return;
+  unlocked = { keys: { header: value.vault!, dataKey: record.dataKey, cloudKey: record.cloudKey }, generation: record.generation };
+}
+/** Keep the current unlocked session on this device for a sliding 30 days. */
+export async function trustThisDevice(now = Date.now()): Promise<void> {
+  const before = await stored(); const local = current(before);
+  if (before.signupRecovery?.vaultId === local.keys.header.id) throw new Error("Save your recovery codes before keeping Drip signed in.");
+  const record: TrustedDevice = { vaultId: local.keys.header.id, generation: local.generation, dataKey: local.keys.dataKey, cloudKey: local.keys.cloudKey, expiresAt: now + TRUSTED_DEVICE_MS };
+  await guardedWrite(before, epoch, s => { s.put(record, TRUSTED); });
+}
+export async function forgetThisDevice(): Promise<void> { await tx("readwrite", s => s.delete(TRUSTED)); }
+export async function isDeviceTrusted(now = Date.now()): Promise<boolean> {
+  const value = await stored();
+  return validTrust(await tx<TrustedDevice | undefined>("readonly", s => s.get(TRUSTED)), value, now);
 }
 export async function hasCloudConnection() { return !!(await tx("readonly", s => s.get("cloudState"))); }
 export async function getItem<T>(key: string): Promise<T | undefined> {
@@ -88,7 +124,7 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
     const value = await stored(); if (!value.cloud) return undefined;
     return connected(value.cloud, current(value).keys) as T;
   }
-  if (key === "localVault") throw new Error("Use the local vault interface.");
+  if (key === "localVault" || key === "trustedDevice") throw new Error("Use the local vault interface.");
   return tx("readonly", s => s.get(key));
 }
 /** Public browser identifier, independent of accounts/keys and shared atomically by tabs. */
@@ -106,9 +142,9 @@ export async function browserDeviceId(): Promise<string> {
   });
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
-  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
+  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock", "trustedDevice"].includes(key)) throw new Error("Use the encrypted storage interface.");
   await tx("readwrite", s => s.put(value, key));
-  if (key === "deviceSession" && (value as Device)?.signedOut) lockLocalVault(true);
+  if (key === "deviceSession" && (value as Device)?.signedOut) { lockLocalVault(true); await forgetThisDevice(); }
 }
 export async function loadData(): Promise<AppData> {
   const value = await stored(); if (!value.data) return emptyData();
@@ -415,6 +451,7 @@ export async function commitLocalSignOut(expected: LocalSessionBinding) {
   if (before.vault?.id !== expected.vaultId || before.gate?.generation !== expected.generation) throw new Error("Device session changed. Your newer sign-in has been kept.");
   await guardedWrite(before, stamp, store => {
     store.put({ signedOut: true, remotePending: true, generation: crypto.randomUUID() }, "deviceSession");
+    store.delete(TRUSTED);
   }, { allowSignedOut: true });
   lockLocalVault(true);
 }
