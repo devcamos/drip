@@ -82,6 +82,7 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     await other.reload(); await expect(other.getByText("£3,000.00").first()).toBeVisible();
     await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toHaveCount(0);
     other.on("dialog", dialog => dialog.accept()); await signOutFromProfile(other);
+    await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
     await other.reload(); await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   } finally { await second.close(); }
 });
