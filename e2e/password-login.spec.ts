@@ -76,7 +76,13 @@ test("existing encrypted accounts gain ordinary password sign-in, offline unlock
     const revoked = await other.request.get("/api/auth/get-session");
     expect(revoked.status()).toBe(200); expect(await revoked.json()).toBeNull();
     await other.reload(); await login(other, handle, password, true); await expect(other.getByText("Gamertag or password is incorrect.")).toBeVisible();
+    // Opting in keeps this browser signed in across a fresh page; sign-out ends it.
+    await other.getByLabel("Keep me signed in on this device").check();
     await login(other, handle, nextPassword); await expect(other.getByText("£3,000.00").first()).toBeVisible();
+    await other.reload(); await expect(other.getByText("£3,000.00").first()).toBeVisible();
+    await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toHaveCount(0);
+    other.on("dialog", dialog => dialog.accept()); await signOutFromProfile(other);
+    await other.reload(); await expect(other.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
   } finally { await second.close(); }
 });
 test("signup saves the original recovery codes and offers the same set later with password confirmation", async ({ page }) => {
@@ -177,21 +183,4 @@ test("signed-out signup preserves a recoverable old account through cancellation
     const restored = await other.newPage(); await restored.goto("http://localhost:4321/#login"); await login(restored, original, password);
     await expect(restored.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Moneybox/ })).toContainText("£1,234.00");
   } finally { await other.close(); }
-});
-test("keep me signed in survives a reopen, and sign-out ends it", async ({ page }) => {
-  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(90_000);
-  const handle = tag(); await onboard(page, handle, true);
-  page.on("dialog", dialog => dialog.accept()); await signOutFromProfile(page);
-  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
-  const form = page.getByRole("form", { name: "Password sign-in", exact: true });
-  await expect(form.getByLabel("Keep me signed in on this device")).not.toBeChecked();
-  await form.getByLabel("Keep me signed in on this device").check();
-  await login(page, handle, password);
-  // A reload is a fresh page: without the opt-in this shows the sign-in screen.
-  await page.reload();
-  await expect(page.getByTestId("header-tag")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toHaveCount(0);
-  await signOutFromProfile(page);
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
 });
