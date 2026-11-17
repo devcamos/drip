@@ -178,3 +178,20 @@ test("signed-out signup preserves a recoverable old account through cancellation
     await expect(restored.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Moneybox/ })).toContainText("£1,234.00");
   } finally { await other.close(); }
 });
+test("keep me signed in survives a reopen, and sign-out ends it", async ({ page }) => {
+  test.skip(!process.env.DRIP_CLOUD_E2E, "Requires the isolated Preview database."); test.setTimeout(90_000);
+  const handle = tag(); await onboard(page, handle, true);
+  page.on("dialog", dialog => dialog.accept()); await signOutFromProfile(page);
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+  const form = page.getByRole("form", { name: "Password sign-in", exact: true });
+  await expect(form.getByLabel("Keep me signed in on this device")).not.toBeChecked();
+  await form.getByLabel("Keep me signed in on this device").check();
+  await login(page, handle, password);
+  // A reload is a fresh page: without the opt-in this shows the sign-in screen.
+  await page.reload();
+  await expect(page.getByTestId("header-tag")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toHaveCount(0);
+  await signOutFromProfile(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
+});

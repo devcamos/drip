@@ -5,6 +5,8 @@ const actions = vi.hoisted(() => ({ passwordUsername: vi.fn(), signInPassword: v
 const passkeys = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), passkeyRecoveryRoot: vi.fn() }));
 vi.mock("../lib/password-login", () => actions);
 vi.mock("../lib/passkey-unlock", () => passkeys);
+const trust = vi.hoisted(() => ({ trustThisDevice: vi.fn() }));
+vi.mock("../lib/db", async original => ({ ...(await original<typeof import("../lib/db")>()), trustThisDevice: trust.trustThisDevice }));
 import { PasswordSignIn } from "../app/PasswordSignIn";
 import { PasswordSetup } from "../app/PasswordSetup";
 import { emptyData } from "../lib/db";
@@ -132,4 +134,35 @@ it("resets with a fresh saved-passkey confirmation and leaves the password uncha
   fireEvent.click(screen.getByRole("button", { name: "Save password" }));
   expect(await screen.findByText(/Password saved/)).toBeInTheDocument();
   expect(actions.setLoginPassword).toHaveBeenCalledWith("passkey-verified-root", "tester", "New password 456!", expect.any(Object));
+});
+
+it("keeps this device signed in only when the user ticks the box, before handing back", async () => {
+  trust.trustThisDevice.mockResolvedValue(undefined);
+  const signedIn = vi.fn(() => { expect(trust.trustThisDevice).toHaveBeenCalledOnce(); });
+  render(<PasswordSignIn onSignedIn={signedIn} />);
+  await waitFor(() => expect(screen.getByLabelText("Gamertag")).toHaveValue("tester"));
+  const stay = screen.getByLabelText("Keep me signed in on this device");
+  expect(stay).not.toBeChecked();
+  fireEvent.click(stay); expect(stay).toBeChecked();
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(signedIn).toHaveBeenCalledOnce());
+});
+it("does not remember the device by default, and a remember failure keeps the sign-in", async () => {
+  const signedIn = vi.fn();
+  const { unmount } = render(<PasswordSignIn onSignedIn={signedIn} />);
+  await waitFor(() => expect(screen.getByLabelText("Gamertag")).toHaveValue("tester"));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(signedIn).toHaveBeenCalledOnce());
+  expect(trust.trustThisDevice).not.toHaveBeenCalled();
+  unmount();
+  trust.trustThisDevice.mockRejectedValueOnce(new Error("storage unavailable"));
+  const again = vi.fn(); render(<PasswordSignIn onSignedIn={again} />);
+  await waitFor(() => expect(screen.getByLabelText("Gamertag")).toHaveValue("tester"));
+  fireEvent.click(screen.getByLabelText("Keep me signed in on this device"));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Synthetic password 42!" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(again).toHaveBeenCalledOnce());
+  expect(screen.queryByRole("alert")).toBeNull();
 });
