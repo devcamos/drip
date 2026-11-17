@@ -41,6 +41,20 @@ it("groups accounts with separate totals, collapses sections and opens the corre
   expect(onOpen).toHaveBeenCalledWith("stock-2");
 });
 
+it("account and credit-card badges show the provider initial, or a wallet icon when nothing has a letter", () => {
+  const accounts = [
+    releaseSaver({ id: "moneyfarm", provider: "MoneyFarm", productCategory: "regular-saver", label: "20,000" }),
+    releaseSaver({ id: "unnamed", provider: "Other", label: "20,000" }),
+    releaseDebt(),
+  ];
+  render(<AccountsHome accounts={accounts} totals={portfolioTotals(accounts)} creditPlans={[]} incomePeriod="month" onIncomePeriod={vi.fn()} onAdd={vi.fn()} onOpen={vi.fn()} onPortfolio={vi.fn()} />);
+  const badge = (name: RegExp) => screen.getByRole("button", { name }).querySelector("[data-badge]")!;
+  expect(badge(/Open 20,000, £5,000\.00, MoneyFarm/)).toHaveTextContent(/^M$/);
+  expect(badge(/Open 20,000, £5,000\.00, Other/)).toHaveAttribute("data-badge", "wallet");
+  expect(badge(/Open 20,000, £5,000\.00, Other/).querySelector("svg")).not.toBeNull();
+  expect(badge(/Open Barclaycard/)).toHaveTextContent(/^B$/);
+});
+
 const at = Date.parse("2026-11-07T12:00:00Z");
 
 it("validates saved share-price updates and preserves the holding when the rate is unavailable", async () => {
