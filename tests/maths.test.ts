@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import * as M from "../lib/maths";
 import type { Account } from "../lib/types";
+import { portfolioTotals } from "../lib/credit-card";
 
 const acct = (o: Partial<Account>): Account => ({
   id: "x", provider: "Zopa", label: "", balance: 3000, ratePct: 7, rateType: "interest", frequency: "monthly",
@@ -8,6 +9,20 @@ const acct = (o: Partial<Account>): Account => ({
 });
 
 describe("maths", () => {
+  it("uses the entered annual dividend yield consistently for forecasts and payment estimates", () => {
+    const stock = acct({ balance: 1000, ratePct: 12, rateType: "dividend", productCategory: "stocks-funds", reinvestIncome: false });
+    expect(portfolioTotals([stock]).annualIncome).toBe(120);
+    expect(M.accountMonthlyIncome(stock, "2028-02-01")).toBeCloseTo(10, 10);
+    expect(M.payoutAmount({ ...stock, frequency: "quarterly" }, "2028-02-01")).toBeCloseTo(30, 10);
+    for (const year of [2026, 2028]) {
+      const forecast = M.projection([stock], 12, 0, `${year}-01-01`).at(-1)!;
+      expect(forecast.income).toBeCloseTo(120, 8);
+      expect(forecast.balance).toBe(1000);
+    }
+    const reinvested = M.projection([{ ...stock, reinvestIncome: true }], 12, 0, "2026-01-01").at(-1)!;
+    expect(reinvested.balance).toBeCloseTo(1000 * 1.01 ** 12, 8);
+    expect(reinvested.income).toBeCloseTo(reinvested.balance - 1000, 8);
+  });
   it("monthly income is that calendar month compounded daily at the AER", () => {
     const october = "2026-10-15";
     expect(M.monthlyIncome(3000, 7, october)).toBeCloseTo(M.accrue(3000, 7, [], "2026-10-01", "2026-11-01").interest, 10);

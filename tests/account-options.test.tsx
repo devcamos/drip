@@ -15,6 +15,13 @@ it("offers twenty named examples without asserting a ranking", () => {
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const old: Account = { id: "stock", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", label: "Private pot", balance: 1000, ratePct: 5, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#ffeedd", payouts: [{ date: "2026-10-01", amount: 4, kind: "actual" }], events: [], createdAt: "2026-10-01" };
 
+it("shows the annual dividend estimate without assuming paid income is reinvested", () => {
+  render(<AccountDetail a={{ ...old, balance: 1000, ratePct: 12, reinvestIncome: false }} onBack={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onChange={vi.fn()} />);
+  const prediction = screen.getByRole("region", { name: "Income predictions" });
+  expect(within(prediction).getByText("Estimated income over 1 year").parentElement).toHaveTextContent("£120.00");
+  expect(prediction).toHaveTextContent(/dividend yield/i);
+});
+
 it("offers Lloyds with category-driven interest defaults, without choosing an ISA for the provider", () => {
   const save = vi.fn(); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
   change("Provider", "Lloyds Bank"); change("Balance", "2500"); change("Rate", "3.25");
