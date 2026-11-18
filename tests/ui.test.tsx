@@ -503,6 +503,27 @@ describe("app lock", () => {
     click("Unlock with Face ID / passkey");
     expect(await screen.findByRole("region", { name: "Your accounts are empty" })).toBeInTheDocument();
   });
+  it("still locks after a background save changes the account data", async () => {
+    const code = await seed({ lock: { credentialId: credId, enabledAt: "x" }, accounts: [acct()] });
+    Object.defineProperty(navigator, "credentials", { configurable: true, value: { get: vi.fn().mockResolvedValue(null) } });
+    let finish!: () => void;
+    const mutate = DB.mutateData;
+    const writer = vi.spyOn(DB, "mutateData").mockImplementationOnce(fn => new Promise((resolve, reject) => { finish = () => { void mutate(fn).then(resolve, reject); }; }));
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    render(<Drip />);
+    await screen.findByRole("heading", { name: /locked/ });
+    type(screen.getByLabelText("Unlock recovery code"), code); click("Unlock with code");
+    fireEvent.click(await screen.findByRole("button", { name: /Open Rainy day pot/ }));
+    click("Top up"); type(screen.getByLabelText("amount"), "100"); click("Save");
+    await waitFor(() => expect(writer).toHaveBeenCalledOnce());
+    const now = Date.now(); const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    visibility.mockReturnValue("hidden"); act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(async () => { finish(); });
+    await waitFor(async () => expect((await loadData()).accounts[0].balance).toBe(3100));
+    clock.mockReturnValue(now + 6 * 60_000);
+    visibility.mockReturnValue("visible"); act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(await screen.findByRole("heading", { name: /locked/ })).toBeInTheDocument();
+  });
 });
 
 describe("onboarding draft persistence", () => {
