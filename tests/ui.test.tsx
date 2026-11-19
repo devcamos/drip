@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
-import { seedVault } from "./storage-fixtures";
+import { rawStore, seedVault } from "./storage-fixtures";
 import Drip from "@/app/Drip";
 import Page from "@/app/page";
 import RootLayout, { metadata, viewport } from "@/app/layout";
@@ -540,6 +540,29 @@ describe("optional persistent storage", () => {
       expect(screen.queryByText(/Could not read local accounts/)).toBeNull();
     } finally {
       if (original) Object.defineProperty(navigator, "storage", original); else delete (navigator as { storage?: StorageManager }).storage;
+    }
+  });
+});
+
+describe("active remembered-session revocation", () => {
+  it("rechecks an opted-in session while visible and returns to sign-in after remote revocation", async () => {
+    const sessions = await import("../lib/trusted-session");
+    const verify = vi.spyOn(sessions, "verifyTrustedSession").mockResolvedValue("valid");
+    const interval = vi.spyOn(window, "setInterval");
+    await seed({ accounts: [acct()] });
+    await rawStore({ cloudState: { userId: "owner", generation: "cloud-1" } });
+    await DB.trustThisDevice();
+    try {
+      render(<Drip />);
+      expect(await screen.findByRole("button", { name: /Open Rainy day pot/ })).toBeInTheDocument();
+      await waitFor(() => expect(verify).toHaveBeenCalledWith("owner"));
+      const recheck = interval.mock.calls.find(([, delay]) => delay === 60_000)?.[0];
+      expect(recheck).toBeTypeOf("function");
+      verify.mockResolvedValue("invalid");
+      await act(async () => { recheck?.(); });
+      expect(await screen.findByRole("heading", { name: "Sign in to Drip" })).toBeInTheDocument();
+    } finally {
+      verify.mockRestore(); interval.mockRestore();
     }
   });
 });
