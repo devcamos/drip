@@ -8,7 +8,7 @@ import { dataFormatVersion } from "../lib/data-format";
 import { paymentReminders, reminderSchedule } from "../lib/payment-reminders";
 import * as M from "../lib/maths";
 import { releaseData, releaseDebt, releaseHoldingsAndDebts, releaseSaver, releaseStock } from "./saved-experience-fixtures";
-import { groupAccounts, shouldCloseProfileOnOwnerChange } from "../app/accounts/presentation";
+import { accountBadge, firstLetter, groupAccounts, shouldCloseProfileOnOwnerChange } from "../app/accounts/presentation";
 import { investmentInputs, parseInvestment } from "../lib/stock-investment";
 
 test("existing tiny share holdings remain editable without changing their saved values", () => {
@@ -375,3 +375,24 @@ test("cash, debt and unknown holdings have no market chart and do not auto-open 
   expect(instrumentForHolding("A fund that is not in the chart catalogue")).toBeNull();
 });
 
+test("card badge uses the provider initial, so a numeric account name cannot show a digit", () => {
+  expect(accountBadge(releaseSaver({ provider: "MoneyFarm", productCategory: "regular-saver", label: "20,000" }))).toBe("M");
+  expect(accountBadge(releaseStock())).toBe("T");
+  expect(accountBadge(releaseDebt())).toBe("B");
+  expect(accountBadge(releaseSaver({ provider: "  zopa " }))).toBe("Z");
+});
+
+test("card badge falls back to the first letter of the account name, then to the wallet icon", () => {
+  expect(accountBadge(releaseSaver({ provider: "", label: "20,000 rainy day" }))).toBe("R");
+  expect(accountBadge(releaseSaver({ provider: "Other", label: "£500 émergency" }))).toBe("É");
+  expect(accountBadge(releaseStock({ provider: "Other", holdingName: "3M", label: "ignored" }))).toBe("M");
+  expect(accountBadge(releaseSaver({ provider: "Other", label: "20,000" }))).toBeNull();
+  expect(accountBadge(releaseSaver({ provider: "", label: "" }))).toBeNull();
+  expect(accountBadge({ provider: undefined as unknown as string, label: "" })).toBeNull();
+});
+
+test("firstLetter skips digits and symbols and handles missing input", () => {
+  expect(firstLetter("1. £ abc")).toBe("A");
+  expect(firstLetter("123 456")).toBeNull();
+  expect(firstLetter(undefined)).toBeNull();
+});
