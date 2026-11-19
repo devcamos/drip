@@ -30,7 +30,7 @@ function transfers(account: Pick<Account, "balance" | "events">, value: MarketVa
 }
 
 /** Cash changes affect recorded principal, never promote an earlier price gain. */
-export function applyValuationTransfer<T extends ValuedAccount>(account: T, type: "topup" | "withdraw", date: string, amount: number): T {
+export function applyValuationTransfer<T extends ValuedAccount>(account: T, type: "topup" | "withdraw", date: string, amount: number, id = crypto.randomUUID()): T {
   const value = account.marketValuation;
   const converted = value && account.investment && convertedHolding(String(value.priceUSD), account.investment.shares, value.fxRate);
   if (!value || !converted || !nonNegativeMoney(amount) || !calendarDay(date)) throw new Error("Could not record this holding transfer. Your saved figures are unchanged.");
@@ -39,8 +39,8 @@ export function applyValuationTransfer<T extends ValuedAccount>(account: T, type
   const recordedBalance = balance === 0 ? 0 : roundMoney(Math.max(0, value.recordedBalance + change));
   if (!nonNegativeMoney(recordedBalance) || !nonNegativeMoney(balance)) throw new Error("This transfer exceeds the supported holding value.");
   const quote = roundMoney(converted.valueGBP), events = account.events ?? [];
-  const history: BalanceEvent[] = anchor(events, value, quote) >= 0 ? events : [...events, { type: "set", date: value.appliedAt.slice(0, 10), amount: quote }];
-  return { ...account, balance, marketValuation: { ...value, recordedBalance }, events: [...history, { type, date, amount: roundMoney(amount) }] };
+  const history: BalanceEvent[] = anchor(events, value, quote) >= 0 ? events : [...events, { id: crypto.randomUUID(), type: "set", date: value.appliedAt.slice(0, 10), amount: quote }];
+  return { ...account, balance, marketValuation: { ...value, recordedBalance }, events: [...history, { id, type, date, amount: roundMoney(amount) }] };
 }
 
 export function hasValuationTransfers(account: Account): boolean {
@@ -81,7 +81,7 @@ export function applyMarketValuation(account: Account, input: { priceUSD: number
   const balance = roundMoney(converted.valueGBP);
   const value: Account = { ...account, balance, marketValuation: {
     priceUSD: input.priceUSD, fxRate: fx!.rate, fxDate: fx!.date, appliedAt: at, recordedBalance: incomeBalance(account),
-  }, events: [...(account.events ?? []), { type: "set", date: at.slice(0, 10), amount: balance }] };
+  }, events: [...(account.events ?? []), { id: crypto.randomUUID(), type: "set", date: at.slice(0, 10), amount: balance }] };
   if (!validMarketValuation(value.marketValuation, value)) throw new Error("Could not apply this holding value. Your saved figures are unchanged.");
   return value;
 }
@@ -90,5 +90,5 @@ export function applyMarketValuation(account: Account, input: { priceUSD: number
 export function clearMarketValuation(account: Account, at = Date.now()): Account {
   if (!account.marketValuation) return account;
   const { marketValuation, ...rest } = account;
-  return { ...rest, balance: marketValuation.recordedBalance, events: [...(account.events ?? []), { type: "set", date: new Date(at).toISOString().slice(0, 10), amount: marketValuation.recordedBalance }] };
+  return { ...rest, balance: marketValuation.recordedBalance, events: [...(account.events ?? []), { id: crypto.randomUUID(), type: "set", date: new Date(at).toISOString().slice(0, 10), amount: marketValuation.recordedBalance }] };
 }

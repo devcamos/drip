@@ -5,7 +5,7 @@ describe("withdrawals", () => {
   it("reduces balance, logs, rejects bad amounts", () => {
     const a = M.applyWithdraw({ balance: 1000, events: [] }, 200.004, "2026-10-15");
     expect(a.balance).toBe(800);
-    expect(a.events).toEqual([{ type: "withdraw", date: "2026-10-15", amount: 200 }]);
+    expect(a.events).toEqual([expect.objectContaining({ type: "withdraw", date: "2026-10-15", amount: 200, id: expect.any(String) })]);
     expect(M.applyWithdraw({ balance: 10, events: undefined }, 10, "2026-10-15").balance).toBe(0);
     expect(() => M.applyWithdraw(a, 0, "2026-10-15")).toThrow();
     expect(() => M.applyWithdraw(a, 801, "2026-10-15")).toThrow(/more than the balance/);

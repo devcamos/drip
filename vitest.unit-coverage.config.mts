@@ -9,7 +9,7 @@ const domain = [
   "account-colour", "account-lifecycle", "account-switch", "cloud-payload",
   "credit-card", "data-format", "decimal-input", "device-policy",
   "dividend-portfolio", "exchange-rates", "identity", "market-valuation",
-  "maths", "payment-calendar", "payment-reminders", "products",
+  "maths", "money-storage", "payment-calendar", "payment-reminders", "products",
   "recovery-file", "stock-chart", "stock-investment", "stock-reading",
 ].map(name => `lib/${name}.ts`);
 

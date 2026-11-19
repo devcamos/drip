@@ -110,7 +110,7 @@ afterAll(async () => {
 
 it("restores every debt and valued holding through real HTTP/auth/Postgres after restart, while rejecting stale cloud replacement", async () => {
   const a = await createAccount();
-  expect(a.envelope.v).toBe(3);
+  expect(a.envelope.v).toBe(5);
   const raw = (await pool.query("SELECT envelope FROM drip_vault WHERE user_id=$1", [a.owner])).rows[0].envelope;
   expect(raw).toEqual(a.envelope); expect(JSON.stringify(raw)).not.toMatch(/Barclaycard|creditCard|marketValuation|averagePriceGBP/);
   expect((await send("/api/auth/sign-out", {}, a.session)).status).toBe(200);
@@ -120,7 +120,7 @@ it("restores every debt and valued holding through real HTTP/auth/Postgres after
   const restoredRoot = await unwrapPasswordRoot((await signed.json()).envelope, a.username, password);
   expect(restoredRoot).toBe(a.root);
   const current = await (await send("/api/cloud", undefined, cookie(signed), a.owner)).json();
-  expect(current.version).toBe(1); expect(current.envelope.v).toBe(3);
+  expect(current.version).toBe(1); expect(current.envelope.v).toBe(5);
   const restored = await unseal(current.envelope, await deriveCloudEncryptionKey(restoredRoot));
   expect(restored).toEqual(migrateData(a.data, "2026-11-07"));
   expect(restored.accounts.filter(account => account.productCategory === "credit-card")).toHaveLength(2);
@@ -134,14 +134,14 @@ it("restores every debt and valued holding through real HTTP/auth/Postgres after
   expect(final.version).toBe(2); expect(await unseal(final.envelope, a.key)).toEqual(migrateData(edited, "2026-11-07"));
 }, 30000);
 
-it("stores v4 archived income and paid statements over real authenticated HTTP while fencing stale replacement", async () => {
+it("stores archived income and paid statements in the current pence format over real HTTP while fencing stale replacement", async () => {
   const a = await createAccount();
   const data = { ...a.data, accounts: a.data.accounts.map(account => account.rateType === "dividend" ? archiveAccount(account, "2026-11-08T12:00:00.000Z") : account.creditCard ? { ...account, creditCard: { ...account.creditCard, statementPaid: true as const } } : account) };
-  const envelope = await seal(data, a.key); expect(envelope.v).toBe(4);
+  const envelope = await seal(data, a.key); expect(envelope.v).toBe(5);
   expect((await put("/api/cloud", { version: 1, envelope }, a.session, a.owner)).status).toBe(200);
   await startAuth();
   const current = await (await send("/api/cloud", undefined, a.session, a.owner)).json();
-  expect(current.envelope.v).toBe(4);
+  expect(current.envelope.v).toBe(5);
   const restored = await unseal(current.envelope, a.key);
   expect(restored.accounts[1].archivedAt).toBe("2026-11-08T12:00:00.000Z");
   expect(restored.accounts[3].creditCard?.statementPaid).toBe(true);

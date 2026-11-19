@@ -38,7 +38,7 @@ describe("encrypted recovery", () => {
     expect((await cloud.unseal(sealed, key)).lock).toBeUndefined();
     await expect(cloud.unseal(sealed, await cloud.cloudKey(generateRecoveryCode()))).rejects.toThrow();
     await expect(cloud.unseal({ ...sealed, ct: sealed.ct.slice(4) }, key)).rejects.toThrow();
-    await expect(cloud.unseal({ ...sealed, v: 5 } as any, key)).rejects.toThrow("Unsupported");
+    await expect(cloud.unseal({ ...sealed, v: 6 } as any, key)).rejects.toThrow("Unsupported");
     await expect(cloud.unseal(await cloud.seal({ ...data, identity: undefined }, key), key)).rejects.toThrow("Invalid cloud copy");
   });
   it("signs in existing users; creates only on explicit enable and reports auth failure", async () => {
@@ -233,7 +233,7 @@ const privateAccount = {
 const labelled: AppData = { ...data, accounts: [privateAccount], snapshots: [{ month: "2026-01", totalBalance: 3000, monthlyIncome: 17.5 }], projection: { monthlyDeposit: 200, years: 1 } };
 async function rawCloudPayload(envelope: cloud.Envelope) {
   const bytes = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(envelope.iv), additionalData: new TextEncoder().encode("drip-cloud-v1") }, key, bytes(envelope.ct));
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(envelope.iv), additionalData: new TextEncoder().encode(`drip-cloud-v${envelope.v}`) }, key, bytes(envelope.ct));
   return JSON.parse(new TextDecoder().decode(plain));
 }
 async function legacyEnvelope(value: AppData, encryptionKey = key): Promise<cloud.Envelope> {
@@ -259,6 +259,7 @@ describe("device-only nickname boundary", () => {
     const envelope = await cloud.seal(input, key);
     const portable = await rawCloudPayload(envelope);
     expect(JSON.stringify(portable)).not.toMatch(/PRIVATE_|DEVICE_PRIVATE|"label"|"note"/);
+    expect(portable).toMatchObject({ money: "pence", accounts: [{ bonus: { amount: 1544 }, payouts: [{ amount: 2265, id: expect.any(String) }] }] });
     const restored = await cloud.unseal(envelope, key);
     expect(restored.accounts[0]).toMatchObject({ productCategory: "cash-isa", taxWrapper: "cash-isa", reinvestIncome: true,
       bonus: { amount: 15.44, expectedDate: "2030-05-06" }, payouts: [{ date: "2026-09-30", amount: 22.65, kind: "actual", incomeType: "interest" }], label: "" });
@@ -268,7 +269,7 @@ describe("device-only nickname boundary", () => {
     const envelope = await cloud.seal(input, key); const portable = await rawCloudPayload(envelope);
     expect(JSON.stringify(portable)).not.toMatch(/DEVICE_PRIVATE|PRIVATE_|"label"|"lock"|"localNote"/);
     const recovered = await cloud.unseal(envelope, key);
-    expect(recovered.accounts[0]).toEqual({ ...privateAccount, label: "" });
+    expect(recovered.accounts[0]).toMatchObject({ ...privateAccount, label: "", payouts: [{ ...privateAccount.payouts[0], id: expect.any(String) }], events: [{ ...privateAccount.events[0], id: expect.any(String) }] });
     expect(recovered.snapshots).toEqual(labelled.snapshots); expect(recovered.projection).toEqual(labelled.projection);
     expect(input.accounts[0].label).toBe("DEVICE_PRIVATE_NICKNAME");
   });

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Account, Frequency, ProductCategory, RateType, TaxWrapper } from "@/lib/types";
 import { PRODUCTS, PROVIDERS, TRADING_212_HOLDINGS, displayProvider, validDate } from "@/lib/products";
 import { ACCOUNT_COLOURS, accountCardStyle, normaliseColour } from "@/lib/account-colour";
@@ -51,6 +51,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const initialProduct = initial.product;
   const initialProvider = initial.provider;
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
   const [id] = useState(() => existing?.id ?? crypto.randomUUID());
   const [provider, setProvider] = useState(initialProvider);
@@ -94,7 +95,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   return <>
     <h1>{existing ? "Edit account" : "Add account"}</h1>
     <form onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
+      event.preventDefault(); if (!valid || submitting.current) return;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
       const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, investment: investment ?? undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,
@@ -108,10 +109,10 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       delete base.positionReviewRequired;
       const changed = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
       const account = existing || !past ? changed : M.withPastBalances(changed, past, today());
-      setBusy(true); setError("");
+      submitting.current = true; setBusy(true); setError("");
       try { if (await onSave(existing && M.round2(b) !== existing.balance ? M.applySetBalance({ ...account, balance: existing.balance }, b, today()) : account) === false) setError("Could not save this account. Your entry is kept. Check the message above before retrying."); }
       catch { setError("Could not save this account. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <label htmlFor="account-category">Product category</label>
       <select disabled={busy} id="account-category" value={category} onChange={e => chooseCategory(e.target.value as ProductCategory)}>{Object.entries(PRODUCTS).filter(([value]) => value !== "credit-card").map(([value, product]) => <option value={value} key={value}>{product.label}</option>)}</select>

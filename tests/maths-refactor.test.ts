@@ -25,9 +25,9 @@ describe("maths refactor keeps behaviour", () => {
   it("balance helpers append rounded events without mutating", () => {
     const a: { balance: number; events?: { type: "topup" | "withdraw" | "set" | "interest"; date: string; amount: number }[] } = { balance: 100 };
     const up = applyTopUp(a, 10.005, "2026-01-01");
-    expect(up.events).toEqual([{ type: "topup", date: "2026-01-01", amount: 10.01 }]);
+    expect(up.events).toEqual([expect.objectContaining({ type: "topup", date: "2026-01-01", amount: 10.01, id: expect.any(String) })]);
     expect(applyWithdraw(up, 5, "2026-01-02").balance).toBe(105.01);
-    expect(applySetBalance(up, 50, "2026-01-03").events?.at(-1)).toEqual({ type: "set", date: "2026-01-03", amount: 50 });
+    expect(applySetBalance(up, 50, "2026-01-03").events?.at(-1)).toMatchObject({ type: "set", date: "2026-01-03", amount: 50, id: expect.any(String) });
     expect(a.events).toBeUndefined();
   });
 });

@@ -187,8 +187,8 @@ test("cloud portability deliberately retains financial terms and strips private 
   const credit = releaseDebt({ label: "private nickname" });
   const stock = applyMarketValuation(releaseStock({ label: "another private nickname" }), price, at);
   const value = cloudPayload(releaseData([credit, stock]));
-  expect(value.accounts[0].creditCard).toEqual(credit.creditCard);
-  expect(value.accounts[1].marketValuation).toEqual(stock.marketValuation);
+  expect(value.accounts[0].creditCard).toEqual({ ...credit.creditCard, minimumPayment: 3500, plannedPayment: 7500 });
+  expect(value.accounts[1].marketValuation).toEqual({ ...stock.marketValuation, recordedBalance: stock.marketValuation!.recordedBalance * 100 });
   expect(JSON.stringify(value)).not.toMatch(/private nickname|another private/);
   expect(value.accounts[0]).not.toHaveProperty("label");
 });

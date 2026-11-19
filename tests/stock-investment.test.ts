@@ -45,7 +45,7 @@ it("preserves only financial investment fields through the encrypted cloud allow
   const data = { ...emptyData(), accounts: [{ ...account, investment: { ...investment, secret: "never portable", originalPrice: { ...investment.originalPrice, privateNote: "never portable" } } }] };
   const portable = cloudPayload(data); expect(portable.accounts[0].investment).toEqual(investment); expect(portable.accounts[0]).not.toHaveProperty("label");
   expect(JSON.stringify(portable)).not.toMatch(/privateNote|never portable|Private nickname/);
-  expect(fromCloudPayload(portable as typeof data).accounts[0]).toMatchObject({ investment, label: "" });
+  expect(fromCloudPayload(portable).accounts[0]).toMatchObject({ investment, label: "" });
   const gbpOnly = cloudPayload({ ...emptyData(), accounts: [{ ...account, investment: { shares: 1, averagePriceGBP: 2 } }] });
   expect(gbpOnly.accounts[0].investment).toEqual({ shares: 1, averagePriceGBP: 2, originalPrice: undefined });
 });

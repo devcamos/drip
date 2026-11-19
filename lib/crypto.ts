@@ -1,4 +1,6 @@
 import { dataFormatVersion } from "./data-format";
+import { fromStoredPence, hasPenceMarker, isStoredPenceAppData, toStoredPence } from "./money-storage";
+import type { AppData } from "./types";
 /**
  * Encrypted backups. The recovery code is the root key:
  * PBKDF2-SHA256 (600k iterations, random 16-byte salt) -> AES-256-GCM (random 12-byte IV).
@@ -42,7 +44,7 @@ async function deriveKey(code: string, salt: Uint8Array, iterations: number): Pr
   );
 }
 
-export interface BackupFile { app: "drip"; v: 1 | 2 | 3 | 4; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
+export interface BackupFile { app: "drip"; v: 1 | 2 | 3 | 4 | 5; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
 
 /** Shared by cloud recovery and the memory-only cloud key restored at local unlock. */
 export async function deriveCloudEncryptionKey(code: string): Promise<CryptoKey> {
@@ -54,8 +56,9 @@ export async function encryptBackup(data: unknown, code: string, iterations = KD
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(code, salt, iterations);
-  const v = dataFormatVersion(data);
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(`drip-v${v}`) }, key, enc.encode(JSON.stringify(data))));
+  const stored = isAppData(data) ? toStoredPence(data) : data;
+  const v = dataFormatVersion(stored);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(`drip-v${v}`) }, key, enc.encode(JSON.stringify(stored))));
   return { app: "drip", v, kdf: "PBKDF2-SHA256", iter: iterations, salt: b64(salt), iv: b64(iv), ct: b64(ct) };
 }
 
@@ -63,15 +66,26 @@ export class BackupError extends Error {}
 
 export async function decryptBackup<T = unknown>(file: unknown, code: string): Promise<T> {
   const f = file as BackupFile;
-  if (!f || f.app !== "drip" || ![1, 2, 3, 4].includes(f.v) || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file this version can read. Check the file or update Drip before restoring it.");
+  if (!f || f.app !== "drip" || ![1, 2, 3, 4, 5].includes(f.v) || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file this version can read. Check the file or update Drip before restoring it.");
   if (!Number.isInteger(f.iter) || f.iter < 100_000 || f.iter > KDF_ITERATIONS) throw new BackupError("Backup uses unsafe settings.");
   try {
     const key = await deriveKey(code, unb64(f.salt), f.iter);
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(f.iv), additionalData: enc.encode(`drip-v${f.v}`) }, key, unb64(f.ct));
-    return JSON.parse(dec.decode(pt)) as T;
-  } catch {
+    const decoded: unknown = JSON.parse(dec.decode(pt));
+    if (f.v === 5) {
+      if (!isStoredPenceAppData(decoded)) throw new BackupError("This backup's money format is invalid. Your current data has not changed.");
+      return fromStoredPence(decoded) as T;
+    }
+    if (hasPenceMarker(decoded)) throw new BackupError("This backup's money format does not match its version. Your current data has not changed.");
+    return decoded as T;
+  } catch (error) {
+    if (error instanceof BackupError) throw error;
     throw new BackupError("Wrong recovery code, or the file is damaged.");
   }
+}
+
+function isAppData(value: unknown): value is AppData {
+  return !!value && typeof value === "object" && "version" in value && value.version === 1 && "accounts" in value && Array.isArray(value.accounts) && "snapshots" in value && Array.isArray(value.snapshots) && "lastBackupAt" in value;
 }
 
 /** Salted SHA-256 verifier so the app can check a typed code without storing it. */

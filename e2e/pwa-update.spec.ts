@@ -58,7 +58,7 @@ test("saved bookmark updates from the old worker, refreshes imported build ident
     await expect.poll(() => page.evaluate(() => caches.keys())).toContain(`drip-shell-${newBuild}`);
     expect(await page.evaluate(async () => new Promise<number>((resolve, reject) => {
       const q = indexedDB.open("drip"); q.onsuccess = () => { resolve(q.result.version); q.result.close(); }; q.onerror = () => reject(q.error);
-    }))).toBe(3);
+    }))).toBe(5);
     await page.getByRole("button", { name: "Add an account", exact: true }).click();
     await page.getByRole("button", { name: /Credit card/ }).click();
     await page.getByLabel("Credit card provider", { exact: true }).selectOption("Lloyds");

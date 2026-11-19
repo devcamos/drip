@@ -15,12 +15,12 @@ const investment = { shares: 27.25750597, averagePriceGBP: 44.99, originalPrice:
 const holding: Account = { id: "stock", label: "", provider: "Trading212", productCategory: "stocks-funds", holdingName: "Realty Income", balance: 1155.28, ratePct: 5.7, rateType: "dividend", frequency: "monthly", nextPayoutDate: "2027-01-01", colour: "#6b2d83", payouts: [], createdAt: "2026-10-01", investment };
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "demo", createdAt: "2026-10-01" }, accounts: [holding] };
 
-it("feature-bearing cloud v2 survives current restore and cannot be decoded or downgraded by the actual old client", async () => {
+it("pence cloud v5 survives current restore and cannot be decoded or downgraded by the actual old client", async () => {
   const key=await cloudKey(fixtureCode), envelope=await seal(data,key);
-  expect(envelope.v).toBe(2);expect(isCloudEnvelope(envelope)).toBe(true);expect((await unseal(envelope,key)).accounts[0].investment).toEqual(investment);
+  expect(envelope.v).toBe(5);expect(isCloudEnvelope(envelope)).toBe(true);expect((await unseal(envelope,key)).accounts[0].investment).toEqual(investment);
   await expect(legacyCloud.unseal(envelope as legacyCloud.Envelope,key)).rejects.toThrow("Unsupported cloud copy");
-  await expect(unseal({...envelope,v:1},key)).rejects.toThrow();await expect(legacyCloud.unseal({...envelope,v:1},key)).rejects.toThrow();
-  expect(isCloudEnvelope({...envelope,v:5})).toBe(false);expect(isCloudEnvelope({...envelope,v:"2"})).toBe(false);
+  await expect(unseal({...envelope,v:4},key)).rejects.toThrow();
+  expect(isCloudEnvelope({...envelope,v:5})).toBe(true);expect(isCloudEnvelope({...envelope,v:6})).toBe(false);expect(isCloudEnvelope({...envelope,v:"5"})).toBe(false);
 });
 it("the real old syncNow cannot clean away stats, PUT, or acknowledge a newer format even at the same cloud revision",async()=>{
   const key=await cloudKey(fixtureCode);await seedVault(data,fixtureCode,{userId:"owner",identityId:data.identity.id,key,version:2,dirty:false,lastSyncAt:null,generation:"old-client",revision:0});
@@ -30,15 +30,15 @@ it("the real old syncNow cannot clean away stats, PUT, or acknowledge a newer fo
   await expect(legacyCloud.syncNow()).rejects.toThrow("Unsupported cloud copy");
   expect(fetcher).toHaveBeenCalledTimes(1);expect(fetcher.mock.calls[0][1].method).toBe("GET");expect(await rawStore()).toEqual(before);
 });
-it("keeps ordinary cloud copies at v1, readable by deployed and new clients",async()=>{
+it("writes ordinary data as pence cloud v5 and still reads deployed legacy cloud copies",async()=>{
   const ordinary={...data,accounts:[{...holding,investment:undefined}]},key=await cloudKey(fixtureCode),current=await seal(ordinary,key),old=await legacyCloud.seal(ordinary,key);
-  expect(current.v).toBe(1);expect(old.v).toBe(1);expect((await legacyCloud.unseal(current as legacyCloud.Envelope,key)).accounts[0].balance).toBe(1155.28);expect((await unseal(old,key)).accounts[0].balance).toBe(1155.28);
+  expect(current.v).toBe(5);expect(old.v).toBe(1);expect((await unseal(current,key)).accounts[0].balance).toBe(1155.28);expect((await unseal(old,key)).accounts[0].balance).toBe(1155.28);
 });
-it("protects new fields in v2 backup files, rejects old-client restore before install, and still restores actual v1 backups",async()=>{
-  const file=await encryptBackup(data,fixtureCode,100000);expect(file.v).toBe(2);expect(await decryptBackup(file,fixtureCode)).toEqual(data);
-  await expect(legacyBackup.decryptBackup(file,fixtureCode)).rejects.toThrow("isn't a Drip backup");await expect(decryptBackup({...file,v:1},fixtureCode)).rejects.toThrow();
+it("stores integer pence in v5 backups, fences old-client restore, and reads actual v1 backups",async()=>{
+  const file=await encryptBackup(data,fixtureCode,100000);expect(file.v).toBe(5);expect(await decryptBackup(file,fixtureCode)).toEqual(data);
+  await expect(legacyBackup.decryptBackup(file,fixtureCode)).rejects.toThrow("isn't a Drip backup");await expect(decryptBackup({...file,v:4},fixtureCode)).rejects.toThrow();
   const ordinary={...data,accounts:[{...holding,investment:undefined}]};const old=await legacyBackup.encryptBackup(ordinary,fixtureCode,100000),current=await encryptBackup(ordinary,fixtureCode,100000);
-  expect(current.v).toBe(1);expect(await decryptBackup(old,fixtureCode)).toEqual(JSON.parse(JSON.stringify(ordinary)));expect(await legacyBackup.decryptBackup(current,fixtureCode)).toEqual(JSON.parse(JSON.stringify(ordinary)));
+  expect(current.v).toBe(5);expect(old.v).toBe(1);expect(await decryptBackup(old,fixtureCode)).toEqual(JSON.parse(JSON.stringify(ordinary)));
 });
 it("does not change formats for non-financial original-code wrappers or data without holdings",()=>{
   for(const value of [null,undefined,"original recovery wrapper",{}, {accounts:null}, {accounts:[null,1,{}]}, {accounts:[]},{accounts:[{investment:undefined}]}])expect(dataFormatVersion(value)).toBe(1);

@@ -41,7 +41,7 @@ describe("category-driven accounts", () => {
     expect(screen.getByLabelText("Paid")).toHaveValue("daily");
     change("Product category", "cash-isa"); change("Balance", "3200");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 3200, ratePct: 4, productCategory: "cash-isa", payouts: [], events: [{ type: "set", amount: 3200, date: today }] }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 3200, ratePct: 4, productCategory: "cash-isa", payouts: [], events: [expect.objectContaining({ type: "set", amount: 3200, date: today, id: expect.any(String) })] }));
   });
   it("records income and a bonus without changing the balance, and allows correcting a payment", async () => {
     vi.stubGlobal("confirm", () => true); render(<DetailHarness />);

@@ -743,6 +743,7 @@
         "app/stocks/StockPrice.tsx",
         "app/stocks/stock-price.module.css",
         "lib/credit-card.ts",
+        "lib/money-storage.ts",
         "lib/market-valuation.ts",
         "lib/profile-preferences.ts",
         "lib/stock-chart.ts"
@@ -750,6 +751,7 @@
       "tests": [
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
+        "tests/money-storage.test.ts",
         "integration/saved-experience-http.integration.test.ts",
         "e2e/saved-experience.e2e.spec.ts",
         "tests/account-workflows.test.ts",
@@ -820,6 +822,7 @@
       "tests/lock.test.ts",
       "tests/maths-refactor.test.ts",
       "tests/maths.test.ts",
+      "tests/money-storage.test.ts",
       "tests/payment-calendar.test.ts",
       "tests/recovery-api.test.ts",
       "tests/regression-policy.test.ts",

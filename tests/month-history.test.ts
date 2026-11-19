@@ -82,7 +82,7 @@ describe("past balances entered once when adding an account (#8)", () => {
     expect(M.withPastBalances(a, [{ date: "2026-11-16", balance: 5 }], "2026-11-16")).toBe(a);
     const next = M.withPastBalances(a, [{ date: "2026-10-31", balance: 1000 }], "2026-11-16");
     expect(next.balance).toBe(1200);
-    expect(next.events).toEqual([{ type: "set", date: "2026-10-31", amount: 1000 }, { type: "set", date: "2026-11-16", amount: 1200 }]);
+    expect(next.events).toEqual([expect.objectContaining({ type: "set", date: "2026-10-31", amount: 1000, id: expect.any(String) }), expect.objectContaining({ type: "set", date: "2026-11-16", amount: 1200, id: expect.any(String) })]);
     expect(M.withPastBalances({ balance: 1, events: undefined }, [{ date: "2026-10-31", balance: 1 }], "2026-11-16").events).toHaveLength(2);
   });
 

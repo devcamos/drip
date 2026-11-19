@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Account, IncomeType } from "@/lib/types";
 import { displayProvider, productLabel, validDate } from "@/lib/products";
 import { accountCardStyle } from "@/lib/account-colour";
@@ -14,7 +14,11 @@ import { useUnsavedDraft } from "./useDraftGuard";
 const today = () => M.localToday();
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
-const balanceChange = { topup: M.applyTopUp, withdraw: M.applyWithdraw, set: M.applySetBalance };
+function changeBalance(account: Account, mode: "topup" | "withdraw" | "set", amount: number, date: string, id: string): Account {
+  if (mode === "topup") return M.applyTopUp(account, amount, date, id);
+  if (mode === "withdraw") return M.applyWithdraw(account, amount, date, id);
+  return M.applySetBalance(account, amount, date, id);
+}
 const eventStyle = {
   topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
   set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
@@ -24,6 +28,7 @@ type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDe
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState(""); const [value, setValue] = useState(""); const [date, setDate] = useState(today());
   const resetDraft = useUnsavedDraft({ value, date }, mode !== null && value !== "");
   const labels = { topup: "Top up", withdraw: "Withdraw", set: "Update balance" };
@@ -38,18 +43,19 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   return <>
     <div className="row-gap">{(["topup", "withdraw", "set"] as const).map(action => <button key={action} disabled={busy} className={`btn ${action === "topup" ? "" : "ghost"}`} onClick={() => { if (mode && value && !confirm("Discard this unsaved balance entry?")) return; const nextValue = action === "set" ? String(a.balance) : ""; resetDraft({ value: nextValue, date }); setMode(action); setValue(nextValue); setError(""); }}>{labels[action]}</button>)}</div>
     {mode && <form className="panel" aria-label={labels[mode]} onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
+      event.preventDefault(); if (!valid || submitting.current || !mode) return;
       if (mode === "withdraw" && n > a.balance) { setError("You can't withdraw more than the balance."); return; }
-      setBusy(true); setError("");
+      const eventId = crypto.randomUUID();
+      submitting.current = true; setBusy(true); setError("");
       try {
         if (await onChange(x => {
           if (mode === "withdraw" && n > x.balance) throw Object.assign(new Error("Balance changed"), { name: "StaleAccountEdit" });
-          return balanceChange[mode](x, n, date);
+          return changeBalance(x, mode, n, date, eventId);
         }) === false) setError("Balance change could not be saved. Your entry is kept; check the message above before retrying.");
         else setMode(null);
       }
       catch { setError("Could not save the balance. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <h2 style={{ marginTop: 0 }}>{labels[mode]}</h2><p className="muted">{descriptions[mode]}</p>
       <div className="grid"><div><label htmlFor="balance-amount">{mode === "set" ? "New balance £" : "Amount £"}</label><input disabled={busy} id="balance-amount" inputMode="decimal" aria-label="amount" value={value} onChange={e => setValue(e.target.value)} /></div><div><label htmlFor="balance-date">Date</label><input disabled={busy} id="balance-date" type="date" max={today()} aria-label="date" aria-invalid={futureDate} aria-describedby={futureDate ? "balance-date-error" : undefined} value={date} onChange={e => setDate(e.target.value)} /></div></div>
@@ -64,6 +70,7 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
 function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [amount, setAmount] = useState(""); const [date, setDate] = useState(today());
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [type, setType] = useState<IncomeType>(a.rateType);
   const [by, setBy] = useState<"week" | "month">("month");
   const [message, setMessage] = useState("");
@@ -96,14 +103,15 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
       }}>Remove</button></span></li>)}</ul></details>
     </>}
     <form onSubmit={async event => {
-      event.preventDefault(); if (!valid) return;
-      setBusy(true); setMessage("");
+      event.preventDefault(); if (!valid || submitting.current) return;
+      const payoutId = crypto.randomUUID();
+      submitting.current = true; setBusy(true); setMessage("");
       try {
-        const saved = await onChange(x => M.recordIncome(x, Number(amount), date, type));
+        const saved = await onChange(x => M.recordIncome(x, Number(amount), date, type, payoutId));
         if (saved === false) { setMessage("Income could not be saved. Keep Drip open and retry."); return; }
         setAmount(""); setType(a.rateType); setMessage("Income recorded. Update your balance separately if needed.");
       } catch { setMessage("Income could not be saved. Keep Drip open and retry."); }
-      finally { setBusy(false); }
+      finally { submitting.current = false; setBusy(false); }
     }}>
       <label htmlFor="income-type">Payment type</label><select disabled={busy} id="income-type" value={type} onChange={e => setType(e.target.value as IncomeType)}><option value={a.rateType}>{incomeLabel[a.rateType]}</option><option value="bonus">Bonus</option></select>
       <div className="grid"><div><label htmlFor="income-amount">Amount received £</label><input disabled={busy} id="income-amount" aria-label="Income amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} /></div><div><label htmlFor="income-date">Payment date</label><input disabled={busy} id="income-date" type="date" max={today()} aria-label="Income date" value={date} onChange={e => setDate(e.target.value)} /></div></div>

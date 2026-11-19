@@ -109,7 +109,7 @@ it("signs up, saves encrypted investment data and restores it using gamertag/pas
   expect(signed.status).toBe(200); expect(signed.headers.get("cache-control")).toBe("no-store");
   expect(await unwrapPasswordRoot((await signed.json()).envelope, a.username, password)).toBe(a.root);
   const vault = await send("/api/cloud", undefined, cookie(signed), a.owner);
-  const stored = await vault.json(); expect(stored.version).toBe(1); expect(stored.envelope.v).toBe(2);
+  const stored = await vault.json(); expect(stored.version).toBe(1); expect(stored.envelope.v).toBe(5);
   expect((await unseal(stored.envelope, a.key)).accounts[0].investment).toEqual({ shares: 20, averagePriceGBP: 50 });
   expect(JSON.stringify(stored)).not.toMatch(/averagePriceGBP|Realty Income|1200/);
 });
