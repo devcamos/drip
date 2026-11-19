@@ -166,3 +166,23 @@ it("does not remember the device by default, and a remember failure keeps the si
   await waitFor(() => expect(again).toHaveBeenCalledOnce());
   expect(screen.queryByRole("alert")).toBeNull();
 });
+
+it("prefers passkey when its lookup resolves after the saved-password lookup", async () => {
+  let finishPasskeyLookup!: (available: boolean) => void;
+  passkeys.hasPasskeyUnlock.mockReturnValueOnce(new Promise(resolve => { finishPasskeyLookup = resolve; }));
+  render(<PasswordSetup data={emptyData()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Current password" })).toHaveAttribute("aria-pressed", "true"));
+  await act(async () => { finishPasskeyLookup(true); });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toHaveAttribute("aria-pressed", "true"));
+});
+
+it("preserves a deliberate recovery-code choice when a late passkey lookup completes", async () => {
+  let finishPasskeyLookup!: (available: boolean) => void;
+  passkeys.hasPasskeyUnlock.mockReturnValueOnce(new Promise(resolve => { finishPasskeyLookup = resolve; }));
+  render(<PasswordSetup data={emptyData()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Current password" })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Recovery code" }));
+  await act(async () => { finishPasskeyLookup(true); });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Saved unlock passkey" })).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Recovery code" })).toHaveAttribute("aria-pressed", "true");
+});
