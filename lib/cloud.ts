@@ -8,9 +8,10 @@ import { localToday, migrateData } from "./maths";
 import { safeFetch } from "./worker-safety";
 import { cloudPayload, fromCloudPayload } from "./cloud-payload";
 import { dataFormatVersion } from "./data-format";
+import { hasPenceMarker, isStoredPenceAppData } from "./money-storage";
 
 export const authClient = createAuthClient({ plugins: [passkeyClient()], fetchOptions: { customFetchImpl: safeFetch } });
-export interface Envelope { app: "drip-cloud"; v: 1 | 2 | 3 | 4; iv: string; ct: string }
+export interface Envelope { app: "drip-cloud"; v: 1 | 2 | 3 | 4 | 5; iv: string; ct: string }
 const enc = new TextEncoder();
 const b64 = (bytes: Uint8Array) => {
   let out = "";
@@ -39,15 +40,18 @@ export async function seal(data: AppData, key: CryptoKey): Promise<Envelope> {
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(`drip-cloud-v${v}`) }, key, enc.encode(JSON.stringify(safe)));
   return { app: "drip-cloud", v, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
 }
-async function decode(envelope: Envelope, key: CryptoKey): Promise<AppData> {
-  if (envelope.app !== "drip-cloud" || ![1, 2, 3, 4].includes(envelope.v)) throw new Error("Unsupported cloud copy. Update Drip before restoring it.");
+async function decode(envelope: Envelope, key: CryptoKey): Promise<{ data: AppData; raw: unknown }> {
+  if (envelope.app !== "drip-cloud" || ![1, 2, 3, 4, 5].includes(envelope.v)) throw new Error("Unsupported cloud copy. Update Drip before restoring it.");
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(envelope.iv), additionalData: enc.encode(`drip-cloud-v${envelope.v}`) }, key, unb64(envelope.ct));
-  const data = JSON.parse(new TextDecoder().decode(plain));
+  const raw: unknown = JSON.parse(new TextDecoder().decode(plain));
+  const valid = envelope.v === 5 ? isStoredPenceAppData(raw) : !hasPenceMarker(raw) && isAppData(raw);
+  if (!valid) throw new Error("Invalid cloud copy.");
+  const data = fromCloudPayload(raw);
   if (!isAppData(data) || !data.identity) throw new Error("Invalid cloud copy.");
-  return data;
+  return { data, raw };
 }
 export async function unseal(envelope: Envelope, key: CryptoKey): Promise<AppData> {
-  return migrateData(fromCloudPayload(await decode(envelope, key)), localToday());
+  return migrateData((await decode(envelope, key)).data, localToday());
 }
 export const readCloudState = () => getItem<CloudState>("cloudState");
 export async function writeCloudState(state: CloudState | undefined, expected?: { generation: string | undefined; connectionGeneration?: string }) {
@@ -141,8 +145,9 @@ export async function syncNow(): Promise<string> {
     if (remote.version !== state.version) throw new Error("Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.");
     // Replace older cloud copies that included device-only nicknames, even when
     // no financial edits are queued. This leaves this device's labels intact.
-    const previous = remote.envelope ? await decode(remote.envelope, state.key) : undefined;
-    const needsCleanup = previous && JSON.stringify(cloudPayload(previous)) !== JSON.stringify(previous);
+    const decoded = remote.envelope ? await decode(remote.envelope, state.key) : undefined;
+    const previous = decoded?.data;
+    const needsCleanup = decoded && stableJson(cloudPayload(previous!)) !== stableJson(decoded.raw);
     if (!state.dirty && !needsCleanup) {
       const latest = await cloudSnapshot();
       if (latest.signedOut || latest.state?.generation !== state.generation || latest.state.vaultId !== state.vaultId) return "Cloud connection changed during sync. Check its status before continuing.";
@@ -166,4 +171,10 @@ export async function syncNow(): Promise<string> {
     };
     return messages[acknowledged];
   } finally { syncing = false; }
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).filter(key => (value as Record<string, unknown>)[key] !== undefined).sort().map(key => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
+  return JSON.stringify(value);
 }

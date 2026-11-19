@@ -7,9 +7,9 @@ export type TaxWrapper = "none" | "cash-isa" | "lifetime-isa" | "stocks-shares-i
 export type IncomeType = RateType | "bonus";
 export interface PendingBonus { amount: number; expectedDate: string }
 
-export interface Payout { date: string; amount: number; kind: "expected" | "actual"; incomeType?: IncomeType }
+export interface Payout { id?: string; date: string; amount: number; kind: "expected" | "actual"; incomeType?: IncomeType }
 
-export interface BalanceEvent { type: "topup" | "withdraw" | "set" | "interest"; date: string; amount: number }
+export interface BalanceEvent { id?: string; type: "topup" | "withdraw" | "set" | "interest"; date: string; amount: number }
 export interface RatePeriod { from: string; ratePct: number } // rate in force from this date
 export interface StockInvestment {
   shares: number;

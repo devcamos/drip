@@ -63,6 +63,7 @@ describe("financial sync and format boundaries", () => {
     expect(dataFormatVersion({ accounts: [{ investment: {} }, { archivedAt: "2026-10-01" }] })).toBe(4);
     expect(dataFormatVersion({ accounts: [{ positionReviewRequired: true }] })).toBe(4);
     expect(dataFormatVersion({ accounts: [{ creditCard: { statementPaid: true } }] })).toBe(4);
+    expect(dataFormatVersion({ money: "pence", accounts: [] })).toBe(5);
   });
 });
 

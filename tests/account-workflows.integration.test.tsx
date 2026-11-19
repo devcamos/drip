@@ -12,6 +12,7 @@ import { archiveAccount } from "../lib/account-lifecycle";
 import { applyMarketValuation } from "../lib/market-valuation";
 import { AccountForm } from "../app/AccountForm";
 import { applyWithdraw, migrateData, ymd } from "../lib/maths";
+import { withStableMoneyIds } from "../lib/money-storage";
 import { releaseData, releaseDebt, releaseSaver, releaseStock } from "./saved-experience-fixtures";
 import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 import * as previousDb from "./fixtures/pre-workflow-client/db";
@@ -72,10 +73,10 @@ it("round-trips archived history, reviewed positions and paid statements through
   expect(JSON.stringify(stored)).not.toContain("Barclaycard");
   db.lockLocalVault(); await db.unlockLocalVault(fixtureCode);
   expect((await db.loadData()).accounts).toEqual(migrateData(data, ymd(new Date())).accounts);
-  const file = await encryptBackup(data, fixtureCode, 100000); expect(file.v).toBe(4);
-  expect(await decryptBackup(file, fixtureCode)).toEqual(data);
+  const file = await encryptBackup(data, fixtureCode, 100000); expect(file.v).toBe(5);
+  expect(await decryptBackup(file, fixtureCode)).toEqual(withStableMoneyIds(data));
   const key = await cloud.cloudKey(fixtureCode), envelope = await cloud.seal(data, key);
-  expect(envelope.v).toBe(4); expect((await cloud.unseal(envelope, key)).accounts).toEqual(migrateData(data, ymd(new Date())).accounts);
+  expect(envelope.v).toBe(5); expect((await cloud.unseal(envelope, key)).accounts).toEqual(migrateData(data, ymd(new Date())).accounts);
   await expect(cloud.unseal({ ...envelope, v: 3 }, key)).rejects.toThrow();
 });
 

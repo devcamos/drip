@@ -2,6 +2,7 @@ import { validDate } from "./products";
 import { accountAssets, isCreditAccount } from "./credit-card";
 import { applyValuationTransfer, incomeBalance } from "./market-valuation";
 import { isArchivedAccount } from "./account-lifecycle";
+import { fromPence, toPence, withStableMoneyIds } from "./money-storage";
 export { incomeBalance } from "./market-valuation";
 import type { Account, AppData, BalanceEvent, Frequency, RatePeriod, Snapshot, IncomeType, Payout } from "./types";
 
@@ -141,11 +142,16 @@ export function pendingBonuses(accts: (Pick<Account, "bonus"> & Categorised)[]):
 }
 
 /** Recording a payment does not assume it is missing from the user's confirmed balance. */
-export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType): Account {
+export function recordIncome(a: Account, amount: number, date: string, incomeType: IncomeType, id = crypto.randomUUID()): Account {
   if (isCreditAccount(a)) throw new Error("Credit-card payments are not income. Update the amount owed from your statement.");
+  const prior = a.payouts.find(payment => payment.id === id);
+  if (prior) {
+    if (prior.date === date && prior.amount === round2(amount) && prior.kind === "actual" && (prior.incomeType ?? a.rateType) === incomeType) return a;
+    throw new Error("Income event id is already used for a different payment.");
+  }
   if (!Number.isFinite(amount) || round2(amount) <= 0) throw new Error("Income must be at least £0.01.");
   if (!validDate(date)) throw new Error("Enter a valid payment date.");
-  const payout: Payout = { date, amount: round2(amount), kind: "actual", incomeType };
+  const payout: Payout = { id, date, amount: round2(amount), kind: "actual", incomeType };
   return { ...a, payouts: [...a.payouts, payout], bonus: incomeType === "bonus" ? undefined : a.bonus };
 }
 
@@ -241,17 +247,28 @@ export function accrue(opening: number, rates: number | RatePeriod[], events: Pi
     .sort((a, b) => a.date.localeCompare(b.date));
   const open = Math.max(opening, 0);
   let bal = open, deposits = 0, withdrawals = 0, interest = 0, i = 0;
+  // Keep full precision in the accrual so the existing AER calculation stays
+  // unchanged. Emit only whole pennies, carrying sub-penny interest forward
+  // until the cumulative earned amount reaches the next penny.
+  let emittedInterestPence = 0;
+  const interestEvents: BalanceEvent[] = [];
   for (let day = t(start); day < t(end); day += DAY) {
     const d = ymd(new Date(day));
     for (; i < evs.length && evs[i].date === d; i++) {
       if (evs[i].type === "set") bal = evs[i].amount; // a confirmed reading resets the balance; not a transfer
       else if (evs[i].type === "topup") { bal += evs[i].amount; deposits += evs[i].amount; }
-      else { const w = Math.min(evs[i].amount, bal); bal -= w; withdrawals += w; }
+      else { const withdrawal = Math.min(evs[i].amount, bal); bal -= withdrawal; withdrawals += withdrawal; }
     }
     const inc = bal * dailyRate(Math.max(rateOnSorted(hist, d), 0), d);
     bal += inc; interest += inc;
+    const accruedPence = toPence(interest);
+    const creditedPence = accruedPence - emittedInterestPence;
+    if (creditedPence > 0) {
+      interestEvents.push({ id: `interest-${d}`, type: "interest", date: d, amount: fromPence(creditedPence) });
+      emittedInterestPence = accruedPence;
+    }
   }
-  return { opening: open, deposits, withdrawals, interest, closing: bal };
+  return { opening: open, deposits, withdrawals, interest, closing: bal, interestEvents };
 }
 
 /** Back-compatible wrapper: top-ups only, single or historical rate. */
@@ -260,29 +277,39 @@ export function periodGrowth(opening: number, rates: number | RatePeriod[], topu
 }
 
 /** Set a new balance and append the matching event, leaving the original account untouched. */
-function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number): A {
+function withEvent<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, type: BalanceEvent["type"], date: string, amount: number, id: string): A {
   if (!validDate(date) || date > localToday()) throw new Error("Use today or a past date for an actual balance change.");
   const priced = a as A & Partial<Pick<Account, "marketValuation" | "investment">>;
   const transfer = type === "topup" || type === "withdraw";
   const review = transfer && priced.investment ? { positionReviewRequired: true as const } : {};
-  if (priced.marketValuation && transfer) return { ...applyValuationTransfer(priced, type, date, amount), ...review };
-  const updated = { ...a, ...review, balance: round2(balance), events: [...(a.events ?? []), { type, date, amount: round2(amount) }] };
+  if (priced.marketValuation && transfer) return { ...applyValuationTransfer(priced, type, date, amount, id), ...review };
+  const updated = { ...a, ...review, balance: round2(balance), events: [...(a.events ?? []), { id, type, date, amount: round2(amount) }] };
   if ("marketValuation" in updated) { const { marketValuation: _valuation, ...recorded } = updated; return recorded as A; }
   return updated;
 }
 
+function replayedEvent<A extends Pick<Account, "balance" | "events">>(a: A, id: string, type: BalanceEvent["type"], date: string, amount: number): A | undefined {
+  const prior = a.events?.find(event => event.id === id);
+  if (!prior) return undefined;
+  if (prior.type === type && prior.date === date && prior.amount === round2(amount)) return a;
+  throw new Error("Balance event id is already used for a different change.");
+}
+
 /** Apply a top-up: adds to balance and logs the event. */
-export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
+export function applyTopUp<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string, id = crypto.randomUUID()): A {
+  const replay = replayedEvent(a, id, "topup", date, amount); if (replay) return replay;
   if (!(amount > 0)) throw new Error("Top-up must be more than £0");
-  return withEvent(a, a.balance + amount, "topup", date, amount);
+  return withEvent(a, a.balance + amount, "topup", date, amount, id);
 }
 
 /** Apply a withdrawal: reduces balance from that date and logs it. Can't exceed the balance. */
-export function applyWithdraw<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string): A {
+export function applyWithdraw<A extends Pick<Account, "balance" | "events">>(a: A, amount: number, date: string, id = crypto.randomUUID()): A {
+  // Recognize an applied retry before checking the new, lower balance.
+  const replay = replayedEvent(a, id, "withdraw", date, amount); if (replay) return replay;
   if (!(amount > 0)) throw new Error("Withdrawal must be more than £0");
   if (amount > a.balance + 1e-9) throw new Error("You can't withdraw more than the balance");
   if (amount > lowestBalanceFrom(a, date) + 1e-9) throw new Error("You can't withdraw more than the balance on that date. Check the date, or log the top-up that came first.");
-  return withEvent(a, a.balance - amount, "withdraw", date, amount);
+  return withEvent(a, a.balance - amount, "withdraw", date, amount, id);
 }
 
 /**
@@ -318,13 +345,14 @@ export function migrateRates<A extends Pick<Account, "ratePct" | "rateHistory" |
 }
 
 export function migrateData(d: AppData, today: string): AppData {
-  return { ...d, accounts: d.accounts.map((a) => { if (isCreditAccount(a)) return a; const m = migrateRates(a); return { ...m, events: m.events ?? [], ratePct: rateOn(m.rateHistory!, today) }; }) };
+  return withStableMoneyIds({ ...d, accounts: d.accounts.map((a) => { if (isCreditAccount(a)) return a; const m = migrateRates(a); return { ...m, events: m.events ?? [], ratePct: rateOn(m.rateHistory!, today) }; }) });
 }
 
 /** Manual balance update (e.g. read from the provider app); logged, not counted as a deposit. */
-export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, date: string): A {
+export function applySetBalance<A extends Pick<Account, "balance" | "events">>(a: A, balance: number, date: string, id = crypto.randomUUID()): A {
+  const replay = replayedEvent(a, id, "set", date, balance); if (replay) return replay;
   if (!(balance >= 0)) throw new Error("Balance can't be negative");
-  return withEvent(a, balance, "set", date, balance);
+  return withEvent(a, balance, "set", date, balance, id);
 }
 
 /** Sum of top-ups across accounts in a YYYY-MM month. */
@@ -400,9 +428,9 @@ export function parsePastBalances(values: readonly string[], dates: readonly str
  */
 export function withPastBalances<A extends Pick<Account, "balance" | "events">>(account: A, entries: readonly { date: string; balance: number }[], today: string): A {
   if (!entries.length) return account;
-  const past: BalanceEvent[] = entries.filter(({ date }) => date < today).map(({ date, balance }) => ({ type: "set", date, amount: round2(balance) }));
+  const past: BalanceEvent[] = entries.filter(({ date }) => date < today).map(({ date, balance }) => ({ id: crypto.randomUUID(), type: "set", date, amount: round2(balance) }));
   if (!past.length) return account;
-  return { ...account, events: [...past, { type: "set", date: today, amount: round2(account.balance) }, ...(account.events ?? [])] };
+  return { ...account, events: [...past, { id: crypto.randomUUID(), type: "set", date: today, amount: round2(account.balance) }, ...(account.events ?? [])] };
 }
 
 /** Split last month-on-month change into top-ups vs growth (interest/other). Null without history. */

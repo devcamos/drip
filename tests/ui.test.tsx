@@ -225,7 +225,7 @@ describe("accounts", () => {
     await screen.findByText("Income recorded. Update your balance separately if needed.");
     const saved = (await loadData()).accounts[0];
     expect(saved.balance).toBe(3050);
-    expect(saved.payouts).toEqual([{ date: today, amount: 22.65, kind: "actual", incomeType: "interest" }]);
+    expect(saved.payouts).toEqual([expect.objectContaining({ date: today, amount: 22.65, kind: "actual", incomeType: "interest", id: expect.any(String) })]);
     expect(screen.queryByText("Changes could not be saved. Your saved data is unchanged; retry the action.")).toBeNull();
   });
   it("shows a balance change as saved only after the encrypted write completes", async () => {

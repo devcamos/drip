@@ -16,7 +16,7 @@ describe("top-ups", () => {
   });
   it("ignores top-ups outside the period, zero/negative ones, and handles zero rate", () => {
     const r = M.periodGrowth(1000, 0, [{ date: "2026-09-30", amount: 50 }, { date: "2026-10-31", amount: 50 }, { date: "2026-10-05", amount: -5 }, { date: "2026-10-05", amount: 20 }], "2026-10-01", "2026-10-31");
-    expect(r).toEqual({ opening: 1000, deposits: 20, withdrawals: 0, interest: 0, closing: 1020 });
+    expect(r).toEqual({ opening: 1000, deposits: 20, withdrawals: 0, interest: 0, closing: 1020, interestEvents: [] });
     expect(M.periodGrowth(-5, 5, [], "2026-10-01", "2026-10-02").opening).toBe(0);
   });
   it("applyTopUp / applySetBalance update balance and log events", () => {
@@ -25,7 +25,7 @@ describe("top-ups", () => {
     expect(a.balance).toBe(3250.56);
     a = M.applySetBalance(a, 3300, "2026-10-20");
     expect(a.balance).toBe(3300);
-    expect(a.events).toEqual([{ type: "topup", date: "2026-10-15", amount: 250.56 }, { type: "set", date: "2026-10-20", amount: 3300 }]);
+    expect(a.events).toEqual([expect.objectContaining({ type: "topup", date: "2026-10-15", amount: 250.56, id: expect.any(String) }), expect.objectContaining({ type: "set", date: "2026-10-20", amount: 3300, id: expect.any(String) })]);
     expect(() => M.applyTopUp(a, 0, "2026-10-15")).toThrow();
     expect(() => M.applySetBalance(a, -1, "2026-10-15")).toThrow();
   });

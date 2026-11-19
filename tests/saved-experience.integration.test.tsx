@@ -7,6 +7,7 @@ vi.mock("better-auth/client", () => ({ createAuthClient: () => auth }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
 import * as db from "../lib/db";
 import { applyWithdraw, migrateData } from "../lib/maths";
+import { withStableMoneyIds } from "../lib/money-storage";
 import * as cloud from "../lib/cloud";
 import * as cryptoFiles from "../lib/crypto";
 import * as oldDb from "./fixtures/pre-debt-client/db";
@@ -146,11 +147,11 @@ it("round-trips multiple real encrypted debts and valued holdings while preservi
   expect(JSON.stringify(stored)).not.toContain("Barclaycard");
   db.lockLocalVault(); expect((await db.unlockLocalVault(fixtureCode)).data).toEqual(migrateData(data, "2026-11-07"));
   const backup = await cryptoFiles.encryptBackup(data, fixtureCode, 100000);
-  expect(backup.v).toBe(4); expect(await cryptoFiles.decryptBackup(backup, fixtureCode)).toEqual(data);
+  expect(backup.v).toBe(5); expect(await cryptoFiles.decryptBackup(backup, fixtureCode)).toEqual(withStableMoneyIds(data));
   await expect(oldCrypto.decryptBackup(backup, fixtureCode)).rejects.toThrow();
   await expect(cryptoFiles.decryptBackup({ ...backup, v: 2 }, fixtureCode)).rejects.toThrow();
   const key = await cloud.cloudKey(fixtureCode), envelope = await cloud.seal(data, key);
-  expect(envelope.v).toBe(4); expect((await cloud.unseal(envelope, key)).accounts).toEqual(migrateData(data, "2026-11-07").accounts);
+  expect(envelope.v).toBe(5); expect((await cloud.unseal(envelope, key)).accounts).toEqual(migrateData(data, "2026-11-07").accounts);
   await expect(oldCloud.unseal(envelope as never, key)).rejects.toThrow("Unsupported cloud copy");
   await expect(cloud.unseal({ ...envelope, v: 2 }, key)).rejects.toThrow();
   for (const legacy of [releaseData([releaseSaver()]), releaseData([releaseStock()])]) {

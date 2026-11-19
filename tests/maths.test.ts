@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import * as M from "../lib/maths";
+import { toPence } from "../lib/money-storage";
 import type { Account } from "../lib/types";
 import { portfolioTotals } from "../lib/credit-card";
 
@@ -136,11 +137,21 @@ describe("today follows the UK calendar (#78)", () => {
   it("accepts a top-up dated today at 00:30 BST and files it in the UK month", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-06-30T23:30:00Z"));
     const a = M.applyTopUp(acct({ balance: 100, events: [] }), 5, "2026-07-01");
-    expect(a.events).toEqual([{ type: "topup", date: "2026-07-01", amount: 5 }]);
+    expect(a.events).toEqual([expect.objectContaining({ type: "topup", date: "2026-07-01", amount: 5, id: expect.any(String) })]);
     expect(() => M.applyTopUp(a, 5, "2026-07-02")).toThrow(/today or a past date/);
     const snaps = M.upsertSnapshot([], [a], new Date());
     expect(snaps).toEqual([expect.objectContaining({ month: "2026-07", deposits: 5 })]);
     expect(M.recordedIncome([acct({ payouts: [{ date: "2026-07-01", amount: 3, kind: "actual", incomeType: "interest" }] })])).toBe(3);
+  });
+  it("treats a retried withdrawal as the same event before checking the reduced balance", () => {
+    const opening = acct({ balance: 100, events: [] });
+    const first = M.applyWithdraw(opening, 75, "2026-10-30", "withdrawal-request-1");
+    expect(first.balance).toBe(25);
+    expect(M.applyWithdraw(first, 75, "2026-10-30", "withdrawal-request-1")).toBe(first);
+    expect(first.events).toHaveLength(1);
+    expect(() => M.applyWithdraw(first, 80, "2026-10-30", "withdrawal-request-1")).toThrow(/already used/);
+    const full = M.applyWithdraw(opening, 100, "2026-10-30", "withdrawal-request-2");
+    expect(M.applyWithdraw(full, 100, "2026-10-30", "withdrawal-request-2")).toBe(full);
   });
 });
 
@@ -222,6 +233,13 @@ describe("day-accurate current-period interest", () => {
 });
 
 describe("annual equivalent rate (AER) is not compounded twice (#77)", () => {
+  it("carries fractional daily interest so penny events reconcile exactly to the balance delta", () => {
+    const result = M.accrue(10_000, 3.65, [], "2026-01-01", "2027-01-01");
+    const eventPence = result.interestEvents.reduce((sum, event) => sum + toPence(event.amount), 0);
+    expect(eventPence).toBe(toPence(result.interest));
+    expect(toPence(result.closing - result.opening - result.deposits + result.withdrawals)).toBe(toPence(result.interest));
+    expect(result.interestEvents.every(event => Number.isSafeInteger(toPence(event.amount)))).toBe(true);
+  });
   it("a full calendar year at a constant rate earns exactly that rate, in normal and leap years", () => {
     expect(M.accrue(1000, 5, [], "2026-01-01", "2027-01-01").interest).toBeCloseTo(50, 2);
     expect(M.accrue(1000, 5, [], "2028-01-01", "2029-01-01").interest).toBeCloseTo(50, 2);

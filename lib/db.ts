@@ -6,6 +6,7 @@ import { checkCode, codeVerifier } from "./crypto";
 import { createVault, openVault, encryptLocal, decryptLocal, type LocalKeys, type VaultHeader, type LocalEnvelope } from "./local-vault";
 import type { PasskeyWrap } from "./passkey-crypto";
 import type { PasswordWrap } from "./password-crypto";
+import { withStableMoneyIds } from "./money-storage";
 
 const DB = "drip", STORE = "kv", KEY = "data";
 export const emptyData = (): AppData => ({ version: 1, accounts: [], snapshots: [], lastBackupAt: null });
@@ -40,12 +41,13 @@ export async function clearOnboardingDraft() { await tx("readwrite", s => s.dele
 
 function open(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
-    // Keep the existing store/ciphertext, but fence clients that cannot preserve
-    // archives, paid statements and position-review metadata before writing.
-    const r = indexedDB.open(DB, 4);
+    // Version 5 fences older clients that would read integer pence as pounds.
+    const r = indexedDB.open(DB, 5);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
-    r.onerror = () => rej(new Error("Could not open local storage.", { cause: r.error }));
+    r.onerror = () => rej(r.error?.name === "VersionError"
+      ? new Error("This Drip data needs a newer app version. Refresh the app to continue.", { cause: r.error })
+      : new Error("Could not open local storage.", { cause: r.error }));
   });
 }
 async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -225,16 +227,18 @@ export async function unlockLocalVault(root: string, expected?: VaultBinding): P
   }
   const data = before.vault ? await decryptLocal<AppData>(before.data as LocalEnvelope, keys) : before.data as AppData ?? emptyData();
   if (!isAppData(data)) throw new Error("Invalid local data. Your stored copy has not changed.");
-  const encrypted = before.vault ? before.data as LocalEnvelope : await encryptLocal(data, keys);
-  if (!before.vault && JSON.stringify(await decryptLocal(encrypted, keys)) !== JSON.stringify(data)) throw new Error("Local encryption verification failed.");
+  const migrated = migrateData(data, localToday());
+  const rewriteData = !before.vault || (before.data as LocalEnvelope | undefined)?.v === 1;
+  const encrypted = rewriteData ? await encryptLocal(migrated, keys) : before.data as LocalEnvelope;
+  if (rewriteData && JSON.stringify(await decryptLocal(encrypted, keys)) !== JSON.stringify(migrated)) throw new Error("Local encryption verification failed.");
   const verifier = before.verifier ?? await codeVerifier(root);
   await guardedWrite(before, stamp, (s) => {
     if (!before.vault) {
       s.put(keys.header, "localVault"); s.put(encrypted, KEY); s.put(verifier, "verifier");
       s.put(metadata(before.cloud as CloudState | undefined), "cloudState");
-    }
+    } else if (rewriteData) s.put(encrypted, KEY);
     s.delete("onboardingDraft");
-  }, { allowSignedOut: true, passkey: expected?.passkeyCiphertext !== undefined, password: expected?.passwordCiphertext !== undefined });
+  }, { allowSignedOut: true, records: rewriteData && !!before.vault, passkey: expected?.passkeyCiphertext !== undefined, password: expected?.passwordCiphertext !== undefined });
   if (stamp !== epoch) throw new VaultLockedError();
   unlocked = { keys, generation: before.gate?.generation, signupRoot: before.signupRecovery?.vaultId === keys.header.id ? root : undefined };
   closing = false;
@@ -458,8 +462,9 @@ export async function commitCloudRestore(data: AppData, state: CloudState | unde
   if (signupPassword && ((!replacement && (before.vault || before.verifier)) || signupPassword.owner !== state?.userId)) throw new Error("This browser already has an account. Sign in instead.");
   if ((before.gate?.signedOut && before.gate.generation !== resumeGeneration) || before.gate?.generation !== expectedGeneration) throw new Error("Device session changed. Sign in again before restoring.");
   const keys = root ? await createVault(root) : current(before, !!resumeGeneration).keys;
-  const encrypted = await encryptLocal(data, keys);
-  if (JSON.stringify(await decryptLocal(encrypted, keys)) !== JSON.stringify(data)) throw new Error("Local encryption verification failed.");
+  const normalized = withStableMoneyIds(data);
+  const encrypted = await encryptLocal(normalized, keys);
+  if (JSON.stringify(await decryptLocal(encrypted, keys)) !== JSON.stringify(normalized)) throw new Error("Local encryption verification failed.");
   const generation = resumeGeneration ? crypto.randomUUID() : before.gate?.generation;
   await guardedWrite(before, stamp, s => {
     s.put(encrypted, KEY); s.put(keys.header, "localVault"); s.put(metadata(state), "cloudState"); s.put(verifier, "verifier"); s.delete("onboardingDraft");

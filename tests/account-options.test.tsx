@@ -30,6 +30,17 @@ it("offers Lloyds with category-driven interest defaults, without choosing an IS
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "Lloyds Bank", productCategory: "easy-access", taxWrapper: "none", rateType: "interest", ratePct: 3.25, frequency: "monthly" }));
 });
 
+it("submits one account save while the encrypted write is pending", async () => {
+  let finish!: (result: boolean) => void;
+  const pending = new Promise<boolean>(resolve => { finish = resolve; });
+  const save = vi.fn(() => pending); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
+  change("Balance", "2500"); change("Rate", "3.25");
+  const form = screen.getByRole("button", { name: "Save" }).closest("form")!;
+  act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+  expect(save).toHaveBeenCalledTimes(1);
+  await act(async () => { finish(true); await pending; });
+});
+
 it("offers the six requested stocks and keeps yield and schedule user-entered when holdings change", () => {
   const save = vi.fn(); render(<AccountForm onSave={save} onCancel={vi.fn()} />);
   change("Product category", "stocks-funds"); change("Provider", "Trading212");
@@ -159,7 +170,7 @@ it("records optional past month-end balances once when adding an account, leavin
   expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   fireEvent.change(document.getElementById("past-balance-2")!, { target: { value: "2000" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 2500, events: [{ type: "set", date: oldest, amount: 2000 }, { type: "set", date: latest, amount: 2400 }, { type: "set", date: M.localToday(), amount: 2500 }] }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ balance: 2500, events: [expect.objectContaining({ type: "set", date: oldest, amount: 2000, id: expect.any(String) }), expect.objectContaining({ type: "set", date: latest, amount: 2400, id: expect.any(String) }), expect.objectContaining({ type: "set", date: M.localToday(), amount: 2500, id: expect.any(String) })] }));
 });
 
 it("doesn't offer past balances when editing an existing account", () => {

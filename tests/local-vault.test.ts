@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { emptyData, localVaultStatus, unlockLocalVault, lockLocalVault, loadData, saveData, getItem, setItem, commitCloudRestore } from "../lib/db";
 import { codeVerifier, deriveCloudEncryptionKey, generateRecoveryCode } from "../lib/crypto";
+import { openVault } from "../lib/local-vault";
 import { createRecoveryCodes, resolveRecoveryCode } from "../lib/recovery-codes";
 import { rawStore, seedVault, fixtureCode as code } from "./storage-fixtures";
 const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "private_user", createdAt: "now" }, lastBackupAt: "private-sentinel" };
@@ -58,6 +59,23 @@ describe("encrypted local storage", () => {
     await expect(unlockLocalVault(code)).rejects.toThrow(); expect(await localVaultStatus()).toBe("locked");
     const raw = await rawStore(); await rawStore({ data: second, localVault: { ...raw.localVault, id: "wrong-vault" } });
     await expect(unlockLocalVault(code)).rejects.toThrow(/Invalid local key/);
+  });
+  it("upgrades an encrypted pounds envelope to pence on unlock and fences the prior DB schema", async () => {
+    const legacy = { ...data, accounts: [{ id: "saver", provider: "Zopa", label: "Rainy day", balance: 123.45, ratePct: 4, rateType: "interest" as const, frequency: "monthly" as const, nextPayoutDate: "2026-11-30", colour: "#000", payouts: [], createdAt: "2026-01-01" }] };
+    await seedVault(legacy);
+    const before = await rawStore(), keys = await openVault(before.localVault, code);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(`drip-local-data-v1:${keys.header.id}`) }, keys.dataKey, new TextEncoder().encode(JSON.stringify(legacy))));
+    const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+    await rawStore({ data: { app: "drip-local-data", v: 1, iv: b64(iv), ct: b64(ciphertext) } });
+    lockLocalVault(true); await unlockLocalVault(code);
+    const saved = await rawStore();
+    expect(saved.data.v).toBe(2);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Uint8Array.from(atob(saved.data.iv), char => char.charCodeAt(0)), additionalData: new TextEncoder().encode(`drip-local-data-v2:${keys.header.id}`) }, keys.dataKey, Uint8Array.from(atob(saved.data.ct), char => char.charCodeAt(0)));
+    const stored = JSON.parse(new TextDecoder().decode(plaintext));
+    expect(stored).toMatchObject({ money: "pence", accounts: [{ balance: 12345, currency: "GBP" }] });
+    expect((await loadData()).accounts[0].balance).toBe(123.45);
+    await expect(new Promise((resolve, reject) => { const request = indexedDB.open("drip", 4); request.onsuccess = () => { request.result.close(); resolve(null); }; request.onerror = () => reject(request.error); })).rejects.toThrow(/lower version/);
   });
   it("rejects an encrypted write finishing after sign-out and preserves the prior ciphertext", async () => {
     await seedVault(data); const first = (await rawStore()).data;
