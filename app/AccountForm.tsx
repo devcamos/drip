@@ -75,13 +75,16 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
   const [bonusAmount, setBonusAmount] = useState(initial.bonusAmount);
   const [bonusDate, setBonusDate] = useState(existing?.bonus?.expectedDate ?? "");
   const [positionConfirmed, setPositionConfirmed] = useState(false);
-  useUnsavedDraft({ provider, custom, category, wrapper, label, holding, customHolding, colour, balance, rate, rateType, investmentFields, frequency, reinvest, next, rateFrom, hasBonus, bonusAmount, bonusDate, positionConfirmed });
+  const [pastDates] = useState(() => M.pastMonthEnds(today()));
+  const [pastBalances, setPastBalances] = useState<string[]>(() => pastDates.map(() => ""));
+  useUnsavedDraft({ provider, custom, category, wrapper, label, holding, customHolding, colour, balance, rate, rateType, investmentFields, frequency, reinvest, next, rateFrom, hasBonus, bonusAmount, bonusDate, positionConfirmed, pastBalances });
+  const past = existing ? [] : M.parsePastBalances(pastBalances, pastDates);
   const isOther = isOtherProvider(provider, existing);
   const b = Number(balance), r = Number(rate);
   const rateChanged = !!existing && r !== existing.ratePct;
   const name = isOther ? custom.trim() : provider;
   const validHolding = validHoldingName(category, provider, customHolding, holding);
-  const valid = (!existing?.positionReviewRequired || positionConfirmed) && investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
+  const valid = past !== null && (!existing?.positionReviewRequired || positionConfirmed) && investment !== null && validHolding && validForm({ balance, rate, frequency, next, provider: name, rateFrom: rateChanged ? rateFrom : undefined, bonus: hasBonus ? { amount: bonusAmount, date: bonusDate } : undefined });
   const retainsMarketBasis = !!existing?.marketValuation && M.round2(b) === existing.balance && holding.trim() === existing.holdingName && investment?.shares === existing.investment?.shares && rateType === "dividend";
   const chooseCategory = (value: ProductCategory) => {
     const defaults = PRODUCTS[value]; setCategory(value); setWrapper(defaults.taxWrapper); setRateType(defaults.rateType);
@@ -103,7 +106,8 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       // recorded provider balance and the new income baseline.
       if (base.marketValuation && (rateType !== "dividend" || base.holdingName !== existing?.holdingName || base.investment?.shares !== existing?.investment?.shares)) delete base.marketValuation;
       delete base.positionReviewRequired;
-      const account = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
+      const changed = rateChanged ? M.applyRateChange(base, r, rateFrom, today()) : base;
+      const account = existing || !past ? changed : M.withPastBalances(changed, past, today());
       setBusy(true); setError("");
       try { if (await onSave(existing && M.round2(b) !== existing.balance ? M.applySetBalance({ ...account, balance: existing.balance }, b, today()) : account) === false) setError("Could not save this account. Your entry is kept. Check the message above before retrying."); }
       catch { setError("Could not save this account. Keep Drip open and retry."); }
@@ -144,6 +148,11 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
       {frequency !== "daily" ? <><label htmlFor="next-payout">Next payout date</label><input disabled={busy} id="next-payout" type="date" value={next} onChange={e => setNext(e.target.value)} /></>
         : <p className="muted">Daily payments need no payout date. Predictions never change your saved balance.</p>}
       <label className="check-label"><input disabled={busy} type="checkbox" checked={reinvest} onChange={e => setReinvest(e.target.checked)} />Reinvest predicted income</label>
+      {!existing && <details className="panel past-balances"><summary>Add past balances (optional)</summary>
+        <p className="muted">Enter month-end balances from your provider&apos;s statements so Trends shows your history and month-on-month change straight away. Leave any month blank.</p>
+        {pastDates.map((date, i) => <div key={date}><label htmlFor={`past-balance-${i}`}>Month end {new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })} (£)</label><input disabled={busy} id={`past-balance-${i}`} inputMode="decimal" value={pastBalances[i]} onChange={e => setPastBalances(values => values.map((v, j) => j === i ? e.target.value : v))} /></div>)}
+        {past === null && <p role="alert" className="err">Past balances must be amounts of £0 or more.</p>}
+      </details>}
       <p className="muted">Your balance is the amount you enter. Keep it up to date using your provider&apos;s figures. Use the standard rate here, excluding any deferred bonus.</p>
       <label className="check-label"><input disabled={busy} type="checkbox" checked={hasBonus} onChange={e => setHasBonus(e.target.checked)} />Track a pending bonus</label>
       {hasBonus && <fieldset className="panel"><legend>Pending bonus</legend>

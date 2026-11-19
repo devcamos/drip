@@ -56,7 +56,7 @@ export interface Account {
 }
 
 /** Month-end total balance snapshot, keyed by YYYY-MM. */
-export interface Snapshot { month: string; totalBalance: number; monthlyIncome: number; deposits?: number; withdrawals?: number }
+export interface Snapshot { month: string; totalBalance: number; monthlyIncome: number; deposits?: number; withdrawals?: number; rebuilt?: true } // rebuilt: derived for display, never saved
 
 export interface LockSettings { credentialId: string | null; enabledAt: string | null }
 export interface AppData { version: 1; accounts: Account[]; snapshots: Snapshot[]; lastBackupAt: string | null; projection?: { monthlyDeposit: number; years: number }; lock?: LockSettings; identity?: Identity }
