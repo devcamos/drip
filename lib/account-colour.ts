@@ -1,3 +1,13 @@
+/**
+ * Drip's own neutral account palette. It isn't taken from any provider's brand,
+ * so cards never imply a provider endorsed or supplied them. Users can still pick
+ * any colour per account. Every value keeps card text at 4.5:1 or better.
+ */
+export const ACCOUNT_COLOURS = {
+  Copper: "#b85a2a", Ocean: "#176b9a", Forest: "#2f6b47", Plum: "#6b2d83",
+  Slate: "#4a5070", Teal: "#0f6b6b", Berry: "#8c2f55", Indigo: "#3d4a8f",
+} as const;
+
 /** Accept only hex colours; older empty/invalid values use the Nexus default. */
 export function normaliseColour(value: unknown): string {
   if (typeof value !== "string" || !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value)) return "#b85a2a";

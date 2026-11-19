@@ -21,6 +21,7 @@ import type { AppData } from "../lib/types";
 import { AccountsHome } from "../app/accounts/AccountsHome";
 import { StockPrice } from "../app/stocks/StockPrice";
 import { portfolioTotals } from "../lib/credit-card";
+import { ACCOUNT_COLOURS } from "../lib/account-colour";
 
 it("groups accounts with separate totals, collapses sections and opens the correct card", () => {
   const accounts = releaseHoldingsAndDebts();
@@ -241,8 +242,13 @@ it("offers credit-card providers without losing a custom provider on edit", asyn
   expect(screen.getByLabelText("Credit card provider")).toHaveValue("__other__");
   expect(screen.getByLabelText("Provider name")).toHaveValue("A local credit union");
   expect(screen.getByRole("option", { name: "Barclaycard" })).toBeInTheDocument();
+  // #3: credit cards share Drip's neutral palette, and the chosen colour is saved.
+  const palette = screen.getAllByRole("group", { name: "Card colour" }).find(element => element.tagName === "DIV")!;
+  expect(within(palette).getAllByRole("button").map(button => button.textContent)).toEqual(Object.keys(ACCOUNT_COLOURS));
+  fireEvent.click(within(palette).getByRole("button", { name: "Indigo" }));
+  expect(within(palette).getByRole("button", { name: "Indigo" })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union" })));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ provider: "A local credit union", colour: ACCOUNT_COLOURS.Indigo })));
 });
 
 function ClickProfileAsSoonAsItAppears({ children }: { children: ReactNode }) {
