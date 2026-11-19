@@ -133,6 +133,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const [saveError, setSaveError] = useState("");
   const [loadError, setLoadError] = useState("");
   const lockOn = !!data?.lock?.credentialId;
+  const hiddenAt = useRef<number | null>(null);
   useEffect(() => {
     if (!data || initialNavigation.current) return;
     initialNavigation.current = true;
@@ -148,11 +149,14 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   }, [view.name, pendingSaves, draftGuard.dirty]);
   useEffect(() => {
     if (!data) return;
-    let hiddenAt: number | null = null;
     const onVis = () => {
-      if (document.visibilityState === "hidden") hiddenAt = Date.now();
-      else if (L.shouldLock(lockOn, hiddenAt, Date.now(), false)) setLocked(true);
+      if (document.visibilityState === "hidden") hiddenAt.current ??= Date.now();
+      else {
+        if (L.shouldLock(lockOn, hiddenAt.current, Date.now(), false)) setLocked(true);
+        hiddenAt.current = null;
+      }
     };
+    if (document.visibilityState === "hidden") hiddenAt.current ??= Date.now();
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [data, lockOn]);
