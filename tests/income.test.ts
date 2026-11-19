@@ -53,16 +53,15 @@ describe("product and income calculations", () => {
   it("predicts dividends without stock-price growth and only reinvests when selected", () => {
     const stocks = account({ balance: 1000, ratePct: 12, rateType: "dividend" });
     const paidOut = M.projection([stocks], 12, 0, "2026-10-18").at(-1)!;
-    const paidMonths = Array.from({ length: 12 }, (_, month) => M.accrue(1000, 12, [], M.addMonths("2026-10-18", month), M.addMonths("2026-10-18", month + 1)).interest);
     expect(paidOut.balance).toBe(1000);
-    // Each month compounds daily, then the interest is paid out so the balance stays £1,000.
-    expect(paidOut.income).toBeCloseTo(paidMonths.reduce((sum, interest) => sum + interest, 0), 8);
+    // The quoted yield is annual cash income, spread evenly without reinvestment.
+    expect(paidOut.income).toBeCloseTo(120, 8);
     const reinvested = M.projection([{ ...stocks, reinvestIncome: true }], 12, 0, "2026-10-18").at(-1)!;
-    expect(reinvested.income).toBeCloseTo(120, 8);
-    expect(reinvested.balance).toBeCloseTo(1120, 8);
+    expect(reinvested.income).toBeCloseTo(1000 * (1.01 ** 12 - 1), 8);
+    expect(reinvested.balance).toBeCloseTo(1000 * 1.01 ** 12, 8);
     const bonus = M.projection([{ ...stocks, bonus: { amount: 10, expectedDate: "2026-11-01" } }], 1, 0, "2026-10-18")[0];
     expect(bonus.balance).toBe(1000);
-    expect(bonus.income).toBeCloseTo(paidMonths[0] + 10, 8);
+    expect(bonus.income).toBeCloseTo(20, 8);
   });
   it("keeps deposits out of predicted income, allocating by starting balances", () => {
     const a = account({ balance: 1000, ratePct: 12 });

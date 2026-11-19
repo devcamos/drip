@@ -151,7 +151,7 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
         <label htmlFor="bonus-date">Expected bonus payment date</label><input disabled={busy} id="bonus-date" type="date" value={bonusDate} onChange={e => setBonusDate(e.target.value)} />
         <p className="muted">Enter your provider&apos;s accrued amount or your own estimate. Drip predicts this amount once on the expected date; it doesn&apos;t calculate eligibility or further bonus accrual.</p>
       </fieldset>}
-      {valid && <p className="muted">≈ {M.gbp(M.monthlyIncome(retainsMarketBasis ? existing!.marketValuation!.recordedBalance : b, r))} estimated a month</p>}
+      {valid && <p className="muted">≈ {M.gbp(M.accountMonthlyIncome({ balance: retainsMarketBasis ? existing!.marketValuation!.recordedBalance : b, ratePct: r, rateType }))} estimated a month</p>}
       <div className="row-gap"><button className="btn" type="submit" disabled={!valid || busy}>{busy ? "Saving…" : "Save"}</button><button className="btn ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button></div>
       {error && <p role="alert" className="err">{error}</p>}
     </form>

@@ -39,22 +39,30 @@ export function annualIncome(balance: number, ratePct: number, from = localToday
 
 const PER_YEAR: Record<Frequency, number> = { daily: 365, monthly: 12, quarterly: 4, annually: 1 };
 type Categorised = Partial<Pick<Account, "productCategory" | "archivedAt">>;
-type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation" | "archivedAt">>;
+type IncomeAccount = Pick<Account, "balance" | "ratePct"> & Partial<Pick<Account, "productCategory" | "marketValuation" | "archivedAt" | "rateType">>;
+
+/** A quoted dividend yield is annual cash income, not an AER. Payments are estimates. */
+function annualDividend(balance: number, ratePct: number): number {
+  return balance > 0 && ratePct > 0 ? balance * ratePct / 100 : 0;
+}
 
 /** Price movements do not rewrite the provider balance used to estimate cash income. */
 export function accountMonthlyIncome(account: IncomeAccount, today = localToday()): number {
-  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : monthlyIncome(incomeBalance(account), account.ratePct, today);
+  if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
+  return account.rateType === "dividend" ? annualDividend(incomeBalance(account), account.ratePct) / 12 : monthlyIncome(incomeBalance(account), account.ratePct, today);
 }
 
 /** Expected income over the 12 months starting at `from`, excluding credit and archived accounts. */
 export function accountAnnualIncome(account: IncomeAccount, from = localToday()): number {
-  return isCreditAccount(account) || isArchivedAccount(account) ? 0 : annualIncome(incomeBalance(account), account.ratePct, from);
+  if (isCreditAccount(account) || isArchivedAccount(account)) return 0;
+  return account.rateType === "dividend" ? annualDividend(incomeBalance(account), account.ratePct) : annualIncome(incomeBalance(account), account.ratePct, from);
 }
 
 /** Amount paid at each payout, compounded daily at the AER over that payment period. */
 export function payoutAmount(a: IncomeAccount & Pick<Account, "frequency">, today = localToday()): number {
   if (isCreditAccount(a) || isArchivedAccount(a)) return 0;
   const balance = incomeBalance(a);
+  if (a.rateType === "dividend") return annualDividend(balance, a.ratePct) / (a.frequency === "daily" ? daysInYear(today) : PER_YEAR[a.frequency]);
   if (a.frequency === "daily") {
     const next = ymd(new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000));
     return accrue(balance, a.ratePct, [], today, next).interest;
@@ -108,7 +116,7 @@ export function projection(accts: ForecastAccount[], months = 12, monthlyDeposit
     const end = addMonths(today, month);
     for (const holding of holdings) {
       const a = holding.account;
-      let earned = accrue(holding.incomeBasis, a.ratePct, [], start, end).interest;
+      let earned = a.rateType === "dividend" ? annualDividend(holding.incomeBasis, a.ratePct) / 12 : accrue(holding.incomeBasis, a.ratePct, [], start, end).interest;
       if (a.bonus && !holding.bonusApplied && a.bonus.expectedDate >= today && a.bonus.expectedDate <= end) {
         earned += a.bonus.amount; holding.bonusApplied = true;
       }

@@ -264,7 +264,7 @@ describe("accounts", () => {
     fireEvent.change(screen.getByLabelText("Type"), { target: { value: "dividend" } });
     fireEvent.change(screen.getByLabelText("Paid"), { target: { value: "quarterly" } });
     type(screen.getByLabelText("Next payout date"), today);
-    expect(screen.getByText(`≈ ${M.gbp(M.monthlyIncome(1200, 5))} estimated a month`)).toBeInTheDocument();
+    expect(screen.getByText("≈ £5.00 estimated a month")).toBeInTheDocument();
     click("Save");
 
     // The form preview also contains the provider name. Wait for saved-detail
