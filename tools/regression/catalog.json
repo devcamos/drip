@@ -144,7 +144,9 @@
         "server/auth.ts",
         "server/password-login.ts",
         "server/password-transaction.ts",
-        "app/AuthWelcome.module.css"
+        "app/AuthWelcome.module.css",
+        "app/StaySignedIn.tsx",
+        "app/StaySignedIn.module.css"
       ],
       "tests": [
         "tests/password-server.test.ts",
@@ -210,6 +212,7 @@
       "sources": [
         "lib/account-switch.ts",
         "lib/db.ts",
+        "lib/trusted-session.ts",
         "lib/draft.ts",
         "lib/local-vault.ts"
       ],
@@ -226,7 +229,9 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
-        "tests/recovery-boundaries.unit.test.ts"
+        "tests/recovery-boundaries.unit.test.ts",
+        "tests/trusted-device.test.ts",
+        "tests/trusted-session.test.ts"
       ]
     },
     {
@@ -598,6 +603,7 @@
       ],
       "tests": [
         "tests/ui.test.tsx",
+        "tests/trusted-session.test.ts",
         "tests/identity.test.ts",
         "tests/signup-form.test.tsx",
         "e2e/smoke.spec.ts",
@@ -905,7 +911,9 @@
       "tests/saved-experience.integration.test.tsx",
       "tests/account-workflows.integration.test.tsx",
       "tests/feedback.integration.test.tsx",
-      "tests/stock-reading.integration.test.tsx"
+      "tests/stock-reading.integration.test.tsx",
+      "tests/trusted-device.test.ts",
+      "tests/trusted-session.test.ts"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
