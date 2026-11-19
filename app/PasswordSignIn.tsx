@@ -4,15 +4,19 @@ import { passwordUsername, signInPassword } from "@/lib/password-login";
 import { AccountSwitchRequired } from "@/lib/account-switch";
 import { DeviceLimitReached } from "@/lib/device-management";
 import { DeviceManager } from "./DeviceManagement";
+import { StaySignedIn, keepSignedIn } from "./StaySignedIn";
 
-export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, showTitle = true }: Readonly<{ onSignedIn: () => void | Promise<void>; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean }>) {
+export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, showTitle = true, stay: sharedStay, onStayChange }: Readonly<{ onSignedIn: () => void | Promise<void>; disabled?: boolean; onBusyChange?: (value: boolean) => void; showTitle?: boolean; stay?: boolean; onStayChange?: (value: boolean) => void }>) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [switchRequest, setSwitchRequest] = useState<AccountSwitchRequired>();
   const [deviceLimit, setDeviceLimit] = useState(false); const [managing, setManaging] = useState(false);
+  const [ownStay, setOwnStay] = useState(false);
+  // The locked screen shares one choice between password and passkey unlock.
+  const stay = sharedStay ?? ownStay; const setStay = onStayChange ?? setOwnStay;
   const edited = useRef(false);
   useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name && !edited.current) setUsername(name); }).catch(() => {}); return () => { active = false; }; }, []);
-  async function finishSignIn() { await signInPassword(username, password, !!switchRequest, switchRequest?.retained); await onSignedIn(); setManaging(false); setDeviceLimit(false); setPassword(""); setSwitchRequest(undefined); }
+  async function finishSignIn() { await signInPassword(username, password, !!switchRequest, switchRequest?.retained); await keepSignedIn(stay); await onSignedIn(); setManaging(false); setDeviceLimit(false); setPassword(""); setSwitchRequest(undefined); }
   if (managing) return <DeviceManager username={username} password={password} onClose={() => { setManaging(false); setDeviceLimit(false); setMessage(""); }} onContinue={finishSignIn} />;
   return <form className="panel password-form" aria-label="Password sign-in" onSubmit={async event => {
     event.preventDefault();
@@ -32,6 +36,7 @@ export function PasswordSignIn({ onSignedIn, disabled = false, onBusyChange, sho
     <p id="login-hint" className="muted">Use your full gamertag, including any numbers.</p>
     <label htmlFor="login-password">Password</label>
     <input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={event => { setPassword(event.target.value); setDeviceLimit(false); setMessage(""); }} disabled={busy || disabled} />
+    <StaySignedIn id="login-stay" checked={stay} onChange={setStay} disabled={busy || disabled} />
     {switchRequest && <section className="account-switch" aria-label="Switch saved account">
       <h2>Another account is saved here</h2>
       {switchRequest.canReplace

@@ -37,7 +37,7 @@ For the full regression gate, including browser journeys and a disposable local 
 
 ## Security and recovery
 
-Financial records are encrypted in the browser before local storage or cloud sync. A gamertag and password provide sign-in; cloud sessions are limited to four devices and expire after seven days. Sign-out locks the local vault and retains its encrypted data. A fresh page needs a password, a configured unlock passkey or a recovery code to unlock it.
+Financial records are encrypted in the browser before local storage or cloud sync. A gamertag and password provide sign-in; cloud sessions are limited to four devices and expire after seven days. Sign-out locks the local vault and retains its encrypted data. A fresh page needs a password, a configured unlock passkey or a recovery code to unlock it, unless you tick "Keep me signed in on this device" when signing in. That remembers this device for up to 30 days using keys the page cannot export. An online automatic reopen checks the cloud session; a revoked or expired session requires a fresh unlock. Automatically remembered offline access is checked when that session reconnects. Remote revocation cannot immediately lock an offline device or erase its local passkey; a user-verified local passkey can still unlock the encrypted local copy. An enabled app lock still asks for Face ID on open.
 
 Save the original recovery codes somewhere safe. If the password, recovery codes and all configured devices are lost, Drip cannot decrypt or reset the account for you. A cloud copy contains the latest successfully synced data; unsynced changes remain on their original device. Sync conflicts require review rather than silently overwriting another device.
 

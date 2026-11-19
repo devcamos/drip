@@ -12,6 +12,7 @@ import { PwaStatus, PwaUpdateSettings } from "./PwaStatus";
 import { InstallTask, useInstallTask } from "./InstallTask";
 import { SignOutButton, SignedOut } from "./DeviceSession";
 import { readDeviceSession } from "@/lib/device-session";
+import { verifyTrustedSession } from "@/lib/trusted-session";
 import { RecoveryCodes } from "./RecoveryCodes";
 import { SignupRecovery } from "./SignupRecovery";
 import { PasskeyUnlock } from "./PasskeyUnlock";
@@ -57,7 +58,7 @@ export default function Drip() {
   const refresh = useCallback(async () => {
     const id = ++sequence.current;
     try {
-      const status = await localVaultStatus(); const session = await readDeviceSession();
+      const status = await localVaultStatus(Date.now(), verifyTrustedSession); const session = await readDeviceSession();
       const checkpoint = await getItem<{ vaultId: string }>("signupRecoveryRequired");
       const { binding } = await passwordUnlockContext();
       if (id !== sequence.current) return;
@@ -79,8 +80,9 @@ export default function Drip() {
     refresh();
     const storage = (event: StorageEvent) => { if (event.key === "drip-session-notify") refresh(); };
     const visible = () => { if (document.visibilityState === "visible") refresh(); };
-    window.addEventListener("drip-session-changed", refresh); window.addEventListener("storage", storage); document.addEventListener("visibilitychange", visible);
-    return () => { sequence.current++; window.removeEventListener("drip-session-changed", refresh); window.removeEventListener("storage", storage); document.removeEventListener("visibilitychange", visible); };
+    const validation = window.setInterval(visible, 60_000);
+    window.addEventListener("drip-session-changed", refresh); window.addEventListener("storage", storage); window.addEventListener("online", refresh); document.addEventListener("visibilitychange", visible);
+    return () => { sequence.current++; window.clearInterval(validation); window.removeEventListener("drip-session-changed", refresh); window.removeEventListener("storage", storage); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", visible); };
   }, [refresh]);
   if (error) return <main><p role="alert">{error}</p><button className="btn" onClick={refresh}>Try again</button></main>;
   if (!gate) return <main><p className="muted">Loading…</p></main>;

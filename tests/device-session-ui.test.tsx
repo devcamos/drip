@@ -6,6 +6,8 @@ const passkeys = vi.hoisted(() => ({ hasPasskeyUnlock: vi.fn(), unlockWithPasske
 vi.mock("../lib/cloud", () => ({ readCloudState: actions.readCloudState }));
 vi.mock("../lib/device-session", () => actions);
 vi.mock("../lib/passkey-unlock", () => passkeys);
+const trust = vi.hoisted(() => ({ trustThisDevice: vi.fn() }));
+vi.mock("../lib/db", async original => ({ ...(await original<typeof import("../lib/db")>()), trustThisDevice: trust.trustThisDevice }));
 import { SignOutButton, SignedOut } from "../app/DeviceSession";
 import { emptyData } from "../lib/db";
 beforeEach(() => {
@@ -13,6 +15,29 @@ beforeEach(() => {
   actions.readCloudState.mockResolvedValue({ dirty: true }); actions.readDeviceSession.mockResolvedValue({ remotePending: false });
   actions.signOutDevice.mockResolvedValue(undefined); actions.finishDeviceSignOut.mockResolvedValue(undefined); actions.resumeDevice.mockResolvedValue(undefined);
   passkeys.hasPasskeyUnlock.mockResolvedValue(false); passkeys.unlockWithPasskey.mockResolvedValue(undefined);
+});
+describe("keep me signed in on reopening", () => {
+  it("shares one choice between password and Face ID unlock on the locked screen", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true); trust.trustThisDevice.mockResolvedValue(undefined);
+    const resumed = vi.fn(); render(<SignedOut onSignedIn={resumed} mode="locked" />);
+    const button = await screen.findByRole("button", { name: "Unlock with Face ID, Touch ID or passkey" });
+    expect(screen.getAllByLabelText("Keep me signed in on this device")).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText("Keep me signed in on this device"));
+    fireEvent.click(button);
+    await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
+    expect(trust.trustThisDevice).toHaveBeenCalledOnce();
+  });
+  it("does not remember the device from a passkey recovery or when unticked", async () => {
+    passkeys.hasPasskeyUnlock.mockResolvedValue(true);
+    const resumed = vi.fn(); render(<SignedOut onSignedIn={resumed} mode="locked" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Unlock with Face ID, Touch ID or passkey" }));
+    await waitFor(() => expect(resumed).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByLabelText("Keep me signed in on this device"));
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Unlock with passkey" }));
+    await waitFor(() => expect(resumed).toHaveBeenCalledTimes(2));
+    expect(trust.trustThisDevice).not.toHaveBeenCalled();
+  });
 });
 describe("visible sign-out and code return", () => {
   it.each(["signedOut", "locked"] as const)("uses one gamertag login in %s and shows recovery methods only after Forgot password", async mode => {

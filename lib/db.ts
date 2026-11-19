@@ -20,8 +20,9 @@ function checkBinding(value: Stored, expected: VaultBinding) {
     (expected.passkeyCiphertext !== undefined && (value.passkey?.ct ?? null) !== expected.passkeyCiphertext) ||
     (expected.passwordCiphertext !== undefined && (value.password?.envelope.ct ?? null) !== expected.passwordCiphertext)) throw new Error("Device session changed. Unlock Drip again before continuing.");
 }
-let unlocked: { keys: LocalKeys; generation?: string; signupRoot?: string } | undefined;
+let unlocked: { keys: LocalKeys; generation?: string; signupRoot?: string; trusted?: boolean; trustPending?: boolean } | undefined;
 let epoch = 0;
+let trustedEpoch = 0;
 let writes: Promise<unknown> = Promise.resolve();
 let lastWrite: Promise<unknown> = Promise.resolve();
 let closing = false;
@@ -75,11 +76,100 @@ const metadata = (value: CloudState | undefined): Metadata | undefined => value 
 } : undefined;
 const connected = (value: Metadata | undefined, keys: LocalKeys): CloudState | undefined => value ? { ...value, key: keys.cloudKey } : undefined;
 
-export async function localVaultStatus(): Promise<"new" | "migration" | "locked" | "unlocked"> {
+export type TrustedSessionCheck = (owner: string) => Promise<"valid" | "invalid" | "offline" | "unavailable">;
+export async function localVaultStatus(now = Date.now(), verifyTrusted?: TrustedSessionCheck): Promise<"new" | "migration" | "locked" | "unlocked"> {
   const value = await stored();
   if (unlocked && (value.vault?.id !== unlocked.keys.header.id || value.gate?.generation !== unlocked.generation)) lockLocalVault();
+  if ((unlocked?.trusted || unlocked?.trustPending) && value.cloud?.userId && verifyTrusted) {
+    const active = unlocked; const stamp = epoch; const trustStamp = trustedEpoch;
+    const result = await verifyTrusted(value.cloud.userId);
+    if (stamp === epoch && trustStamp === trustedEpoch && unlocked === active) {
+      const record = await tx<TrustedDevice | undefined>("readonly", s => s.get(TRUSTED));
+      if (!record || !validTrust(record, value, now)) {
+        active.trusted = false; active.trustPending = false;
+      } else if (result === "valid" && active.trustPending) {
+        // Only a server-confirmed, opted-in session should be rechecked while
+        // the current page remains open. An explicit local/passkey unlock with
+        // an expired cookie stays usable until the next open.
+        active.trusted = true; active.trustPending = false;
+      } else if (result === "invalid" && active.trustPending) {
+        // A fresh explicit passkey/password unlock must remain usable even if
+        // its cloud cookie is already expired. Do not poll that invalid cookie
+        // continuously; the next explicit sign-in can re-arm the trust check.
+        active.trustPending = false;
+      } else if (result === "invalid" && active.trusted) {
+        await guardedWrite(value, stamp, (s, cloud) => { if (cloud?.userId !== value.cloud?.userId || cloud?.generation !== value.cloud?.generation) throw new Error("Cloud account changed."); s.delete(TRUSTED); });
+        trustedEpoch++;
+        lockLocalVault(true);
+      }
+    }
+  }
+  if (!unlocked) await restoreTrustedDevice(value, now, verifyTrusted);
   if (!value.vault) return value.data || value.verifier ? "migration" : "new";
   try { current(value); return "unlocked"; } catch { return "locked"; }
+}
+/** A device the user chose to keep signed in. The keys are stored as
+ * non-extractable CryptoKeys: scripts on this origin can use them, but cannot
+ * read the key bytes. The window slides on each open and is bound to the vault
+ * and device-session generation, so sign-out, device revocation or an account
+ * switch invalidates it. */
+export const TRUSTED_DEVICE_MS = 30 * 24 * 60 * 60 * 1000;
+const TRUSTED = "trustedDevice";
+interface TrustedDevice { vaultId: string; generation?: string; dataKey: CryptoKey; cloudKey: CryptoKey; expiresAt: number }
+function validTrust(record: TrustedDevice | undefined, value: Stored, now: number): record is TrustedDevice {
+  return !!record && !!value.vault && !value.gate?.signedOut && record.vaultId === value.vault.id &&
+    record.generation === value.gate?.generation && typeof record.expiresAt === "number" && record.expiresAt > now &&
+    value.signupRecovery?.vaultId !== value.vault.id && record.dataKey instanceof CryptoKey && record.cloudKey instanceof CryptoKey;
+}
+async function restoreTrustedDevice(value: Stored, now: number, verifyTrusted?: TrustedSessionCheck) {
+  const stamp = epoch; const trustStamp = trustedEpoch;
+  const record = await tx<TrustedDevice | undefined>("readonly", s => s.get(TRUSTED));
+  if (stamp !== epoch || trustStamp !== trustedEpoch) return;
+  if (!record) return;
+  if (!validTrust(record, value, now)) { await forgetThisDevice(); return; }
+  if (value.cloud?.userId) {
+    const result = await (verifyTrusted?.(value.cloud.userId) ?? Promise.resolve("unavailable"));
+    if (stamp !== epoch || trustStamp !== trustedEpoch) return;
+    if (result === "invalid") {
+      await guardedWrite(value, stamp, (s, cloud) => { if (cloud?.userId !== value.cloud?.userId || cloud?.generation !== value.cloud?.generation) throw new Error("Cloud account changed."); s.delete(TRUSTED); });
+      trustedEpoch++;
+      // A parallel valid response may already have restored this trusted
+      // session. An invalid response must also close that in-memory vault.
+      if (stamp === epoch && unlocked?.trusted) lockLocalVault(true);
+      return;
+    }
+    if (result !== "valid" && result !== "offline") return;
+  }
+  // Slide the window only if the device session is unchanged at write time.
+  let accepted: TrustedDevice | undefined;
+  await guardedWrite(value, stamp, (s, cloud, currentTrust) => {
+    if (cloud?.userId !== value.cloud?.userId || cloud?.generation !== value.cloud?.generation) throw new Error("Cloud account changed.");
+    // A different tab may have removed trust while verification was pending.
+    // Check and renew the current record in the same write transaction.
+    if (trustedEpoch === trustStamp && validTrust(currentTrust, value, now)) {
+      accepted = currentTrust;
+      s.put({ ...currentTrust, expiresAt: now + TRUSTED_DEVICE_MS }, TRUSTED);
+    }
+  });
+  if (stamp !== epoch || trustedEpoch !== trustStamp || unlocked || !accepted) return;
+  unlocked = { keys: { header: value.vault!, dataKey: accepted.dataKey, cloudKey: accepted.cloudKey }, generation: accepted.generation, trusted: true };
+}
+/** Keep the current unlocked session on this device for a sliding 30 days. */
+export async function trustThisDevice(now = Date.now()): Promise<void> {
+  const before = await stored(); const local = current(before); const stamp = epoch;
+  if (before.signupRecovery?.vaultId === local.keys.header.id) throw new Error("Save your recovery codes before keeping Drip signed in.");
+  const record: TrustedDevice = { vaultId: local.keys.header.id, generation: local.generation, dataKey: local.keys.dataKey, cloudKey: local.keys.cloudKey, expiresAt: now + TRUSTED_DEVICE_MS };
+  await guardedWrite(before, stamp, s => { s.put(record, TRUSTED); });
+  trustedEpoch++;
+  // The current session was opened with explicit credentials or a passkey.
+  // Only mark a later, automatically restored session as trusted: otherwise
+  // an expired cloud cookie can immediately undo a fresh passkey unlock.
+  if (stamp === epoch && unlocked === local) local.trustPending = true;
+}
+export async function forgetThisDevice(): Promise<void> { await tx("readwrite", s => s.delete(TRUSTED)); if (unlocked) { unlocked.trusted = false; unlocked.trustPending = false; } }
+export async function isDeviceTrusted(now = Date.now()): Promise<boolean> {
+  const value = await stored();
+  return validTrust(await tx<TrustedDevice | undefined>("readonly", s => s.get(TRUSTED)), value, now);
 }
 export async function hasCloudConnection() { return !!(await tx("readonly", s => s.get("cloudState"))); }
 export async function getItem<T>(key: string): Promise<T | undefined> {
@@ -88,7 +178,7 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
     const value = await stored(); if (!value.cloud) return undefined;
     return connected(value.cloud, current(value).keys) as T;
   }
-  if (key === "localVault") throw new Error("Use the local vault interface.");
+  if (key === "localVault" || key === "trustedDevice") throw new Error("Use the local vault interface.");
   return tx("readonly", s => s.get(key));
 }
 /** Public browser identifier, independent of accounts/keys and shared atomically by tabs. */
@@ -106,9 +196,9 @@ export async function browserDeviceId(): Promise<string> {
   });
 }
 export async function setItem(key: string, value: unknown): Promise<void> {
-  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock"].includes(key)) throw new Error("Use the encrypted storage interface.");
+  if ([KEY, "cloudState", "localVault", "onboardingDraft", "passkeyUnlock", "passwordUnlock", "trustedDevice"].includes(key)) throw new Error("Use the encrypted storage interface.");
   await tx("readwrite", s => s.put(value, key));
-  if (key === "deviceSession" && (value as Device)?.signedOut) lockLocalVault(true);
+  if (key === "deviceSession" && (value as Device)?.signedOut) { lockLocalVault(true); await forgetThisDevice(); }
 }
 export async function loadData(): Promise<AppData> {
   const value = await stored(); if (!value.data) return emptyData();
@@ -218,11 +308,11 @@ export async function saveRecoveryCodesConfirmation(expectedVaultId: string | un
 }
 
 /** Compare snapshots inside the write transaction after asynchronous crypto finishes. */
-async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean; signup?: SignupReplacement; retained?: RetainedAccount } = {}): Promise<void> {
+async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectStore, cloud?: Metadata, trusted?: TrustedDevice) => void, options: { allowSignedOut?: boolean; records?: boolean; passkey?: boolean; password?: boolean; signup?: SignupReplacement; retained?: RetainedAccount } = {}): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite"); const s = t.objectStore(STORE); let failure: Error | undefined;
-    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock"), verifier = s.get("verifier");
+    const gate = s.get("deviceSession"), vault = s.get("localVault"), data = s.get(KEY), cloud = s.get("cloudState"), passkey = s.get("passkeyUnlock"), password = s.get("passwordUnlock"), trusted = s.get(TRUSTED), verifier = s.get("verifier");
     verifier.onsuccess = () => {
       if (stamp !== epoch || gate.result?.generation !== before.gate?.generation || (!options.allowSignedOut && gate.result?.signedOut) ||
         vault.result?.id !== before.vault?.id) {
@@ -245,7 +335,7 @@ async function guardedWrite(before: Stored, stamp: number, write: (s: IDBObjectS
       if ((!before.vault || options.records) && (JSON.stringify(data.result) !== JSON.stringify(before.data) || JSON.stringify(cloud.result) !== JSON.stringify(before.cloud))) {
         failure = new RecordConflictError(); t.abort(); return;
       }
-      try { write(s, cloud.result); }
+      try { write(s, cloud.result, trusted.result); }
       catch (error) { failure = error instanceof Error ? error : new Error("Local storage write failed."); t.abort(); }
     };
     t.oncomplete = () => { db.close(); resolve(); };
@@ -415,6 +505,7 @@ export async function commitLocalSignOut(expected: LocalSessionBinding) {
   if (before.vault?.id !== expected.vaultId || before.gate?.generation !== expected.generation) throw new Error("Device session changed. Your newer sign-in has been kept.");
   await guardedWrite(before, stamp, store => {
     store.put({ signedOut: true, remotePending: true, generation: crypto.randomUUID() }, "deviceSession");
+    store.delete(TRUSTED);
   }, { allowSignedOut: true });
   lockLocalVault(true);
 }

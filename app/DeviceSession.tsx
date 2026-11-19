@@ -10,6 +10,7 @@ import { AuthLayout, useAuthScreen, type AuthScreen as AuthRoute } from "./AuthS
 import { SignupForm } from "./SignupForm";
 import { signUpPassword } from "@/lib/password-login";
 import { emptyData } from "@/lib/db";
+import { keepSignedIn } from "./StaySignedIn";
 import { RecoveryCodeInput, RecoveryHelp } from "./RecoveryCodeInput";
 import { PwaStatus } from "./PwaStatus";
 
@@ -57,7 +58,7 @@ function signedOutCopy(mode: NonNullable<SignedOutProps["mode"]>, recovering: bo
 
 function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", screen, navigate }: SignedOutProps & Readonly<{ screen: AuthRoute; navigate: (next: AuthRoute) => void }>) {
   const [code, setCode] = useState(""); const [message, setMessage] = useState(""); const [remoteMessage, setRemoteMessage] = useState(""); const [pending, setPending] = useState(false); const [busy, setBusy] = useState(false);
-  const [passkey, setPasskey] = useState(false);
+  const [passkey, setPasskey] = useState(false); const [stay, setStay] = useState(false);
   const recovering = mode === "migration" || screen === "recover";
   const signingUp = mode !== "migration" && screen === "signup";
   const cloudRecovery = mode !== "migration" && screen === "backup";
@@ -84,12 +85,12 @@ function SignedOutScreen({ data, verifier, onSignedIn, mode = "signedOut", scree
   return <AuthLayout title={cloudRecovery ? "Recover another account" : copy.title} welcome={signingIn || signingUp}
     description={copy.description}>
     <PwaStatus />
-    {signingIn && <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} />}
+    {signingIn && <PasswordSignIn showTitle={false} onSignedIn={onSignedIn} disabled={busy} onBusyChange={setBusy} stay={stay} onStayChange={setStay} />}
     {passkey && mode !== "migration" && (recovering || (signingIn && mode === "locked")) && <section className="panel" aria-label="Unlock with your passkey">
       <h2>Use your saved unlock passkey</h2><p className="muted">No password or code needed. You can set a new password in Settings after unlocking.</p>
       <button className="btn" disabled={busy} onClick={async () => {
         setBusy(true); setMessage("");
-        try { await unlockWithPasskey(); await onSignedIn(); }
+        try { await unlockWithPasskey(); await keepSignedIn(signingIn && stay); await onSignedIn(); }
         catch (error) { setMessage((error as Error).name === "NotAllowedError" ? "Passkey unlock was cancelled or unavailable. Try again or use a recovery code." : "Could not unlock with this passkey. Try again or use a recovery code."); }
         finally { setBusy(false); }
       }}>{busy ? "Unlocking…" : signingIn ? "Unlock with Face ID, Touch ID or passkey" : "Unlock with passkey"}</button>
