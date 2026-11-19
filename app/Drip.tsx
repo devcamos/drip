@@ -172,8 +172,10 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         if (L.shouldLock(!!loaded.lock?.credentialId, null, Date.now(), true)) setLocked(true);
       }
       if (navigator.storage?.persist) {
-        const already = await navigator.storage.persisted?.();
-        if (!already) await navigator.storage.persist();
+        try {
+          const already = await navigator.storage.persisted?.();
+          if (!already) await navigator.storage.persist();
+        } catch { /* Persistence is optional; rejection does not mean accounts failed to load. */ }
       }
     })().catch(() => setLoadError("Could not read local accounts. Your stored copy has not been changed. Reload Drip and unlock again."));
     return () => { loadSequence.current++; };

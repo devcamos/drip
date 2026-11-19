@@ -526,6 +526,24 @@ describe("app lock", () => {
   });
 });
 
+describe("optional persistent storage", () => {
+  it.each(["persisted", "persist"] as const)("keeps accounts usable when %s rejects", async failAt => {
+    await seed({ accounts: [acct()] });
+    const original = Object.getOwnPropertyDescriptor(navigator, "storage");
+    const storage = { persisted: vi.fn().mockImplementation(async () => { if (failAt === "persisted") throw new Error("denied"); return false; }), persist: vi.fn().mockRejectedValue(new Error("denied")) };
+    Object.defineProperty(navigator, "storage", { configurable: true, value: storage });
+    try {
+      render(<Drip />);
+      expect(await screen.findByRole("button", { name: /Open Rainy day pot/ })).toBeInTheDocument();
+      await waitFor(() => expect(storage.persisted).toHaveBeenCalled());
+      await act(async () => {});
+      expect(screen.queryByText(/Could not read local accounts/)).toBeNull();
+    } finally {
+      if (original) Object.defineProperty(navigator, "storage", original); else delete (navigator as { storage?: StorageManager }).storage;
+    }
+  });
+});
+
 describe("onboarding draft persistence", () => {
   it("keeps the unsent gamertag in memory but clears passwords after leaving and coming back", async () => {
     const first = render(<Drip />);
