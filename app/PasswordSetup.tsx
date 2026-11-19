@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { passwordRecoveryRoot, passwordUsername, setLoginPassword } from "@/lib/password-login";
 import { hasPasskeyUnlock, passkeyRecoveryRoot } from "@/lib/passkey-unlock";
 import type { AppData } from "@/lib/types";
@@ -9,8 +9,9 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
   const [password, setPassword] = useState(""); const [again, setAgain] = useState(""); const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [method, setMethod] = useState<"code" | "password" | "passkey">("code");
   const [hasPassword, setHasPassword] = useState(false); const [hasPasskey, setHasPasskey] = useState(false);
-  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) { setUsername(name); setHasPassword(true); setMethod("password"); } }).catch(() => {}); return () => { active = false; }; }, []);
-  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) setHasPasskey(value); }).catch(() => {}); return () => { active = false; }; }, []);
+  const methodWasSelected = useRef(false);
+  useEffect(() => { let active = true; void passwordUsername().then(name => { if (active && name) { setUsername(name); setHasPassword(true); if (!methodWasSelected.current) setMethod(current => current === "passkey" ? current : "password"); } }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void hasPasskeyUnlock().then(value => { if (active) { setHasPasskey(value); if (value && !methodWasSelected.current) setMethod("passkey"); } }).catch(() => {}); return () => { active = false; }; }, []);
   return <section className="panel" aria-label="Sign-in and password">
     <h2>Sign-in &amp; password</h2>
     <p className="muted">Set a new password without changing your accounts. Confirm with your current password, a configured unlock passkey, or a recovery code.</p>
@@ -31,9 +32,9 @@ export function PasswordSetup({ data }: Readonly<{ data: AppData }>) {
       <input id="setup-login-tag" autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={event => setUsername(event.target.value)} disabled={busy} />
       <p className="muted">Your sign-in gamertag must be unique. Use 3–16 letters, numbers or underscores.</p>
       <fieldset className="recovery-methods" disabled={busy}><legend>Confirm it’s you</legend>
-        {hasPassword && <button type="button" className="btn ghost small" aria-pressed={method === "password"} onClick={() => { setMethod("password"); setCode(""); setMessage(""); }}>Current password</button>}
-        {hasPasskey && <button type="button" className="btn ghost small" aria-pressed={method === "passkey"} onClick={() => { setMethod("passkey"); setCode(""); setMessage(""); }}>Saved unlock passkey</button>}
-        <button type="button" className="btn ghost small" aria-pressed={method === "code"} onClick={() => { setMethod("code"); setCode(""); setMessage(""); }}>Recovery code</button>
+        {hasPassword && <button type="button" className="btn ghost small" aria-pressed={method === "password"} onClick={() => { methodWasSelected.current = true; setMethod("password"); setCode(""); setMessage(""); }}>Current password</button>}
+        {hasPasskey && <button type="button" className="btn ghost small" aria-pressed={method === "passkey"} onClick={() => { methodWasSelected.current = true; setMethod("passkey"); setCode(""); setMessage(""); }}>Saved unlock passkey</button>}
+        <button type="button" className="btn ghost small" aria-pressed={method === "code"} onClick={() => { methodWasSelected.current = true; setMethod("code"); setCode(""); setMessage(""); }}>Recovery code</button>
       </fieldset>
       {method === "passkey" ? <p className="muted">Your password manager will ask for Face ID, Touch ID or your device lock when you save. You won’t need your old password or recovery code.</p> : <>
         <label htmlFor="setup-login-code">{method === "password" ? "Current password" : "Recovery code to set or reset your password"}</label>
