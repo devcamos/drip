@@ -37,4 +37,22 @@ describe("private analytics dashboard",()=>{
   const m=analyticsDashboardModel([releaseDebt(),highApr,releaseSaver(),highAER],today);
   expect(m.rateComparison?.card).toBe(highApr);expect(m.rateComparison?.saver).toBe(highAER);expect(m.rateComparison?.gap).toBe(25);
  });
+ it("builds a 12-month income trend and a non-overlapping asset mix",()=>{
+  const m=analyticsDashboardModel([
+   releaseSaver({balance:5000}),
+   releaseStock({balance:2500}),
+   releaseStock({id:"isa-stock",balance:2000,taxWrapper:"stocks-shares-isa"}),
+   releaseDebt({balance:1200}),
+   archiveAccount(releaseSaver({id:"archived",balance:90000})),
+  ],today);
+  expect(m.charts.incomeTrend).toHaveLength(12);
+  expect(m.charts.incomeTrend[0].month).toBe("2026-12");
+  expect(m.charts.incomeTrend.every(point=>point.income>0)).toBe(true);
+  expect(m.charts.allocation).toEqual([
+   {id:"isas",label:"ISAs",value:2000},
+   {id:"dividends",label:"Dividends outside ISAs",value:2500},
+   {id:"other",label:"Other assets",value:5000},
+  ]);
+  expect(m.charts.allocation.reduce((total,slice)=>total+slice.value,0)).toBe(m.totals.assets);
+ });
 });

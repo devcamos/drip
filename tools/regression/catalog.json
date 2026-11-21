@@ -828,8 +828,10 @@
       "name": "Private account analytics and payment carousels",
       "sources": [
         "app/AnalyticsDashboard.tsx",
+        "app/AnalyticsDashboardCharts.tsx",
         "lib/analytics-dashboard.ts",
-        "app/analytics-dashboard.module.css"
+        "app/analytics-dashboard.module.css",
+        "app/analytics-dashboard-charts.module.css"
       ],
       "tests": [
         "tests/analytics-dashboard.test.ts",
