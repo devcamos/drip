@@ -20,4 +20,21 @@ describe("private analytics dashboard",()=>{
   const m=analyticsDashboardModel([releaseDebt(),releaseSaver()],today);
   expect(m.rateComparison?.gap).toBeGreaterThan(0);expect(analyticsDashboardModel([],today).rateComparison).toBeNull();
  });
+ it("aggregates multiple debts and holdings while keeping overlapping ISA totals clear",()=>{
+  const secondDebt=releaseDebt({id:"credit-2",balance:300});
+  const secondStock=releaseStock({id:"stock-2",balance:800,taxWrapper:"stocks-shares-isa"});
+  const m=analyticsDashboardModel([releaseDebt(),secondDebt,releaseStock(),secondStock],today);
+  expect(m.totals.debt).toBe(1500);expect(m.totals.dividends).toBe(3300);expect(m.totals.isas).toBe(800);
+  expect(m.counts).toEqual({assets:2,debt:2,dividends:2,isas:1});
+ });
+ it("does not show a rate comparison when the best saver rate matches or exceeds card APR",()=>{
+  expect(analyticsDashboardModel([releaseDebt({creditCard:{apr:4.1,minimumPayment:35}}),releaseSaver()],today).rateComparison).toBeNull();
+  expect(analyticsDashboardModel([releaseDebt({creditCard:{apr:3,minimumPayment:35}}),releaseSaver()],today).rateComparison).toBeNull();
+ });
+ it("chooses the highest recorded APR and savings rate for its informational comparison",()=>{
+  const highApr=releaseDebt({id:"credit-2",provider:"Lloyds",creditCard:{apr:30,minimumPayment:20}});
+  const highAER=releaseSaver({id:"cash-2",provider:"Lloyds",ratePct:5});
+  const m=analyticsDashboardModel([releaseDebt(),highApr,releaseSaver(),highAER],today);
+  expect(m.rateComparison?.card).toBe(highApr);expect(m.rateComparison?.saver).toBe(highAER);expect(m.rateComparison?.gap).toBe(25);
+ });
 });
