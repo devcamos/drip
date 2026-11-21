@@ -88,6 +88,10 @@ button.accountCard:focus-visible { outline-color:currentColor !important; outlin
 .nextPayment > p,.paymentPlan > p { font-size:12px; color:var(--quiet); line-height:1.7; margin:16px 0 0; }
 .paymentPlan { border-color:#e5d1d7; background:linear-gradient(135deg,#fffdf9,#fbf1f2); }
 .paymentPlan .paymentDue { font-size:12px; line-height:1.7; margin:13px 0; overflow-wrap:anywhere; }
+.paymentCarousel { display:flex; gap:12px; overflow-x:auto; overscroll-behavior-inline:contain; scroll-snap-type:x mandatory; scrollbar-width:thin; padding:2px 2px 10px; }
+.planCard { flex:0 0 min(100%,360px); min-width:0; padding:12px; border:1px solid #ead9dc; border-radius:14px; background:#fffaf7; scroll-snap-align:start; }
+.paymentCarousel:focus-visible { outline:3px solid var(--copper); outline-offset:3px; }
+.paymentCarousel .paymentRow { flex:0 0 min(100%,360px); box-sizing:border-box; padding:10px; border:1px solid var(--edge); border-radius:14px; background:#fffaf7; scroll-snap-align:start; }
 .debtPill { padding:5px 7px; flex:none; border:1px solid #ddc7cd; border-radius:6px; color:#704653; font-size:8px; letter-spacing:.9px; background:#f7edf0; }
 .repaymentNumbers { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; padding-top:15px; border-top:1px solid #ead9dc; margin:14px 0 0; }
 .repaymentNumbers dt { color:var(--quiet); font-size:11px; line-height:1.6; }

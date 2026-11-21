@@ -44,8 +44,9 @@ import { activeAccounts, archiveAccount, isArchivedAccount, restoreAccount } fro
 import { ArchivedAccounts } from "./ArchivedAccounts";
 import { DraftGuardContext, useDraftGuardState } from "./useDraftGuard";
 import { Feedback } from "./Feedback";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
-type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "payments" } | { name: "archived" } | { name: "feedback" };
+type View = { name: "home" } | { name: "choose" } | { name: "detail"; id: string } | { name: "add"; id?: string; category?: ProductCategory } | { name: "trends" } | { name: "settings" } | { name: "portfolio" } | { name: "analytics" } | { name: "payments" } | { name: "archived" } | { name: "feedback" };
 type Verifier = { salt: string; hash: string };
 
 const today = () => M.localToday();
@@ -245,8 +246,6 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const assets = accountAssets(data.accounts);
   const creditPlans = active.filter(isCreditAccount).map(account => ({ accountId: account.id, name: accountTitle(account), apr: account.creditCard!.apr, minimumPayment: account.creditCard!.minimumPayment, plannedPayment: account.creditCard!.plannedPayment, paymentDate: account.nextPayoutDate }));
   const counts = { cash: assets.filter(account => account.rateType !== "dividend").length, stocks: assets.filter(account => account.rateType === "dividend").length, credits: creditPlans.length };
-  const next = M.upcoming(assets, calendarDay)[0];
-  const nextPayment = next ? { accountId: next.account.id, name: accountTitle(next.account), date: next.date, amount: next.amount } : null;
   function closeProfile() { setProfileOpen(false); requestAnimationFrame(() => profileButton.current?.focus()); }
   function profileNavigate(nextView: View) { if (draftGuard.leave()) { setProfileOpen(false); setView(nextView); } }
   async function changePeriod(period: IncomePeriod) {
@@ -260,7 +259,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     } catch { if (sequence === preferenceSequence.current) setPreferenceError("Could not save your display preference. Your previous view is kept; retry."); }
     finally { if (sequence === preferenceSequence.current) setPreferenceBusy(false); }
   }
-  const accountsCanvas = <AccountsHome accounts={active} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(data.accounts, calendarDay.slice(0, 7), calendarDay)} nextPayment={nextPayment} estimatedValues={assets.some(account => !!account.marketValuation)} onAdd={() => navigate({ name: "choose" })} onOpen={id => navigate({ name: "detail", id })} onPortfolio={() => navigate({ name: "portfolio" })} />;
+  const accountsCanvas = <AccountsHome accounts={active} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(data.accounts, calendarDay.slice(0, 7), calendarDay)} today={calendarDay} onPayments={() => navigate({ name: "payments" })} estimatedValues={assets.some(account => !!account.marketValuation)} onAdd={() => navigate({ name: "choose" })} onOpen={id => navigate({ name: "detail", id })} onPortfolio={() => navigate({ name: "portfolio" })} />;
   let body: React.ReactNode;
   switch (view.name) {
   case "detail": {
@@ -303,6 +302,9 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     break;
   case "portfolio":
     body = <DividendPortfolio accounts={data.accounts.filter(account => !isCreditAccount(account))} onOpen={id => navigate({ name: "detail", id })} onAdd={() => navigate({ name: "add", category: "stocks-funds" })} />;
+    break;
+  case "analytics":
+    body = <AnalyticsDashboard accounts={data.accounts} today={calendarDay} onOpen={id => navigate({ name: "detail", id })} />;
     break;
   case "payments":
     body = <PaymentNotifications accounts={data.accounts} identityId={data.identity.id} onOpen={id => navigate({ name: "detail", id })} />;
@@ -348,9 +350,9 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
       </main>
       <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
       <nav className="tabs" aria-label="Main">
-        {(["home", "portfolio", "trends", "add", "settings"] as const).map((n) => (
+        {(["home", "portfolio", "analytics", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>
-            {{ home: "Accounts", portfolio: "Portfolio", trends: "Trends", add: "Add", settings: "Settings" }[n]}
+            {{ home: "Accounts", portfolio: "Portfolio", analytics: "Insights", trends: "Trends", add: "Add", settings: "Settings" }[n]}
           </button>
         ))}
       </nav>

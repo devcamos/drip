@@ -12,6 +12,10 @@ const catalog = (): Catalog => ({ version: 1, features: [{ id: "cash", name: "Ca
 const files = ["lib/cash.ts", "tests/cash.test.ts"];
 
 describe("regression evidence guard", () => {
+  it("keeps dashboard calculations, UI interactions and mobile journey in separate layers", () => {
+    const c = JSON.parse(readFileSync(new URL("../tools/regression/catalog.json", import.meta.url), "utf8")) as Catalog;
+    expect(c.pyramids?.find(row => row.featureId === "analytics-dashboard")).toEqual({ featureId: "analytics-dashboard", unit: ["tests/analytics-dashboard.test.ts"], integration: ["tests/analytics-dashboard.integration.test.tsx", "tests/payment-carousel.integration.test.tsx"], browser: ["e2e/analytics-dashboard.e2e.spec.ts"] });
+  });
   const webkit = () => ({ suites: [{ specs: webkitJourneys.map(row => ({ ...row, tests: [{ projectName: "mobile-webkit", status: "expected", results: [{ status: "passed" }] }] })) }] });
   it("requires every named WebKit journey to pass once in the correct project", () => {
     expect(validateBrowserMatrix(webkit())).toEqual({ passed: webkitJourneys.length, required: webkitJourneys.length, errors: [] });

@@ -323,7 +323,7 @@ describe("accounts", () => {
     render(<Drip />);
     expect(within(await screen.findByRole("region", { name: "Money overview" })).getByText("£4,000.00", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Next little drop")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Chip/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open Chip,/ }));
     expect(await screen.findByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
     expect(screen.getByRole("region", { name: "Money overview" })).toBeInTheDocument();
@@ -604,8 +604,8 @@ describe("daily interest accounts", () => {
     expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
     expect(within(screen.getByRole("region", { name: "Account cards" })).getByRole("button", { name: /Open Moneyfarm/i })).toBeInTheDocument();
-    const up = screen.getByRole("region", { name: "Next expected payment" });
-    expect(within(up).queryByText(/Moneyfarm/i)).toBeNull();
+    const up = screen.getByRole("region", { name: "Next little drop" });
+    expect(within(up).getAllByText(/Daily payments through/)).toHaveLength(3);
   });
   it("keeps an older daily balance authoritative on open and separates legacy estimates", async () => {
     const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
@@ -613,7 +613,7 @@ describe("daily interest accounts", () => {
     render(<Drip />);
     await screen.findByRole("region", { name: "Money overview" });
     expect((await loadData()).accounts[0]).toMatchObject({ balance: 10000, accruedThrough: past });
-    fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open MoneyFarm,/ }));
     expect(await screen.findByText("Previous interest estimates")).toBeInTheDocument();
     expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
     expect(screen.getByText(/Your saved balance has been preserved/)).toBeInTheDocument();
@@ -674,7 +674,7 @@ describe("accessibility polish", () => {
     await screen.findByRole("region", { name: "Money overview" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("button", { name: "Accounts" })).toBeInTheDocument();
-    expect(within(nav).getAllByRole("button")).toHaveLength(5);
+    expect(within(nav).getAllByRole("button")).toHaveLength(6);
     const css = readFileSync("app/globals.css", "utf8");
     expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*animation:\s*none/);
     expect(css).toMatch(/nav\.tabs button[^}]*min-height:\s*44px/);
