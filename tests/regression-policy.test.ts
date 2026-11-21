@@ -224,6 +224,16 @@ describe("regression evidence guard", () => {
     expect(pkg.dependencies["web-push"]).toBe("4.0.0");
     expect(pkg.engines.node).toBe("24.x");
   });
+  it("keeps version-locked dependency pairs in step after grouped updates", () => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+    const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+    const installed = (name: string) => lock.packages["node_modules/" + name].version;
+    // The passkey plugin is released with Better Auth and must match it exactly.
+    expect(pkg.dependencies["@better-auth/passkey"]).toBe(pkg.dependencies["better-auth"]);
+    expect(installed("@better-auth/passkey")).toBe(installed("better-auth"));
+    // Coverage must come from the same Vitest release that runs the suites.
+    expect(installed("@vitest/coverage-v8")).toBe(installed("vitest"));
+  });
   it("keeps jsdom 31 on a Node release that satisfies its engine range", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8"));
     const [major, minor] = readFileSync(".nvmrc", "utf8").trim().split(".").map(Number);
