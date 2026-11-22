@@ -54,5 +54,6 @@ describe("private analytics dashboard",()=>{
    {id:"other",label:"Other assets",value:5000},
   ]);
   expect(m.charts.allocation.reduce((total,slice)=>total+slice.value,0)).toBe(m.totals.assets);
+  expect(m.charts.debtBreakdown).toEqual([{id:"credit",label:"Barclaycard",value:1200}]);
  });
 });

@@ -8,11 +8,15 @@ test("unlocked user reviews private analytics and opens an account from a life p
  await expect(page.getByRole("heading",{name:"Financial overview"})).toBeVisible();
  await expect(page.getByRole("region",{name:"Financial overview"})).toContainText("£1,200.00");
  const charts=page.getByRole("region",{name:"Dashboard charts"});
+ await expect(charts.getByRole("button",{name:"Income"})).toHaveAttribute("aria-pressed","true");
  await expect(charts.getByRole("img",{name:/Estimated monthly income over the next 12 months/})).toBeVisible();
- await charts.getByRole("button",{name:"Pie"}).click();
+ await charts.getByRole("button",{name:"Assets"}).click();
  await expect(charts.getByRole("img",{name:/Asset mix totalling/})).toBeVisible();
  if(process.env.DRIP_UI_CAPTURE){await mkdir("docs/screenshots/account-analytics",{recursive:true});await page.screenshot({path:"docs/screenshots/account-analytics/analytics-pie-mobile.png",fullPage:true,scale:"css"});}
- await charts.getByRole("button",{name:"Line"}).click();
+ await charts.getByRole("button",{name:"Debt"}).click();
+ await expect(charts.getByRole("img",{name:/Debt by account totalling/})).toBeVisible();
+ if(process.env.DRIP_UI_CAPTURE){await mkdir("docs/screenshots/account-analytics",{recursive:true});await page.screenshot({path:"docs/screenshots/account-analytics/analytics-debt-mobile.png",fullPage:true,scale:"css"});}
+ await charts.getByRole("button",{name:"Income"}).click();
  await expect(page.getByRole("region",{name:"Potential life plays carousel"})).toBeVisible();
  if(process.env.DRIP_UI_CAPTURE){await mkdir("docs/screenshots/account-analytics",{recursive:true});await page.screenshot({path:"docs/screenshots/account-analytics/analytics-mobile.png",fullPage:true,scale:"css"});}
  await page.getByRole("button",{name:"Review card"}).click();
