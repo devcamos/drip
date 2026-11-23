@@ -60,7 +60,7 @@ describe("encrypted local storage", () => {
     const raw = await rawStore(); await rawStore({ data: second, localVault: { ...raw.localVault, id: "wrong-vault" } });
     await expect(unlockLocalVault(code)).rejects.toThrow(/Invalid local key/);
   });
-  it("upgrades an encrypted pounds envelope to pence on unlock and fences the prior DB schema", async () => {
+  it("upgrades an encrypted pounds envelope to pence on unlock and fences older DB schemas", async () => {
     const legacy = { ...data, accounts: [{ id: "saver", provider: "Zopa", label: "Rainy day", balance: 123.45, ratePct: 4, rateType: "interest" as const, frequency: "monthly" as const, nextPayoutDate: "2026-11-30", colour: "#000", payouts: [], createdAt: "2026-01-01" }] };
     await seedVault(legacy);
     const before = await rawStore(), keys = await openVault(before.localVault, code);
@@ -75,7 +75,7 @@ describe("encrypted local storage", () => {
     const stored = JSON.parse(new TextDecoder().decode(plaintext));
     expect(stored).toMatchObject({ money: "pence", accounts: [{ balance: 12345, currency: "GBP" }] });
     expect((await loadData()).accounts[0].balance).toBe(123.45);
-    await expect(new Promise((resolve, reject) => { const request = indexedDB.open("drip", 4); request.onsuccess = () => { request.result.close(); resolve(null); }; request.onerror = () => reject(request.error); })).rejects.toThrow(/lower version/);
+    await expect(new Promise((resolve, reject) => { const request = indexedDB.open("drip", 5); request.onsuccess = () => { request.result.close(); resolve(null); }; request.onerror = () => reject(request.error); })).rejects.toThrow(/lower version/);
   });
   it("rejects an encrypted write finishing after sign-out and preserves the prior ciphertext", async () => {
     await seedVault(data); const first = (await rawStore()).data;
