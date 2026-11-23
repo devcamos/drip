@@ -128,6 +128,19 @@
       ]
     },
     {
+      "featureId": "analytics-dashboard",
+      "unit": [
+        "tests/analytics-dashboard.test.ts"
+      ],
+      "integration": [
+        "tests/analytics-dashboard.integration.test.tsx",
+        "tests/payment-carousel.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/analytics-dashboard.e2e.spec.ts"
+      ]
+    },
+    {
       "featureId": "account-review",
       "unit": [
         "tests/account-review.test.ts"
@@ -630,6 +643,7 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
+        "tests/analytics-dashboard.integration.test.tsx",
         "tests/account-review.integration.test.tsx"
       ]
     },
@@ -777,6 +791,7 @@
         "e2e/account-workflows.e2e.spec.ts",
         "tests/stock-reading.integration.test.tsx",
         "e2e/stock-reading.e2e.spec.ts",
+        "tests/payment-carousel.integration.test.tsx",
         "tests/account-review.integration.test.tsx"
       ]
     },
@@ -828,6 +843,23 @@
       ]
     },
     {
+      "id": "analytics-dashboard",
+      "name": "Private account analytics and payment carousels",
+      "sources": [
+        "app/AnalyticsDashboard.tsx",
+        "app/AnalyticsDashboardCharts.tsx",
+        "lib/analytics-dashboard.ts",
+        "app/analytics-dashboard.module.css",
+        "app/analytics-dashboard-charts.module.css"
+      ],
+      "tests": [
+        "tests/analytics-dashboard.test.ts",
+        "tests/analytics-dashboard.integration.test.tsx",
+        "tests/payment-carousel.integration.test.tsx",
+        "e2e/analytics-dashboard.e2e.spec.ts"
+      ]
+    },
+    {
       "id": "account-review",
       "name": "User-confirmed review reminders for saved account figures",
       "sources": [
@@ -876,8 +908,9 @@
       "tests/cloud-sync.unit.test.ts",
       "tests/feedback.test.ts",
       "tests/stock-reading.test.ts",
-      "tests/account-review.test.ts",
-      "tests/month-history.test.ts"
+      "tests/month-history.test.ts",
+      "tests/analytics-dashboard.test.ts",
+      "tests/account-review.test.ts"
     ],
     "integration": [
       "tests/account-options.test.tsx",
@@ -949,9 +982,11 @@
       "tests/account-workflows.integration.test.tsx",
       "tests/feedback.integration.test.tsx",
       "tests/stock-reading.integration.test.tsx",
-      "tests/account-review.integration.test.tsx",
       "tests/trusted-device.test.ts",
-      "tests/trusted-session.test.ts"
+      "tests/trusted-session.test.ts",
+      "tests/analytics-dashboard.integration.test.tsx",
+      "tests/payment-carousel.integration.test.tsx",
+      "tests/account-review.integration.test.tsx"
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
@@ -1000,6 +1035,7 @@
       "e2e/stock-reading.e2e.spec.ts",
       "e2e/stock-valuation.e2e.spec.ts",
       "e2e/welcome-prototype.e2e.spec.ts",
+      "e2e/analytics-dashboard.e2e.spec.ts",
       "e2e/account-review.e2e.spec.ts"
     ]
   },
