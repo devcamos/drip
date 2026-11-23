@@ -20,6 +20,15 @@ describe("regression evidence guard", () => {
   it("requires every named WebKit journey to pass once in the correct project", () => {
     expect(validateBrowserMatrix(webkit())).toEqual({ passed: webkitJourneys.length, required: webkitJourneys.length, errors: [] });
   });
+  it("keeps saved-account, credit-card and payment-calendar journeys in the mobile WebKit subset", () => {
+    expect(webkitJourneys).toEqual(expect.arrayContaining([
+      expect.objectContaining({ file: "account-workflows.e2e.spec.ts", title: "future transfers cannot change current money and unsaved edits survive cancelled navigation" }),
+      expect.objectContaining({ file: "account-workflows.e2e.spec.ts", title: "stock position review, archive and restore preserve received dividends" }),
+      expect.objectContaining({ file: "account-workflows.e2e.spec.ts", title: "credit-card reminders and calendar stay separate from income and paid statements survive reload" }),
+      expect.objectContaining({ file: "payment-calendar.e2e.spec.ts", title: "an existing user views upcoming cash/dividend payments and opens the matching holding" }),
+      expect.objectContaining({ file: "payment-calendar.e2e.spec.ts", title: "a user edits a payment schedule and the new calendar survives encrypted reload" }),
+    ]));
+  });
   it("rejects skipped, flaky, wrong-browser and missing WebKit evidence", () => {
     for (const mutate of [
       (x: ReturnType<typeof webkit>) => { x.suites[0].specs[0].tests[0].results[0].status = "skipped"; },
