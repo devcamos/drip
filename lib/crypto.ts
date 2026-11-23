@@ -44,7 +44,7 @@ async function deriveKey(code: string, salt: Uint8Array, iterations: number): Pr
   );
 }
 
-export interface BackupFile { app: "drip"; v: 1 | 2 | 3 | 4 | 5; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
+export interface BackupFile { app: "drip"; v: 1 | 2 | 3 | 4 | 5 | 6; kdf: "PBKDF2-SHA256"; iter: number; salt: string; iv: string; ct: string }
 
 /** Shared by cloud recovery and the memory-only cloud key restored at local unlock. */
 export async function deriveCloudEncryptionKey(code: string): Promise<CryptoKey> {
@@ -66,13 +66,13 @@ export class BackupError extends Error {}
 
 export async function decryptBackup<T = unknown>(file: unknown, code: string): Promise<T> {
   const f = file as BackupFile;
-  if (!f || f.app !== "drip" || ![1, 2, 3, 4, 5].includes(f.v) || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file this version can read. Check the file or update Drip before restoring it.");
+  if (!f || f.app !== "drip" || ![1, 2, 3, 4, 5, 6].includes(f.v) || f.kdf !== "PBKDF2-SHA256") throw new BackupError("This isn't a Drip backup file this version can read. Check the file or update Drip before restoring it.");
   if (!Number.isInteger(f.iter) || f.iter < 100_000 || f.iter > KDF_ITERATIONS) throw new BackupError("Backup uses unsafe settings.");
   try {
     const key = await deriveKey(code, unb64(f.salt), f.iter);
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(f.iv), additionalData: enc.encode(`drip-v${f.v}`) }, key, unb64(f.ct));
     const decoded: unknown = JSON.parse(dec.decode(pt));
-    if (f.v === 5) {
+    if (f.v >= 5) {
       if (!isStoredPenceAppData(decoded)) throw new BackupError("This backup's money format is invalid. Your current data has not changed.");
       return fromStoredPence(decoded) as T;
     }

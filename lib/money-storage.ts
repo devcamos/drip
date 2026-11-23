@@ -1,4 +1,5 @@
 import type { Account, AppData, BalanceEvent, Payout, Snapshot } from "./types";
+import { validReviewDate } from "./account-review";
 
 /** Money values are pounds inside the app and integer pence in encrypted storage. */
 export interface StoredPenceAccount extends Omit<Account, "balance" | "bonus" | "payouts" | "events" | "creditCard" | "marketValuation"> {
@@ -95,6 +96,7 @@ export function isStoredPenceAppData(value: unknown): value is StoredPenceAppDat
   if (value.projection !== undefined && (!isRecord(value.projection) || !safePence(value.projection.monthlyDeposit))) return false;
   if (!value.accounts.every(account => {
     if (!isRecord(account) || account.currency !== "GBP" || !safePence(account.balance) || !Array.isArray(account.payouts)) return false;
+    if ([account.balanceReviewedAt, account.rateReviewedAt, account.paymentDateReviewedAt].some(date => date !== undefined && !validReviewDate(date))) return false;
     if (account.bonus !== undefined && (!isRecord(account.bonus) || !safePence(account.bonus.amount))) return false;
     if (account.creditCard !== undefined && (!isRecord(account.creditCard) || !safePence(account.creditCard.minimumPayment) || (account.creditCard.plannedPayment !== undefined && !safePence(account.creditCard.plannedPayment)))) return false;
     if (account.marketValuation !== undefined && (!isRecord(account.marketValuation) || !safePence(account.marketValuation.recordedBalance))) return false;

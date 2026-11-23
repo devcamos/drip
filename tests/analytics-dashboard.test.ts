@@ -1,6 +1,7 @@
 import { describe,expect,it } from "vitest";
 import { analyticsDashboardModel } from "../lib/analytics-dashboard";
 import { archiveAccount } from "../lib/account-lifecycle";
+import { paymentCalendar } from "../lib/payment-calendar";
 import { releaseDebt,releaseSaver,releaseStock } from "./saved-experience-fixtures";
 describe("private analytics dashboard",()=>{
  const today="2026-11-19";
@@ -36,6 +37,14 @@ describe("private analytics dashboard",()=>{
   const highAER=releaseSaver({id:"cash-2",provider:"Lloyds",ratePct:5});
   const m=analyticsDashboardModel([releaseDebt(),highApr,releaseSaver(),highAER],today);
   expect(m.rateComparison?.card).toBe(highApr);expect(m.rateComparison?.saver).toBe(highAER);expect(m.rateComparison?.gap).toBe(25);
+ });
+ it("keeps payments due today visible separately from the forward calendar",()=>{
+  const today="2026-11-20",cash=releaseSaver({nextPayoutDate:today}),debt=releaseDebt({nextPayoutDate:today});
+  const calendar=paymentCalendar([cash,debt],today)!;
+  expect(calendar.dueToday.map(payment=>({id:payment.account.id,date:payment.date,repayment:payment.repayment}))).toEqual([
+   {id:"cash",date:today,repayment:undefined},{id:"credit",date:today,repayment:true},
+  ]);
+  expect(calendar.months.flatMap(month=>month.payments).every(payment=>payment.date>today)).toBe(true);
  });
  it("builds a 12-month income trend and a non-overlapping asset mix",()=>{
   const m=analyticsDashboardModel([

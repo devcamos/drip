@@ -3,6 +3,7 @@ import { validInvestment } from "./stock-investment";
 import { isCreditAccount, validCreditAmount, validCreditCardTerms } from "./credit-card";
 import { validMarketValuation } from "./market-valuation";
 import { validLifecycleFields } from "./account-lifecycle";
+import { validAccountReviewFields } from "./account-review";
 import { ACCOUNT_COLOURS } from "./account-colour";
 
 /**
@@ -40,7 +41,7 @@ export function validDate(value: unknown): value is string {
 }
 /** Validate new optional fields while preserving older backups without categories. */
 export function validProductFields(account: Account): boolean {
-  if (!validLifecycleFields(account)) return false;
+  if (!validLifecycleFields(account) || !validAccountReviewFields(account)) return false;
   if (isCreditAccount(account)) return typeof account.provider === "string" && account.provider.trim().length > 0 && account.provider.length <= 100 &&
     validCreditAmount(account.balance) && validCreditCardTerms(account.creditCard) && account.rateType === "interest" && account.ratePct === 0 &&
     account.frequency === "monthly" && validDate(account.nextPayoutDate) && Array.isArray(account.payouts) && account.payouts.length === 0 &&

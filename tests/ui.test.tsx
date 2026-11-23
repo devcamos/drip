@@ -605,7 +605,8 @@ describe("daily interest accounts", () => {
     click("← Accounts");
     expect(within(screen.getByRole("region", { name: "Account cards" })).getByRole("button", { name: /Open Moneyfarm/i })).toBeInTheDocument();
     const up = screen.getByRole("region", { name: "Next little drop" });
-    expect(within(up).getAllByText(/Daily payments through/)).toHaveLength(3);
+    expect(within(up).getAllByText(/Daily payments through/)).toHaveLength(4);
+    expect(within(up).getByText(/Due today · Daily payments through/)).toBeInTheDocument();
   });
   it("keeps an older daily balance authoritative on open and separates legacy estimates", async () => {
     const past = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);

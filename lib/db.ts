@@ -41,8 +41,9 @@ export async function clearOnboardingDraft() { await tx("readwrite", s => s.dele
 
 function open(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
-    // Version 5 fences older clients that would read integer pence as pounds.
-    const r = indexedDB.open(DB, 5);
+    // Version 6 also fences v5 clients that would drop account review fields
+    // during local-to-cloud sync. Keep the previous pence-format fence too.
+    const r = indexedDB.open(DB, 6);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
     r.onerror = () => rej(r.error?.name === "VersionError"

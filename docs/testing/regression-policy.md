@@ -34,6 +34,7 @@ source files and executable regression evidence for every current area:
 - Daily currency conversion.
 - Trends, forecasts and deposits.
 - Payment calendars and in-app reminders.
+- User-confirmed account figure review reminders and encrypted version compatibility.
 - Phone-reminder enrolment, limits and dispatch.
 - PWA installation, offline shell and safe updates.
 - The holdings prototype.

@@ -264,7 +264,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   switch (view.name) {
   case "detail": {
     const a = active.find((x) => x.id === view.id);
-    body = a ? <AccountDetail key={a.id} a={a} onBack={() => navigate({ name: "home" })} onEdit={() => navigate({ name: "add", id: a.id })}
+    body = a ? <AccountDetail key={a.id} a={a} today={calendarDay} onBack={() => navigate({ name: "home" })} onEdit={() => navigate({ name: "add", id: a.id })}
       onChange={(fn) => update((d) => {
         if (!d.accounts.some(account => account.id === a.id)) throw new Error("This account was removed. Return to Accounts.");
         return { ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) };

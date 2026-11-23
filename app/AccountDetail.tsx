@@ -11,6 +11,8 @@ import { CreditCardDetail } from "./CreditCardDetail";
 import { StockPrice } from "./stocks/StockPrice";
 import { StockReading } from "./stocks/StockReading";
 import { useUnsavedDraft } from "./useDraftGuard";
+import { AccountReviewPanel } from "./AccountReview";
+import { confirmAccountFiguresReviewed } from "@/lib/account-review";
 const today = () => M.localToday();
 const fmtDate = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const incomeLabel = { interest: "Interest", dividend: "Dividend", bonus: "Bonus" };
@@ -23,7 +25,7 @@ const eventStyle = {
   topup: { label: "Top up", className: "ok", prefix: "+" }, withdraw: { label: "Withdrawal", className: "err", prefix: "−" },
   set: { label: "Balance set", className: "", prefix: "" }, interest: { label: "Interest", className: "", prefix: "" },
 };
-type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onArchive?: () => void | Promise<boolean>; onChange: (fn: (x: Account) => Account) => void | Promise<boolean> }>;
+type Props = Readonly<{ a: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onArchive?: () => void | Promise<boolean>; onChange: (fn: (x: Account) => Account) => void | Promise<boolean>; today?: string }>;
 
 function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
   const [mode, setMode] = useState<"topup" | "withdraw" | "set" | null>(null);
@@ -50,7 +52,8 @@ function BalanceActions({ a, onChange }: Pick<Props, "a" | "onChange">) {
       try {
         if (await onChange(x => {
           if (mode === "withdraw" && n > x.balance) throw Object.assign(new Error("Balance changed"), { name: "StaleAccountEdit" });
-          return changeBalance(x, mode, n, date, eventId);
+          const updated = changeBalance(x, mode, n, date, eventId);
+          return mode === "set" ? { ...updated, balanceReviewedAt: today() } : updated;
         }) === false) setError("Balance change could not be saved. Your entry is kept; check the message above before retrying.");
         else setMode(null);
       }
@@ -122,8 +125,12 @@ function IncomeHistory({ a, onChange }: Pick<Props, "a" | "onChange">) {
   </section>;
 }
 
-export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange }: Props) {
-  if (isCreditAccount(a)) return <CreditCardDetail account={a} onBack={onBack} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} onChange={onChange} />;
+export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange, today: reviewToday = today() }: Props) {
+  const reviewPanel = <AccountReviewPanel account={a} today={reviewToday} onConfirm={() => onChange(current => {
+    if (current.balance !== a.balance || current.ratePct !== a.ratePct || current.rateType !== a.rateType || current.frequency !== a.frequency || current.nextPayoutDate !== a.nextPayoutDate || JSON.stringify(current.creditCard) !== JSON.stringify(a.creditCard)) throw Object.assign(new Error("Account figures changed"), { name: "StaleAccountEdit" });
+    return confirmAccountFiguresReviewed(current, reviewToday);
+  })}/>;
+  if (isCreditAccount(a)) return <CreditCardDetail account={a} onBack={onBack} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} onChange={onChange} reviewPanel={reviewPanel} />;
   const events = (a.events ?? []).filter(e => e.type !== "interest").toSorted((x, y) => y.date.localeCompare(x.date));
   const legacy = M.interestHistory(a.events, "month");
   const forecast = M.projection([a], 12).at(-1)!;
@@ -135,6 +142,7 @@ export function AccountDetail({ a, onBack, onEdit, onDelete, onArchive, onChange
       {a.label && <div className="meta">{a.label}</div>}<div className="bal">{M.gbp(a.balance)}</div>
     </div>
     <p className="muted">{a.marketValuation ? "Your saved market estimate. Dividend predictions retain your recorded income assumptions." : "Your entered balance. Predictions and recorded income never change it automatically."}</p>
+    {reviewPanel}
     {a.positionReviewRequired && <section className="banner warn" aria-label="Share position needs review"><span>Check your recorded shares after this cash movement. Price updates and capital return are paused until you confirm the position.</span><button className="btn ghost small" onClick={onEdit}>Update share position</button></section>}
     {events.some(event => event.date > today()) && <p role="status" className="banner warn">An earlier entry has a future date. Check your provider's current balance and use Update balance to correct your saved figure if needed.</p>}
     {a.rateType === "dividend" && <><StockPrice key={a.id} account={a} onChange={onChange} onEdit={onEdit} onBack={onBack} /><StockInvestmentSummary account={a} onEdit={onEdit} /><StockReading holdingName={a.holdingName} /></>}
