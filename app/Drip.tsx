@@ -260,12 +260,12 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     } catch { if (sequence === preferenceSequence.current) setPreferenceError("Could not save your display preference. Your previous view is kept; retry."); }
     finally { if (sequence === preferenceSequence.current) setPreferenceBusy(false); }
   }
-  const accountsCanvas = <AccountsHome accounts={active} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(data.accounts, calendarDay.slice(0, 7), calendarDay)} nextPayment={nextPayment} estimatedValues={assets.some(account => !!account.marketValuation)} onAdd={() => navigate({ name: "choose" })} onOpen={id => navigate({ name: "detail", id })} onPortfolio={() => navigate({ name: "portfolio" })} />;
+  const accountsCanvas = <AccountsHome accounts={active} identity={data.identity} totals={portfolioTotals(data.accounts)} creditPlans={creditPlans} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} receivedThisMonth={M.recordedIncome(data.accounts, calendarDay.slice(0, 7), calendarDay)} nextPayment={nextPayment} estimatedValues={assets.some(account => !!account.marketValuation)} today={calendarDay} onAdd={() => navigate({ name: "choose" })} onOpen={id => navigate({ name: "detail", id })} onPortfolio={() => navigate({ name: "portfolio" })} />;
   let body: React.ReactNode;
   switch (view.name) {
   case "detail": {
     const a = active.find((x) => x.id === view.id);
-    body = a ? <AccountDetail key={a.id} a={a} onBack={() => navigate({ name: "home" })} onEdit={() => navigate({ name: "add", id: a.id })}
+    body = a ? <AccountDetail key={a.id} a={a} today={calendarDay} onBack={() => navigate({ name: "home" })} onEdit={() => navigate({ name: "add", id: a.id })}
       onChange={(fn) => update((d) => {
         if (!d.accounts.some(account => account.id === a.id)) throw new Error("This account was removed. Return to Accounts.");
         return { ...d, accounts: d.accounts.map((x) => x.id === a.id ? fn(x) : x) };

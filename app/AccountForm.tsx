@@ -97,8 +97,12 @@ export function AccountForm({ existing, onSave, onCancel, initialCategory }: Rea
     <form onSubmit={async event => {
       event.preventDefault(); if (!valid || submitting.current) return;
       const createdAt = existing?.createdAt ?? new Date().toISOString();
+      const reviewedOn = today();
       const base: Account = { ...existing, id, provider: name, label: label.trim(), holdingName: category === "stocks-funds" ? holding.trim() || undefined : undefined, investment: investment ?? undefined, balance: M.round2(b), ratePct: existing?.ratePct ?? r, rateType,
         productCategory: category, taxWrapper: wrapper, reinvestIncome: reinvest, frequency, nextPayoutDate: frequency === "daily" ? today() : next,
+        balanceReviewedAt: !existing || M.round2(b) !== existing.balance ? reviewedOn : existing.balanceReviewedAt,
+        rateReviewedAt: !existing || r !== existing.ratePct || rateType !== existing.rateType ? reviewedOn : existing.rateReviewedAt,
+        paymentDateReviewedAt: frequency !== "daily" && (!existing || frequency !== existing.frequency || next !== existing.nextPayoutDate) ? reviewedOn : existing?.paymentDateReviewedAt,
         bonus: hasBonus ? { amount: M.round2(Number(bonusAmount)), expectedDate: bonusDate } : undefined,
         colour, payouts: existing?.payouts ?? [], events: existing?.events ?? [], createdAt,
         rateHistory: existing?.rateHistory ?? [{ from: createdAt.slice(0, 10), ratePct: r }] };

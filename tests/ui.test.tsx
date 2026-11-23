@@ -323,7 +323,7 @@ describe("accounts", () => {
     render(<Drip />);
     expect(within(await screen.findByRole("region", { name: "Money overview" })).getByText("£4,000.00", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Next little drop")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Chip/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open Chip,/ }));
     expect(await screen.findByText("No income logged yet.")).toBeInTheDocument();
     click("← Accounts");
     expect(screen.getByRole("region", { name: "Money overview" })).toBeInTheDocument();
@@ -613,7 +613,7 @@ describe("daily interest accounts", () => {
     render(<Drip />);
     await screen.findByRole("region", { name: "Money overview" });
     expect((await loadData()).accounts[0]).toMatchObject({ balance: 10000, accruedThrough: past });
-    fireEvent.click(screen.getByRole("button", { name: /MoneyFarm/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open MoneyFarm,/ }));
     expect(await screen.findByText("Previous interest estimates")).toBeInTheDocument();
     expect(screen.getByText("No income logged yet.")).toBeInTheDocument();
     expect(screen.getByText(/Your saved balance has been preserved/)).toBeInTheDocument();

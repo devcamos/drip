@@ -6,9 +6,10 @@ import { accountCardStyle } from "@/lib/account-colour";
 import { creditCardWarnings } from "@/lib/credit-card";
 import { gbp } from "@/lib/maths";
 import { displayProvider } from "@/lib/products";
+import type { ReactNode } from "react";
 
-type Props = Readonly<{ account: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onArchive?: () => void | Promise<boolean>; onChange?: (fn: (account: Account) => Account) => void | Promise<boolean> }>;
-export function CreditCardDetail({ account, onBack, onEdit, onDelete, onArchive, onChange }: Props) {
+type Props = Readonly<{ account: Account; onBack: () => void; onEdit: () => void; onDelete: () => void | Promise<boolean>; onArchive?: () => void | Promise<boolean>; onChange?: (fn: (account: Account) => Account) => void | Promise<boolean>; reviewPanel?: ReactNode }>;
+export function CreditCardDetail({ account, onBack, onEdit, onDelete, onArchive, onChange, reviewPanel }: Props) {
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const terms = account.creditCard!;
   const warnings = creditCardWarnings(account);
@@ -28,6 +29,7 @@ export function CreditCardDetail({ account, onBack, onEdit, onDelete, onArchive,
       }}>{terms.statementPaid ? "Reopen statement reminder" : "Mark statement paid"}</button>}
       {warnings.length ? <ul className="muted" aria-label="Payment plan notes">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul> : null}
     </section>
+    {reviewPanel}
     {error ? <p role="alert" className="err">{error}</p> : null}
     <div className="row-gap"><button className="btn" disabled={busy} onClick={onEdit}>Edit credit card</button>{onArchive && <button className="btn ghost" disabled={busy} onClick={onArchive}>Archive account</button>}<button className="btn danger" disabled={busy} onClick={async () => {
       setBusy(true); setError("");

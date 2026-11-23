@@ -52,8 +52,15 @@ export function CreditCardForm({ existing, onSave, onCancel }: Props) {
       if (!checked.value || Object.keys(nextErrors).length || !candidate) { requestAnimationFrame(() => form.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus()); return; }
       setBusy(true);
       try {
+        const reviewedOn = M.localToday();
+        const reviewDates: Account = {
+          ...candidate,
+          balanceReviewedAt: !existing || checked.value.balance !== existing.balance ? reviewedOn : existing.balanceReviewedAt,
+          rateReviewedAt: !existing || checked.value.creditCard.apr !== existing.creditCard?.apr ? reviewedOn : existing.rateReviewedAt,
+          paymentDateReviewedAt: !existing || checked.value.nextPayoutDate !== existing.nextPayoutDate ? reviewedOn : existing.paymentDateReviewedAt,
+        };
         const next = existing && checked.value.balance !== existing.balance
-          ? M.applySetBalance({ ...candidate, balance: existing.balance }, checked.value.balance, M.localToday()) : candidate;
+          ? M.applySetBalance({ ...reviewDates, balance: existing.balance }, checked.value.balance, reviewedOn) : reviewDates;
         if (await onSave(next) === false) setMessage("Could not save this credit card. Your saved figures are unchanged; keep Drip open and retry.");
       } catch { setMessage("Could not save this credit card. Your saved figures are unchanged; keep Drip open and retry."); }
       finally { setBusy(false); }

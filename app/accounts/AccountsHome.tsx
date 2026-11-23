@@ -3,7 +3,8 @@
 import type { Account } from "@/lib/types";
 import { formatTag, type Identity } from "@/lib/identity";
 import { accountCardStyle } from "@/lib/account-colour";
-import { gbp } from "@/lib/maths";
+import { gbp, localToday } from "@/lib/maths";
+import { accountsNeedingReview } from "@/lib/account-review";
 import { displayProvider, productLabel } from "@/lib/products";
 import { accountBadge, accountDate, accountTitle, calendarParts, groupAccounts, type AccountsTotals, type CreditPlan, type IncomePeriod, type NextAccountPayment } from "./presentation";
 import s from "./accounts.module.css";
@@ -22,15 +23,17 @@ export type AccountsHomeProps = Readonly<{
   nextPayment?: NextAccountPayment | null;
   preferenceBusy?: boolean;
   estimatedValues?: boolean;
+  today?: string;
 }>;
 
-export function AccountsHome({ accounts, identity, totals, creditPlans, incomePeriod, onIncomePeriod, onAdd, onOpen, onPortfolio, receivedThisMonth, nextPayment, preferenceBusy = false, estimatedValues = false }: AccountsHomeProps) {
+export function AccountsHome({ accounts, identity, totals, creditPlans, incomePeriod, onIncomePeriod, onAdd, onOpen, onPortfolio, receivedThisMonth, nextPayment, preferenceBusy = false, estimatedValues = false, today = localToday() }: AccountsHomeProps) {
   const accountIds = new Set(accounts.map(account => account.id));
   const plans = creditPlans.filter(plan => accountIds.has(plan.accountId));
   const debts = new Map(plans.map(plan => [plan.accountId, plan]));
   const assets = accounts.filter(account => !debts.has(account.id));
   const stockCount = assets.filter(account => account.rateType === "dividend").length;
   const groups = groupAccounts(accounts);
+  const reviewQueue = accountsNeedingReview(accounts, today);
   const dateParts = nextPayment ? calendarParts(nextPayment.date) : null;
   if (!accounts.length) return <section className={`${s.experience} ${s.emptyState}`} aria-label="Your accounts are empty">
     <div className={s.emptyCopy}><p className={s.eyebrow}>YOUR ACCOUNTS</p><h1>Your money,<br /><em>taking shape.</em></h1><p>Your account list is empty. Add savings, an investment or a credit card to start seeing the picture.</p><button className={s.primary} onClick={onAdd}>Add an account <span aria-hidden="true">+</span></button><small>Use the figures from your provider. You can add more accounts at any time.</small></div>
@@ -38,6 +41,7 @@ export function AccountsHome({ accounts, identity, totals, creditPlans, incomePe
   </section>;
   return <section className={s.experience} aria-label="Your saved accounts">
     <header className={s.accountsHeading}><div><p className={s.eyebrow}>{identity ? `HELLO, ${formatTag(identity)}` : "YOUR ACCOUNTS"}</p><h1>A little more <em>perspective.</em></h1></div><span className={s.currencyPill}>Your accounts · GBP</span></header>
+    {reviewQueue.length ? <section className={s.reviewTask} aria-label="Review your figures"><div><p className={s.eyebrow}>A QUICK CHECK</p><h2>Review your figures</h2><p>Some saved details are new or due for review. Drip doesn&apos;t verify figures with providers.</p></div><ul>{reviewQueue.map(({ account, fields }) => <li key={account.id}><span><b>{accountTitle(account)}</b><small>{fields.map(field => field.label).join(" · ")} · {fields.length} {fields.length === 1 ? "figure" : "figures"} due</small></span><button onClick={() => onOpen(account.id)} aria-label={`Review ${accountTitle(account)}`}>Review <span aria-hidden="true">↗</span></button></li>)}</ul></section> : null}
     <div className={s.overview}>
       <section className={s.balanceHero} aria-label="Money overview"><div className={s.heroTop}><span>Money</span><span className={s.heroMark} aria-hidden="true">↗</span></div><p>{gbp(totals.money)}</p><dl className={s.financialBreakdown}><div><dt>Credit card debt</dt><dd>{gbp(totals.debt)}</dd></div><div><dt>Net position</dt><dd>{gbp(totals.netPosition)}</dd></div></dl><small className={s.netNote}>Your assets and credit card debt in one view.</small><div className={s.balanceFoot}><span><i />{assets.length} asset {assets.length === 1 ? "account" : "accounts"} + {plans.length} credit {plans.length === 1 ? "card" : "cards"}</span><span>{estimatedValues ? "Includes a market estimate" : "Recorded values"}</span></div></section>
       <section className={s.incomeHero} aria-label="Estimated income"><p className={s.eyebrow}>YOUR INCOME OUTLOOK</p><h2>{gbp(incomePeriod === "month" ? totals.monthlyIncome : totals.annualIncome)}<span> / {incomePeriod === "month" ? "month" : "year"}</span></h2><p>{incomePeriod === "month" ? "Estimated monthly average" : "Estimated annual income"}</p><div className={s.periodPicker} role="group" aria-label="Estimate period"><button disabled={preferenceBusy} aria-pressed={incomePeriod === "month"} onClick={() => onIncomePeriod("month")}>Monthly</button><button disabled={preferenceBusy} aria-pressed={incomePeriod === "year"} onClick={() => onIncomePeriod("year")}>Yearly</button></div><small>Savings and investment income estimates. Payment amounts and dates can vary.</small></section>

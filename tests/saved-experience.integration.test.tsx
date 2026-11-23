@@ -305,7 +305,7 @@ it("uses real saved accounts in profile, debt detail, owner-scoped preference an
   await waitFor(() => expect(within(profile).getByRole("button", { name: "Yearly" })).toHaveAttribute("aria-pressed", "true"));
   await waitFor(async () => expect((await rawStore())[`income-period:${releaseIdentity.id}`]).toBe("year"));
   fireEvent.click(within(profile).getByRole("button", { name: /Manage accounts/ }));
-  fireEvent.click(screen.getByRole("button", { name: /Barclaycard/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Open Barclaycard,/ }));
   expect(await screen.findByRole("heading", { name: "Your payment plan" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Credit card payment plan" })).toHaveTextContent("24.9%");
   fireEvent.click(screen.getByRole("button", { name: "Edit credit card" }));

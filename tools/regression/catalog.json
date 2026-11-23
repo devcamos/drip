@@ -126,6 +126,18 @@
       "browser": [
         "e2e/stock-reading.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "account-review",
+      "unit": [
+        "tests/account-review.test.ts"
+      ],
+      "integration": [
+        "tests/account-review.integration.test.tsx"
+      ],
+      "browser": [
+        "e2e/account-review.e2e.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -203,7 +215,8 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
-        "tests/recovery-boundaries.unit.test.ts"
+        "tests/recovery-boundaries.unit.test.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -263,7 +276,8 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
         "tests/domain-boundaries.unit.test.ts",
-        "tests/cloud-sync.unit.test.ts"
+        "tests/cloud-sync.unit.test.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -336,7 +350,8 @@
         "e2e/account-workflows.e2e.spec.ts",
         "tests/domain-boundaries.unit.test.ts",
         "tests/stock-reading.integration.test.tsx",
-        "e2e/stock-reading.e2e.spec.ts"
+        "e2e/stock-reading.e2e.spec.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -363,7 +378,8 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
         "e2e/rate-change.spec.ts",
-        "tests/month-history.test.ts"
+        "tests/month-history.test.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -613,7 +629,8 @@
         "e2e/saved-experience.e2e.spec.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -646,7 +663,8 @@
         "tools/regression/webkit.mjs"
       ],
       "tests": [
-        "tests/regression-policy.test.ts"
+        "tests/regression-policy.test.ts",
+        "tests/account-review.test.ts"
       ]
     },
     {
@@ -758,7 +776,8 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
         "tests/stock-reading.integration.test.tsx",
-        "e2e/stock-reading.e2e.spec.ts"
+        "e2e/stock-reading.e2e.spec.ts",
+        "tests/account-review.integration.test.tsx"
       ]
     },
     {
@@ -807,6 +826,20 @@
         "tests/stock-reading.integration.test.tsx",
         "e2e/stock-reading.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "account-review",
+      "name": "User-confirmed review reminders for saved account figures",
+      "sources": [
+        "app/AccountReview.tsx",
+        "lib/account-review.ts"
+      ],
+      "tests": [
+        "tests/account-review.test.ts",
+        "tests/account-review.integration.test.tsx",
+        "tests/domain-boundaries.unit.test.ts",
+        "e2e/account-review.e2e.spec.ts"
+      ]
     }
   ],
   "layers": {
@@ -843,6 +876,7 @@
       "tests/cloud-sync.unit.test.ts",
       "tests/feedback.test.ts",
       "tests/stock-reading.test.ts",
+      "tests/account-review.test.ts",
       "tests/month-history.test.ts"
     ],
     "integration": [
@@ -915,6 +949,7 @@
       "tests/account-workflows.integration.test.tsx",
       "tests/feedback.integration.test.tsx",
       "tests/stock-reading.integration.test.tsx",
+      "tests/account-review.integration.test.tsx",
       "tests/trusted-device.test.ts",
       "tests/trusted-session.test.ts"
     ],
@@ -964,7 +999,8 @@
       "e2e/stock-investment.spec.ts",
       "e2e/stock-reading.e2e.spec.ts",
       "e2e/stock-valuation.e2e.spec.ts",
-      "e2e/welcome-prototype.e2e.spec.ts"
+      "e2e/welcome-prototype.e2e.spec.ts",
+      "e2e/account-review.e2e.spec.ts"
     ]
   },
   "conditional": [
