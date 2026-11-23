@@ -27,6 +27,15 @@ describe("regression evidence guard", () => {
     const c = JSON.parse(readFileSync(new URL("../tools/regression/catalog.json", import.meta.url), "utf8")) as Catalog;
     expect(c.pyramids?.find(row => row.featureId === "analytics-dashboard")).toEqual({ featureId: "analytics-dashboard", unit: ["tests/analytics-dashboard.test.ts"], integration: ["tests/analytics-dashboard.integration.test.tsx", "tests/payment-carousel.integration.test.tsx"], browser: ["e2e/analytics-dashboard.e2e.spec.ts"] });
   });
+  it("limits hosted Checkly login checks to successful Preview deployments and their exact commit", () => {
+    const workflow = readFileSync(new URL("../.github/workflows/checkly-preview.yml", import.meta.url), "utf8");
+    expect(workflow).toContain("github.event.deployment.environment == 'Preview'");
+    expect(workflow).toContain("github.event.deployment_status.state == 'success'");
+    expect(workflow).toContain("ref: ${{ github.event.deployment.sha || github.sha }}");
+    expect(workflow).toContain("github-sha: ${{ github.event.deployment.sha || github.sha }}");
+    expect(workflow).toContain("reporting: github-check");
+    expect(workflow).not.toMatch(/deployment\.environment\s*==\s*'Production'/);
+  });
   const webkit = () => ({ suites: [{ specs: webkitJourneys.map(row => ({ ...row, tests: [{ projectName: "mobile-webkit", status: "expected", results: [{ status: "passed" }] }] })) }] });
   it("requires every named WebKit journey to pass once in the correct project", () => {
     expect(validateBrowserMatrix(webkit())).toEqual({ passed: webkitJourneys.length, required: webkitJourneys.length, errors: [] });

@@ -653,6 +653,7 @@
       "sources": [
         ".github/workflows/ci.yml",
         ".github/workflows/pr-architecture-intelligence.yml",
+        ".github/workflows/checkly-preview.yml",
         "package-lock.json",
         "package.json",
         "playwright.config.ts",
