@@ -173,8 +173,7 @@
       "sources": [
         "app/api/identity/handle/route.ts",
         "lib/identity-reservation.ts",
-        "server/handle-reservations.ts",
-        "lib/worker-safety.ts"
+        "server/handle-reservations.ts"
       ],
       "tests": [
         "tests/handle-reservation.test.ts",
