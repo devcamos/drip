@@ -1,7 +1,8 @@
 /** Older clients discard unknown financial fields. Feature-bearing encrypted
  * copies must use a version they reject before restoring or rewriting data. */
-export function dataFormatVersion(data: unknown): 1 | 2 | 3 | 4 | 5 {
+export function dataFormatVersion(data: unknown): 1 | 2 | 3 | 4 | 5 | 6 {
   if (!data || typeof data !== "object" || !("accounts" in data) || !Array.isArray(data.accounts)) return 1;
+  if (data.accounts.some(account => account && typeof account === "object" && (account.balanceReviewedAt !== undefined || account.rateReviewedAt !== undefined || account.paymentDateReviewedAt !== undefined))) return 6;
   // Pence is a storage-format change. Old clients would otherwise interpret
   // an integer such as 12345 as £12,345 instead of £123.45.
   if ("money" in data && data.money === "pence") return 5;

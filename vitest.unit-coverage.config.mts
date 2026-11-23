@@ -6,7 +6,7 @@ import catalog from "./tools/regression/catalog.json" with { type: "json" };
 // authentication and browser APIs) is covered by the separate whole-app gate.
 // Review this inventory whenever a business-logic module is added or moved.
 const domain = [
-  "account-colour", "account-lifecycle", "account-switch", "cloud-payload",
+  "account-colour", "account-lifecycle", "account-review", "account-switch", "cloud-payload",
   "credit-card", "data-format", "decimal-input", "device-policy",
   "dividend-portfolio", "exchange-rates", "identity", "market-valuation",
   "maths", "money-storage", "payment-calendar", "payment-reminders", "products",

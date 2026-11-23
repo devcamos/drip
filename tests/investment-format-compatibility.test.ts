@@ -20,7 +20,7 @@ it("pence cloud v5 survives current restore and cannot be decoded or downgraded 
   expect(envelope.v).toBe(5);expect(isCloudEnvelope(envelope)).toBe(true);expect((await unseal(envelope,key)).accounts[0].investment).toEqual(investment);
   await expect(legacyCloud.unseal(envelope as legacyCloud.Envelope,key)).rejects.toThrow("Unsupported cloud copy");
   await expect(unseal({...envelope,v:4},key)).rejects.toThrow();
-  expect(isCloudEnvelope({...envelope,v:5})).toBe(true);expect(isCloudEnvelope({...envelope,v:6})).toBe(false);expect(isCloudEnvelope({...envelope,v:"5"})).toBe(false);
+  expect(isCloudEnvelope({...envelope,v:5})).toBe(true);expect(isCloudEnvelope({...envelope,v:6})).toBe(true);expect(isCloudEnvelope({...envelope,v:7})).toBe(false);expect(isCloudEnvelope({...envelope,v:"5"})).toBe(false);
 });
 it("the real old syncNow cannot clean away stats, PUT, or acknowledge a newer format even at the same cloud revision",async()=>{
   const key=await cloudKey(fixtureCode);await seedVault(data,fixtureCode,{userId:"owner",identityId:data.identity.id,key,version:2,dirty:false,lastSyncAt:null,generation:"old-client",revision:0});

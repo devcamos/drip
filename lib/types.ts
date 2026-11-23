@@ -32,6 +32,9 @@ export interface Account {
   id: string;
   archivedAt?: string; // retained history, excluded from active balances and predictions
   positionReviewRequired?: true; // cash movement is not an inferred buy/sell transaction
+  balanceReviewedAt?: string; // YYYY-MM-DD; user-confirmed against their provider
+  rateReviewedAt?: string; // YYYY-MM-DD; user-confirmed against their provider
+  paymentDateReviewedAt?: string; // YYYY-MM-DD; user-confirmed against their provider
   provider: string;      // e.g. "Zopa"
   label: string;         // device nickname: excluded from cloud sync; explicit file exports retain it
   holdingName?: string; // stock/fund identity: portable with the encrypted financial record

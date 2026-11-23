@@ -86,7 +86,7 @@ test("a user edits a payment schedule and the new calendar survives encrypted re
   await openCalendar(page);
   const restored = await openMonth(page, "2027-02");
   await restored.getByRole("button", { name: "Open Zopa for 2027-02-20", exact: true }).click();
-  await expect(page.getByText("£3,000.00", { exact: true })).toBeVisible();
+  await expect(page.locator(".bal")).toHaveText("£3,000.00");
   await page.getByRole("navigation").getByRole("button", { name: "Portfolio", exact: true }).click();
   await expect(page.getByTestId("dividend-income-total")).toHaveText("£12.50");
 });

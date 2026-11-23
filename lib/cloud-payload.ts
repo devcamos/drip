@@ -14,9 +14,9 @@ function portableCloudData(data: AppData): AppData {
     identity: identity ? { id: identity.id, handle: identity.handle, suffix: identity.suffix, createdAt: identity.createdAt } : undefined,
     projection: projection ? { monthlyDeposit: projection.monthlyDeposit, years: projection.years } : undefined,
     snapshots: data.snapshots.map(({ month, totalBalance, monthlyIncome, deposits, withdrawals }) => ({ month, totalBalance, monthlyIncome, deposits, withdrawals })),
-    accounts: data.accounts.map(({ id, provider, archivedAt, positionReviewRequired, holdingName, investment, creditCard, marketValuation, balance, label: _label, ratePct, rateType, productCategory, taxWrapper, reinvestIncome, bonus, frequency, nextPayoutDate, colour, payouts, events, accruedThrough, rateHistory, createdAt }): Account => ({
+    accounts: data.accounts.map(({ id, provider, archivedAt, positionReviewRequired, balanceReviewedAt, rateReviewedAt, paymentDateReviewedAt, holdingName, investment, creditCard, marketValuation, balance, label: _label, ratePct, rateType, productCategory, taxWrapper, reinvestIncome, bonus, frequency, nextPayoutDate, colour, payouts, events, accruedThrough, rateHistory, createdAt }): Account => ({
       id, provider, label: "", balance, ratePct, rateType, frequency, nextPayoutDate, colour, accruedThrough, createdAt,
-      archivedAt, positionReviewRequired,
+      archivedAt, positionReviewRequired, balanceReviewedAt, rateReviewedAt, paymentDateReviewedAt,
       productCategory, taxWrapper, reinvestIncome, holdingName,
       investment: investment ? { shares: investment.shares, averagePriceGBP: investment.averagePriceGBP,
         originalPrice: investment.originalPrice ? { currency: investment.originalPrice.currency, averagePrice: investment.originalPrice.averagePrice } : undefined } : undefined,
