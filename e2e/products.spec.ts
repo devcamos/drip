@@ -48,7 +48,7 @@ test(`${product.label}: income and bonus predictions survive reload and encrypte
   await expect(page.getByRole("form", { name: "Update balance", exact: true })).toHaveCount(0);
   await expect(page.getByTestId("income-history")).toContainText("£22.65");
   await page.reload(); await unlock(page, code);
-  await page.getByRole("button", { name: product.provider }).click();
+  await page.getByRole("button", { name: new RegExp(`^Open ${product.provider},`) }).click();
   await expect(page.locator(".bal")).toHaveText("£3,200.00");
   await expect(page.getByText("Pending bonus · £15.44")).toBeVisible();
   await expect(page.getByTestId("income-history")).toContainText("£22.65");
@@ -70,7 +70,7 @@ test(`${product.label}: income and bonus predictions survive reload and encrypte
     await restored.getByLabel("Backup file", { exact: true }).setInputFiles((await backup.path())!);
     await restored.getByLabel("Restore recovery code", { exact: true }).fill(code);
     await restored.getByRole("button", { name: "Restore", exact: true }).click();
-    await restored.getByRole("button", { name: product.provider }).click();
+    await restored.getByRole("button", { name: new RegExp(`^Open ${product.provider},`) }).click();
     await expect(restored.locator(".bal")).toHaveText("£3,200.00");
     await expect(restored.getByText(product.label, { exact: true })).toBeVisible();
     await expect(restored.getByText("Pending bonus · £15.44")).toBeVisible();
@@ -99,8 +99,9 @@ test("product and recorded income survive fresh-device encrypted cloud recovery"
     const restored = await fresh.newPage(); await restored.goto("http://localhost:4321");
     await showCloudRecovery(restored);
     await restored.getByLabel("Recovery code", { exact: true }).fill(code);
-    await withAuthRetry(restored, () => restored.getByRole("button", { name: "Restore cloud accounts", exact: true }).click(), restored.getByRole("button", { name: /MoneyFarm/ }));
-    await restored.getByRole("button", { name: /MoneyFarm/ }).click();
+    const moneyFarmCard = restored.getByRole("button", { name: /^Open MoneyFarm,/ });
+    await withAuthRetry(restored, () => restored.getByRole("button", { name: "Restore cloud accounts", exact: true }).click(), moneyFarmCard);
+    await moneyFarmCard.click();
     await expect(restored.getByText("Cash ISA", { exact: true })).toBeVisible();
     await expect(restored.locator(".bal")).toHaveText("£3,000.00");
     await expect(restored.getByText("Pending bonus · £15.44")).toBeVisible();
