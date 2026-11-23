@@ -12,6 +12,17 @@ const catalog = (): Catalog => ({ version: 1, features: [{ id: "cash", name: "Ca
 const files = ["lib/cash.ts", "tests/cash.test.ts"];
 
 describe("regression evidence guard", () => {
+  it("keeps the Better Auth core and passkey releases type-compatible", () => {
+    const app = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    const lock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
+    const auth = lock.packages["node_modules/better-auth"];
+    const passkey = lock.packages["node_modules/@better-auth/passkey"];
+    const core = lock.packages["node_modules/@better-auth/core"];
+    expect(app.dependencies["better-auth"]).toBe(app.dependencies["@better-auth/passkey"]);
+    expect(lock.packages["node_modules/better-auth"].version).toBe(lock.packages["node_modules/@better-auth/passkey"].version);
+    expect(core.version).toBe(auth.dependencies["@better-auth/core"]);
+    expect(passkey.peerDependencies["@better-auth/core"]).toBe(`^${core.version}`);
+  });
   it("keeps dashboard calculations, UI interactions and mobile journey in separate layers", () => {
     const c = JSON.parse(readFileSync(new URL("../tools/regression/catalog.json", import.meta.url), "utf8")) as Catalog;
     expect(c.pyramids?.find(row => row.featureId === "analytics-dashboard")).toEqual({ featureId: "analytics-dashboard", unit: ["tests/analytics-dashboard.test.ts"], integration: ["tests/analytics-dashboard.integration.test.tsx", "tests/payment-carousel.integration.test.tsx"], browser: ["e2e/analytics-dashboard.e2e.spec.ts"] });
