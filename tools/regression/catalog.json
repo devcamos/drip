@@ -176,6 +176,7 @@
       "tests": [
         "tests/password-server.test.ts",
         "tests/password-login.test.ts",
+        "tests/deployment-preflight.test.ts",
         "tests/password-ui.test.tsx",
         "tests/signup-form.test.tsx",
         "tests/signup-recovery-ui.test.tsx",

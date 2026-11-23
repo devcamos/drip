@@ -6,6 +6,19 @@ export function authBaseURL(env) {
   if (branch) return `https://${branch}`;
   return env.BETTER_AUTH_URL?.trim() || undefined;
 }
+/** Exact Preview deployment URLs are used by deployment-triggered synthetic
+ * checks; retain the stable branch URL as the auth base, but trust that
+ * deployment's own origin for browser login requests. */
+export function authTrustedOrigins(env) {
+  const origins = new Set();
+  const base = authBaseURL(env);
+  if (base) origins.add(new URL(base).origin);
+  const deploymentHost = env.VERCEL_ENV === "preview" ? env.VERCEL_URL?.trim() : "";
+  if (deploymentHost && /^[a-z0-9.-]+\.vercel\.app$/i.test(deploymentHost)) {
+    origins.add(`https://${deploymentHost}`);
+  }
+  return [...origins];
+}
 const local = host => ["localhost", "127.0.0.1", "[::1]"].includes(host);
 function validDatabase(value) {
   try {

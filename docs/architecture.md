@@ -61,6 +61,10 @@ flowchart LR
 The Checkly path is restricted to Preview and is activated only after its account,
 GitHub connection, synthetic test account, protected-deployment bypass and Slack
 alert channel are configured. See [Checkly Preview setup](checkly-preview.md).
+The Preview branch alias remains Better Auth's canonical base URL. For a
+deployment-triggered check, Drip additionally trusts only that deployment's
+exact Vercel `VERCEL_URL` origin; it does not trust arbitrary `*.vercel.app`
+origins.
 
 ## C4 level 3: components and trust boundaries
 

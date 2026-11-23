@@ -6,6 +6,13 @@ environment is `Preview`; it checks out the deployment's commit SHA, uses that
 deployment's HTTPS URL, and reports a Checkly GitHub Check against the commit.
 Production deployments are out of scope.
 
+The deployment URL in a Vercel success event may be an immutable deployment
+hostname rather than the stable branch alias. Drip keeps the branch alias as
+Better Auth's base URL and trusts the exact Preview deployment origin from
+Vercel's `VERCEL_URL` for browser-origin validation. It does not broadly trust
+all `vercel.app` hosts, and the deployment workflow still checks out and reports
+the specific deployment commit.
+
 The browser journey uses one dedicated synthetic account and verifies password
 login, a known saved balance after restoration in a fresh browser context, and
 confirmed sign-out. It never creates accounts during scheduled runs, uses no
