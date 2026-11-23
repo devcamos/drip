@@ -37,6 +37,33 @@ describe("private analytics dashboard",()=>{
   const m=analyticsDashboardModel([releaseDebt(),highApr,releaseSaver(),highAER],today);
   expect(m.rateComparison?.card).toBe(highApr);expect(m.rateComparison?.saver).toBe(highAER);expect(m.rateComparison?.gap).toBe(25);
  });
+ it("uses a cash LISA product category when no explicit wrapper is set and ignores lower comparison rates",()=>{
+  const lisa=releaseSaver({id:"lisa",productCategory:"cash-lisa",taxWrapper:undefined,balance:800});
+  const highApr=releaseDebt({id:"high-card",creditCard:{apr:30,minimumPayment:20}});
+  const lowerApr=releaseDebt({id:"lower-card",creditCard:{apr:20,minimumPayment:20}});
+  const highRate=releaseSaver({id:"high-rate",ratePct:5});
+  const lowerRate=releaseSaver({id:"lower-rate",ratePct:3});
+  const m=analyticsDashboardModel([lisa,highApr,lowerApr,highRate,lowerRate],today);
+  expect(m.totals.isas).toBe(800);
+  expect(m.rateComparison?.card).toBe(highApr);
+  expect(m.rateComparison?.saver).toBe(highRate);
+ });
+ it("uses the dividend type as the recorded-payout fallback and excludes ineligible receipts",()=>{
+  const stock=releaseStock({payouts:[
+   {date:today,amount:11,kind:"actual"},
+   {date:today,amount:20,kind:"expected",incomeType:"dividend"},
+   {date:"2026-11-20",amount:30,kind:"actual",incomeType:"dividend"},
+   {date:today,amount:-4,kind:"actual",incomeType:"dividend"},
+  ]});
+  expect(analyticsDashboardModel([stock],today).income.dividendReceivedThisMonth).toBe(11);
+ });
+ it("handles older accounts without product categories or card terms",()=>{
+  const olderSaver=releaseSaver({id:"legacy-cash",productCategory:undefined,taxWrapper:"none"});
+  const olderCard=releaseDebt({id:"legacy-card",creditCard:undefined});
+  const m=analyticsDashboardModel([olderSaver,olderCard],today);
+  expect(m.totals).toMatchObject({assets:5000,debt:1200,isas:0});
+  expect(m.rateComparison).toBeNull();
+ });
  it("builds a 12-month income trend and a non-overlapping asset mix",()=>{
   const m=analyticsDashboardModel([
    releaseSaver({balance:5000}),

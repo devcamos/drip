@@ -13,7 +13,8 @@ export function analyticsDashboardModel(accounts: Account[], today: string) {
   const card = cards.reduce<Account | undefined>((best, a) => !best || a.creditCard!.apr > best.creditCard!.apr ? a : best, undefined);
   const saver = savings.reduce<Account | undefined>((best, a) => !best || a.ratePct > best.ratePct ? a : best, undefined);
   const forecast = projection(assets, 12, 0, today);
-  const annualEstimate = round2(forecast.at(-1)?.income ?? 0);
+  // projection was called with a fixed 12-month horizon and returns one row per month.
+  const annualEstimate = round2(forecast[11]!.income);
   const incomeTrend = forecast.map((point, index) => ({
     month: addMonths(today, index + 1).slice(0, 7),
     income: round2(point.income - (forecast[index - 1]?.income ?? 0)),
