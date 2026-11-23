@@ -21,6 +21,7 @@ import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
 import { reserveIdentity } from "@/lib/identity-reservation";
+import { authClient } from "@/lib/cloud";
 import { SignupForm } from "./SignupForm";
 import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
@@ -371,7 +372,10 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => navigate({ name: "settings" })} /> : null}
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
-      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} onRenameIdentity={async handle => {
+      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} confirmRename={async () => {
+        const result = await authClient.signIn.passkey();
+        if (result.error) throw new Error("A cloud sign-in passkey is required. Add one in Security & devices, then try again.");
+      }} onRenameIdentity={async handle => {
         const identity = await reserveIdentity({ ...data.identity!, handle }, "rename");
         const saved = await update(current => {
           if (current.identity?.id !== identity.id) throw Object.assign(new Error("Profile changed"), { name: "StaleAccountEdit" });
