@@ -1,10 +1,20 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { regressionDatabaseURL } from "../../server/local-test-database.ts";
+import { Client } from "pg";
+import { assertRegressionDatabaseAvailable } from "../../server/local-test-database.ts";
 
 // The comprehensive suite can touch only the known disposable loopback DB.
 const database = process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test";
-regressionDatabaseURL(database);
+await assertRegressionDatabaseAvailable(database, async connectionString => {
+  const client = new Client({ connectionString, connectionTimeoutMillis: 1500 });
+  try {
+    await client.connect();
+    await client.query("SELECT 1");
+  } finally {
+    await client.end().catch(() => {});
+  }
+});
+console.log("Disposable regression Postgres is reachable.");
 if (process.env.VERCEL || process.env.VERCEL_ENV) throw new Error("Run the regression fixture outside deployment environments.");
 const base = process.env.REGRESSION_BASE ?? (process.env.CI ? undefined : "origin/main");
 if (!base) throw new Error("CI must specify its exact regression comparison commit.");

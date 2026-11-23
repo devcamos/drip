@@ -1,9 +1,26 @@
-import { expect, it } from "vitest";
-import { localTestDatabase, regressionDatabaseURL } from "../server/local-test-database";
+import { expect, it, vi } from "vitest";
+import { assertRegressionDatabaseAvailable, localTestDatabase, regressionDatabaseURL } from "../server/local-test-database";
 import { deploymentProblems } from "../scripts/deployment-config.mjs";
 
 const database = "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test";
 const fixture = { DRIP_CLOUD_E2E: "1", DATABASE_URL: database, DRIP_TEST_DATABASE_URL: database, BETTER_AUTH_URL: "http://localhost:4321" };
+it("passes the disposable Postgres target to the readiness probe", async () => {
+  const connect = vi.fn(async () => {});
+  await assertRegressionDatabaseAvailable(database, connect);
+  expect(connect).toHaveBeenCalledWith(new URL(database).href);
+});
+it("fails fast with safe local setup instructions without exposing connection credentials", async () => {
+  const privateTarget = "postgresql://synthetic-secret@127.0.0.1:55438/drip_notifications_test";
+  const error = await assertRegressionDatabaseAvailable(privateTarget, async () => { throw new Error("connection details"); }).catch(value => value);
+  expect(error).toBeInstanceOf(Error);
+  expect(error.message).toMatch(/Disposable regression Postgres is unavailable at 127\.0\.0\.1:55438\/drip_notifications_test[\s\S]*docker run[\s\S]*npm run test:regression[\s\S]*never connects to Preview or Production/);
+  expect(error.message).not.toMatch(/synthetic-secret|connection details/);
+});
+it("rejects a non-loopback target before probing it", async () => {
+  const connect = vi.fn(async () => {});
+  await expect(assertRegressionDatabaseAvailable("postgresql://user:secret@preview.invalid/db", connect)).rejects.toThrow(/target withheld/);
+  expect(connect).not.toHaveBeenCalled();
+});
 it("leaves the existing deployment transport unchanged without explicit opt-in", () => {
   expect(localTestDatabase({ DATABASE_URL: "postgres://private-host/application", VERCEL: "1" })).toBeUndefined();
   expect(localTestDatabase({ ...fixture, DRIP_CLOUD_E2E: "0" })).toBeUndefined();
