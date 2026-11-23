@@ -373,7 +373,593 @@
         "e2e/products.spec.ts",
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
-        "e2e/saved-experie…5497 tokens truncated…test.ts",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts",
+        "tests/account-review.integration.test.tsx"
+      ]
+    },
+    {
+      "id": "calculations",
+      "name": "Balances, topups, withdrawals, rate changes and income arithmetic",
+      "sources": [
+        "lib/maths.ts",
+        "lib/types.ts"
+      ],
+      "tests": [
+        "tests/maths.test.ts",
+        "tests/maths-refactor.test.ts",
+        "tests/gaps.test.ts",
+        "tests/daily.test.ts",
+        "tests/topup.test.ts",
+        "tests/income.test.ts",
+        "tests/income-remove-ui.test.tsx",
+        "e2e/income-update.spec.ts",
+        "e2e/products.spec.ts",
+        "e2e/smoke.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "e2e/rate-change.spec.ts",
+        "tests/month-history.test.ts",
+        "tests/account-review.integration.test.tsx"
+      ]
+    },
+    {
+      "id": "dividends",
+      "name": "Dividend portfolio and received-income totals",
+      "sources": [
+        "app/DividendPortfolio.tsx",
+        "app/IncomeSummary.tsx",
+        "lib/dividend-portfolio.ts"
+      ],
+      "tests": [
+        "tests/income.test.ts",
+        "tests/income-remove-ui.test.tsx",
+        "tests/stock-investment-ui.test.tsx",
+        "tests/stock-investment.test.ts",
+        "e2e/stock-investment.spec.ts",
+        "e2e/income-notifications.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "holdings",
+      "name": "Shares, acquisition cost, valuation and yield",
+      "sources": [
+        "app/StockInvestment.tsx",
+        "lib/stock-investment.ts",
+        "lib/decimal-input.ts"
+      ],
+      "tests": [
+        "tests/stock-investment.test.ts",
+        "tests/stock-investment-ui.test.tsx",
+        "e2e/stock-investment.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts"
+      ]
+    },
+    {
+      "id": "fx",
+      "name": "Daily FX estimates and bounded upstream API failures",
+      "sources": [
+        "app/CurrencyEstimate.tsx",
+        "app/api/exchange-rates/route.ts",
+        "lib/exchange-rates.ts",
+        "server/exchange-rates.ts"
+      ],
+      "tests": [
+        "tests/exchange-rates.test.ts",
+        "tests/currency-estimate.test.tsx",
+        "e2e/exchange-rates.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/incidents.test.ts",
+        "tests/incident-api.integration.test.ts"
+      ]
+    },
+    {
+      "id": "forecasts",
+      "name": "Trends, forecasts and deposit assumptions",
+      "sources": [
+        "app/Trends.tsx"
+      ],
+      "tests": [
+        "tests/trends.test.tsx",
+        "tests/trends-ui.test.tsx",
+        "tests/maths.test.ts",
+        "tests/gaps.test.ts",
+        "e2e/smoke.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/month-history.test.ts"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "Expected payments, recurrence and reminders",
+      "sources": [
+        "app/PaymentCalendar.tsx",
+        "app/PaymentNotifications.tsx",
+        "app/useCalendarDay.ts",
+        "lib/payment-calendar.ts",
+        "lib/payment-reminders.ts"
+      ],
+      "tests": [
+        "tests/payment-calendar.test.ts",
+        "tests/payment-calendar.integration.test.tsx",
+        "tests/income-reminders.test.ts",
+        "tests/income-notifications-ui.test.tsx",
+        "e2e/payment-calendar.e2e.spec.ts",
+        "e2e/income-notifications.spec.ts",
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "notifications",
+      "name": "Phone-reminder enrolment, scheduling, limits and dispatch",
+      "sources": [
+        "app/PhoneReminders.tsx",
+        "app/api/notifications/config/route.ts",
+        "app/api/notifications/dispatch/route.ts",
+        "app/api/notifications/subscription/route.ts",
+        "app/api/notifications/test/route.ts",
+        "lib/phone-reminders.ts",
+        "scripts/payment-notifications.sql",
+        "server/notifications/api.ts",
+        "server/notifications/config.ts",
+        "server/notifications/crypto.ts",
+        "server/notifications/dispatch.ts",
+        "server/notifications/model.ts",
+        "server/notifications/runtime.ts",
+        "server/notifications/store.ts"
+      ],
+      "tests": [
+        "tests/notifications-security.test.ts",
+        "tests/phone-reminders.test.ts",
+        "tests/income-notifications-ui.test.tsx",
+        "e2e/income-notifications.spec.ts",
+        "integration/notifications-postgres.test.ts",
+        "integration/notification-rate-limits.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/notification-boundaries.unit.test.ts",
+        "tests/incidents.test.ts"
+      ]
+    },
+    {
+      "id": "pwa",
+      "name": "Install task, offline shell, safe worker updates and data retention",
+      "sources": [
+        "app/InstallTask.tsx",
+        "app/PwaStatus.tsx",
+        "app/sw-build.js/route.ts",
+        "lib/worker-safety.ts",
+        "public/apple-touch-icon.png",
+        "public/icon-192.png",
+        "public/icon-512.png",
+        "public/icon-maskable-512.png",
+        "public/manifest.webmanifest",
+        "public/sw.js"
+      ],
+      "tests": [
+        "tests/install-task.test.tsx",
+        "tests/pwa.test.tsx",
+        "tests/pwa-build.test.ts",
+        "tests/service-worker.test.ts",
+        "tests/worker-safety.test.ts",
+        "e2e/install-task.spec.ts",
+        "e2e/pwa-update.spec.ts",
+        "e2e/signin-update.spec.ts",
+        "e2e/pwa-current-update.e2e.spec.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "prototype",
+      "name": "Design prototypes and Preview-only routes",
+      "sources": [
+        "app/prototype/HoldingsPrototype.tsx",
+        "app/prototype/holdings.ts",
+        "app/prototype/page.tsx",
+        "app/prototype/prototype.module.css",
+        "app/prototype/welcome/AccountPreview.tsx",
+        "app/prototype/welcome/WelcomePanels.tsx",
+        "app/prototype/welcome/WelcomePrototype.tsx",
+        "app/prototype/welcome/page.tsx",
+        "app/prototype/welcome/welcome.module.css"
+      ],
+      "tests": [
+        "tests/holdings-prototype.test.tsx",
+        "tests/holdings-prototype-route.test.tsx",
+        "e2e/holdings-prototype.spec.ts",
+        "tests/welcome-prototype.integration.test.tsx",
+        "e2e/welcome-prototype.e2e.spec.ts",
+        "tests/credit-prototype.test.ts",
+        "tests/credit-prototype.integration.test.tsx",
+        "e2e/credit-prototype.e2e.spec.ts",
+        "tests/stock-chart.test.ts",
+        "tests/stock-chart.integration.test.tsx",
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "delivery",
+      "name": "Deployment configuration and database schema compatibility",
+      "sources": [
+        "next.config.mjs",
+        "scripts/deployment-config.d.mts",
+        "scripts/deployment-config.mjs",
+        "scripts/migrate.mjs",
+        "scripts/release-device-session-cap.sql",
+        "scripts/validate-deployment.mjs",
+        "server/database-types.ts",
+        "server/local-test-database.ts"
+      ],
+      "tests": [
+        "tests/deployment-preflight.test.ts",
+        "tests/database-types.test.ts",
+        "e2e/signin-update.spec.ts",
+        "tests/local-test-database.test.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "shell",
+      "name": "App navigation, identity and screen orchestration",
+      "sources": [
+        "app/Drip.tsx",
+        "app/favicon.ico",
+        "app/globals.css",
+        "app/layout.tsx",
+        "app/page.tsx",
+        "lib/identity.ts",
+        "public/fonts/DM-Sans.ttf",
+        "public/fonts/OFL-DM-Sans.txt"
+      ],
+      "tests": [
+        "tests/ui.test.tsx",
+        "tests/trusted-session.test.ts",
+        "tests/identity.test.ts",
+        "tests/signup-form.test.tsx",
+        "e2e/smoke.spec.ts",
+        "e2e/auth-screens.spec.ts",
+        "e2e/gamertag-signin.spec.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/analytics-dashboard.integration.test.tsx",
+        "tests/account-review.integration.test.tsx"
+      ]
+    },
+    {
+      "id": "governance",
+      "name": "Regression catalog, change evidence and test-control guards",
+      "sources": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/pr-architecture-intelligence.yml",
+        "package-lock.json",
+        "package.json",
+        "playwright.config.ts",
+        "playwright.income.config.ts",
+        "tools/regression/check.mjs",
+        "tools/regression/policy.d.mts",
+        "tools/regression/policy.mjs",
+        "tools/regression/report.mjs",
+        "tools/regression/playwright-summary.mjs",
+        "tools/regression/playwright-summary.d.mts",
+        "tools/regression/run.mjs",
+        "vitest.calendar.config.mts",
+        "vitest.config.mts",
+        "vitest.unit-coverage.config.mts",
+        "vitest.integration.config.mts",
+        "tools/regression/cloud.mjs",
+        "tools/regression/prepare-cloud.mjs",
+        "playwright.cloud.config.ts",
+        "playwright.webkit.config.ts",
+        "tools/regression/browser-matrix.mjs",
+        "tools/regression/browser-matrix.d.mts",
+        "tools/regression/webkit.mjs"
+      ],
+      "tests": [
+        "tests/regression-policy.test.ts",
+        "tests/account-review.test.ts",
+        "tests/local-test-database.test.ts"
+      ]
+    },
+    {
+      "id": "credit-prototype",
+      "name": "Credit-card debt prototype and statement repayment planning",
+      "sources": [
+        "app/prototype/welcome/CreditCardPreview.tsx",
+        "app/prototype/welcome/credit-card.ts"
+      ],
+      "tests": [
+        "tests/credit-prototype.test.ts",
+        "tests/credit-prototype.integration.test.tsx",
+        "e2e/credit-prototype.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "stock-chart-prototype",
+      "name": "Dividend-card chart auto-loading, ranges and recorded holding separation",
+      "sources": [
+        "app/prototype/welcome/StockPricePreview.tsx",
+        "app/prototype/welcome/stock-chart.ts",
+        "app/prototype/welcome/stock-price.module.css"
+      ],
+      "tests": [
+        "tests/stock-chart.test.ts",
+        "tests/stock-chart.integration.test.tsx",
+        "e2e/stock-chart.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "stock-valuation-prototype",
+      "name": "User-entered share-price valuation with dated FX and unchanged dividend income",
+      "sources": [
+        "app/prototype/welcome/StockValuePreview.tsx",
+        "app/prototype/welcome/stock-valuation.ts"
+      ],
+      "tests": [
+        "tests/stock-valuation.test.ts",
+        "tests/stock-valuation.integration.test.tsx",
+        "e2e/stock-valuation.e2e.spec.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "feedback-prototype",
+      "name": "Feedback experience and proposed C4 delivery architecture",
+      "sources": [
+        "app/prototype/feedback/page.tsx",
+        "app/prototype/feedback/FeedbackPrototype.tsx",
+        "app/prototype/feedback/FeedbackArchitecture.tsx",
+        "app/prototype/feedback/FeedbackExperience.tsx",
+        "app/prototype/feedback/FeedbackDialog.tsx",
+        "app/prototype/feedback/feedback-model.ts",
+        "app/prototype/feedback/feedback.module.css"
+      ],
+      "tests": [
+        "tests/feedback-prototype.test.ts",
+        "tests/feedback-prototype.integration.test.tsx",
+        "e2e/feedback-prototype.e2e.spec.ts",
+        "tests/holdings-prototype-route.test.tsx"
+      ]
+    },
+    {
+      "id": "profile-wallet-prototype",
+      "name": "Profile settings entry and independent multiple-account prototype",
+      "sources": [
+        "app/prototype/welcome/ProfilePreview.tsx",
+        "app/prototype/welcome/demo-accounts.ts"
+      ],
+      "tests": [
+        "tests/profile-wallet.test.ts",
+        "tests/profile-wallet.integration.test.tsx",
+        "e2e/profile-wallet.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "saved-experience",
+      "name": "Saved accounts, credit-card debts, profile preferences and explicit holding valuation",
+      "sources": [
+        "app/AccountChooser.tsx",
+        "app/AccountChooser.module.css",
+        "app/CreditCardForm.tsx",
+        "app/CreditCardDetail.tsx",
+        "app/accounts/AccountsHome.tsx",
+        "app/accounts/AppAccountHeader.tsx",
+        "app/accounts/ProfileSettings.tsx",
+        "app/accounts/presentation.ts",
+        "app/accounts/accounts.module.css",
+        "app/stocks/StockPrice.tsx",
+        "app/stocks/stock-price.module.css",
+        "lib/credit-card.ts",
+        "lib/money-storage.ts",
+        "lib/market-valuation.ts",
+        "lib/profile-preferences.ts",
+        "lib/stock-chart.ts"
+      ],
+      "tests": [
+        "tests/saved-experience.test.ts",
+        "tests/saved-experience.integration.test.tsx",
+        "tests/money-storage.test.ts",
+        "integration/saved-experience-http.integration.test.ts",
+        "e2e/saved-experience.e2e.spec.ts",
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts",
+        "tests/payment-carousel.integration.test.tsx",
+        "tests/account-review.integration.test.tsx"
+      ]
+    },
+    {
+      "id": "account-workflows",
+      "name": "Safe actual balance dates, share reviews, draft protection, statement reminders and archived income",
+      "sources": [
+        "lib/account-lifecycle.ts",
+        "app/useDraftGuard.tsx",
+        "app/ArchivedAccounts.tsx"
+      ],
+      "tests": [
+        "tests/account-workflows.test.ts",
+        "tests/account-workflows.integration.test.tsx",
+        "e2e/account-workflows.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "feedback-inbox",
+      "name": "Private feedback submission and database triage",
+      "sources": [
+        "app/Feedback.tsx",
+        "app/api/feedback/route.ts",
+        "lib/feedback.ts",
+        "server/feedback/api.ts",
+        "server/feedback/store.ts",
+        "scripts/feedback.sql",
+        "app/feedback.module.css"
+      ],
+      "tests": [
+        "tests/feedback.test.ts",
+        "tests/feedback.integration.test.tsx",
+        "integration/feedback-postgres.test.ts",
+        "e2e/feedback.e2e.spec.ts",
+        "tests/incidents.test.ts"
+      ]
+    },
+    {
+      "id": "stock-reading",
+      "name": "Reading sources for dividend holdings",
+      "sources": [
+        "lib/stock-reading.ts",
+        "app/stocks/StockReading.tsx",
+        "app/stocks/stock-reading.module.css"
+      ],
+      "tests": [
+        "tests/stock-reading.test.ts",
+        "tests/stock-reading.integration.test.tsx",
+        "e2e/stock-reading.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "analytics-dashboard",
+      "name": "Private account analytics and payment carousels",
+      "sources": [
+        "app/AnalyticsDashboard.tsx",
+        "app/AnalyticsDashboardCharts.tsx",
+        "lib/analytics-dashboard.ts",
+        "app/analytics-dashboard.module.css",
+        "app/analytics-dashboard-charts.module.css"
+      ],
+      "tests": [
+        "tests/analytics-dashboard.test.ts",
+        "tests/analytics-dashboard.integration.test.tsx",
+        "tests/payment-carousel.integration.test.tsx",
+        "e2e/analytics-dashboard.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "account-review",
+      "name": "User-confirmed review reminders for saved account figures",
+      "sources": [
+        "app/AccountReview.tsx",
+        "lib/account-review.ts"
+      ],
+      "tests": [
+        "tests/account-review.test.ts",
+        "tests/account-review.integration.test.tsx",
+        "tests/domain-boundaries.unit.test.ts",
+        "e2e/account-review.e2e.spec.ts"
+      ]
+    },
+    {
+      "id": "incident-reporting",
+      "name": "Privacy-safe API 5xx reporting and Slack alert delivery",
+      "sources": [
+        "server/incidents.ts"
+      ],
+      "tests": [
+        "tests/incidents.test.ts",
+        "tests/incident-api.integration.test.ts",
+        "e2e/incident-boundary.spec.ts"
+      ]
+    }
+  ],
+  "layers": {
+    "unit": [
+      "tests/cloud-api.test.ts",
+      "tests/incidents.test.ts",
+      "tests/database-types.test.ts",
+      "tests/device-sessions.test.ts",
+      "tests/exchange-rates.test.ts",
+      "tests/gaps.test.ts",
+      "tests/identity.test.ts",
+      "tests/income-reminders.test.ts",
+      "tests/income.test.ts",
+      "tests/lock.test.ts",
+      "tests/maths-refactor.test.ts",
+      "tests/maths.test.ts",
+      "tests/money-storage.test.ts",
+      "tests/payment-calendar.test.ts",
+      "tests/recovery-api.test.ts",
+      "tests/regression-policy.test.ts",
+      "tests/topup.test.ts",
+      "tests/local-test-database.test.ts",
+      "tests/credit-prototype.test.ts",
+      "tests/stock-chart.test.ts",
+      "tests/stock-valuation.test.ts",
+      "tests/feedback-prototype.test.ts",
+      "tests/profile-wallet.test.ts",
+      "tests/saved-experience.test.ts",
+      "tests/account-workflows.test.ts",
+      "tests/domain-boundaries.unit.test.ts",
+      "tests/notification-boundaries.unit.test.ts",
+      "tests/credential-validation.unit.test.ts",
+      "tests/device-management.unit.test.ts",
+      "tests/recovery-boundaries.unit.test.ts",
+      "tests/cloud-sync.unit.test.ts",
+      "tests/feedback.test.ts",
+      "tests/stock-reading.test.ts",
+      "tests/month-history.test.ts",
+      "tests/analytics-dashboard.test.ts",
+      "tests/account-review.test.ts"
+    ],
+    "integration": [
+      "tests/account-options.test.tsx",
+      "tests/cloud-sync-ui.test.tsx",
+      "tests/cloud-ui.test.tsx",
+      "tests/cloud.test.ts",
+      "tests/crypto.test.ts",
+      "tests/currency-estimate.test.tsx",
+      "tests/daily.test.ts",
+      "tests/db.test.ts",
+      "tests/deployment-preflight.test.ts",
+      "tests/device-management-client.test.ts",
+      "tests/device-management-race.test.tsx",
+      "tests/device-management-ui.test.tsx",
+      "tests/incident-api.integration.test.ts",
       "tests/device-session-ui.test.tsx",
       "tests/device-session.test.ts",
       "tests/device-sessions-http.test.ts",
