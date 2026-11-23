@@ -39,8 +39,8 @@ it("allocates distinct case-insensitive tags under concurrent claims and returns
 
 it("returns the same reserved identity on retries and never renames an ensure request", async () => {
   const item = await owner(), original = await reserve(item.identityId, item.userId, "Original");
-  expect(await reserve(item.identityId, item.userId, "ORIGINAL")).toEqual(original);
-  expect(await reserve(item.identityId, item.userId, "Different", false)).toEqual(original);
+  expect(await reserve(item.identityId, item.userId, "ORIGINAL")).toMatchObject({ ...original, changed: false });
+  expect(await reserve(item.identityId, item.userId, "Different", false)).toMatchObject({ ...original, changed: false });
 });
 
 it("keeps renamed handles for 30 days, lets their owner reclaim them, then frees expired handles", async () => {
@@ -60,7 +60,7 @@ it("keeps renamed handles for 30 days, lets their owner reclaim them, then frees
 it("binds one stable identity per user and never renames during an ensure", async () => {
   const first = await owner(), second = await owner();
   const original = await reserve(first.identityId, first.userId, "Original");
-  expect(await reserve(first.identityId, first.userId, "Different", false)).toEqual(original);
+  expect(await reserve(first.identityId, first.userId, "Different", false)).toMatchObject({ ...original, changed: false });
   await expect(reserve(first.identityId, second.userId, "Taken")).rejects.toMatchObject({ code: "IDENTITY_OWNED" });
   await expect(reserve(randomUUID(), first.userId, "Another")).rejects.toMatchObject({ code: "ACCOUNT_ALREADY_HAS_IDENTITY" });
 });

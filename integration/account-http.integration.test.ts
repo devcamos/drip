@@ -228,6 +228,9 @@ it("reserves profile gamertags case-insensitively, assigns a stable suffix, and 
   expect((await pool.query("SELECT count(*)::int AS count FROM drip_handle_reservations WHERE identity_id=$1 AND NOT active AND cooling_until > now()", [firstIdentity])).rows[0].count).toBe(1);
   await send("/api/identity/handle", { identityId: firstIdentity, handle: "FinalRiver", mode: "rename" }, first.session);
   await pool.query("UPDATE drip_handle_reservations SET cooling_until=now()-interval '1 second' WHERE identity_id=$1 AND NOT active AND handle_key='riverbank'", [firstIdentity]);
+  // This scenario creates four synthetic users in one test; reset Better Auth's
+  // unrelated signup burst limiter so fixture creation does not hit its cap.
+  await pool.query('TRUNCATE "rateLimit"');
   const fourth = await createAccount();
   const expired = await send("/api/identity/handle", { identityId: fourth.data.identity.id, handle: "Riverbank", mode: "ensure" }, fourth.session);
   expect(expired.status).toBe(200); expect(await expired.json()).toMatchObject({ handle: "Riverbank" });
