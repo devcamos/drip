@@ -7,7 +7,7 @@ try {
   const vitest = JSON.parse(readFileSync("regression-results/vitest.json", "utf8"));
   const browser = JSON.parse(readFileSync("regression-results/browser.json", "utf8"));
   const cloud = existsSync("regression-results/browser-cloud.json") ? JSON.parse(readFileSync("regression-results/browser-cloud.json", "utf8")) : { suites: [], errors: [{ message: "Required local cloud reporter is missing." }] };
-  const matrix = existsSync("regression-results/browser-matrix-summary.json") ? JSON.parse(readFileSync("regression-results/browser-matrix-summary.json", "utf8")) : { passed: 0, required: 4, errors: ["Required WebKit evidence is missing."] };
+  const matrix = existsSync("regression-results/browser-matrix-summary.json") ? JSON.parse(readFileSync("regression-results/browser-matrix-summary.json", "utf8")) : { passed: 0, required: 10, errors: ["Required WebKit evidence is missing."] };
   if (!Array.isArray(vitest.testResults) || !Array.isArray(browser.suites) || !Array.isArray(cloud.suites)) throw new Error("Executed Vitest, browser and local cloud reporter results are required.");
   const records = [];
   const fileName = name => name.replaceAll("\\", "/").replace(resolve(".").replaceAll("\\", "/") + "/", "");

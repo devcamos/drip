@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // The iPhone profile is WebKit emulation, not a physical iOS/PWA test.
 export default defineConfig({
   testDir: "e2e",
-  testMatch: ["auth-screens.spec.ts", "stock-investment.spec.ts", "feedback.e2e.spec.ts", "pwa-current-update.e2e.spec.ts", "rate-change.spec.ts"],
+  testMatch: ["auth-screens.spec.ts", "account-workflows.e2e.spec.ts", "payment-calendar.e2e.spec.ts", "stock-investment.spec.ts", "feedback.e2e.spec.ts", "pwa-current-update.e2e.spec.ts", "rate-change.spec.ts"],
   timeout: 60_000,
   workers: 1,
   retries: 0,
