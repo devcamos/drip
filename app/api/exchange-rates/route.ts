@@ -1,7 +1,8 @@
 import { isFxCurrency } from "@/lib/exchange-rates";
 import { fetchExchangeRate } from "@/server/exchange-rates";
+import { withApiIncidents } from "@/server/incidents";
 
-export async function GET(request: Request) {
+export const GET = withApiIncidents(async (request: Request) => {
   const query = new URL(request.url).searchParams;
   const base = query.get("base");
   if (query.size !== 1 || !isFxCurrency(base)) return Response.json({ error: "Choose USD or EUR to convert to GBP." }, { status: 400, headers: { "Cache-Control": "no-store" } });
@@ -14,4 +15,4 @@ export async function GET(request: Request) {
     console.error("Drip daily exchange rate unavailable.", { provider: "Frankfurter", base });
     return Response.json({ error: "Daily exchange rates are unavailable. Try again shortly." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-}
+});

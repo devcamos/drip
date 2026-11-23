@@ -29,12 +29,19 @@ flowchart LR
     UI -->|"Opt-in reminder schedule"| Notify
     UI -->|"Explicit feedback message"| Feedback
     UI -->|"Public currency pair"| Exchange
+    Auth --> Incidents
+    Cloud --> Incidents
+    Notify --> Incidents
+    Feedback --> Incidents
+    Exchange --> Incidents
+    Incidents -->|"Preview alert when configured"| Slack
     subgraph Vercel["Vercel · Next.js application"]
         Auth["Better Auth + device routes"]
         Cloud["Cloud vault API"]
         Notify["Notification API + dispatch"]
         Feedback["Authenticated feedback API"]
         Exchange["Exchange-rate API"]
+        Incidents["API error boundary<br/>server/incidents"]
         Cron["Production daily cron"] --> Notify
     end
     Auth --> DB[("Neon Postgres")]
@@ -45,6 +52,7 @@ flowchart LR
     Notify -->|"Generic Web Push"| Push["Push provider"]
     Push --> Worker
     Exchange --> FX["Frankfurter"]
+    Slack["Slack #incidents"]
 ```
 
 The app origin matters for browser storage, cookies and passkeys. Preview and Production use separate environments and secrets. Cron runs automatically in Production; Preview requires a controlled manual dispatch for testing.
@@ -69,16 +77,22 @@ flowchart TB
         API["Authenticated vault route<br/>app/api/cloud"]
         PushAPI["Reminder validation and dispatch<br/>server/notifications/"]
         FeedbackAPI["Feedback validation and inbox<br/>server/feedback/"]
+        ErrorBoundary["API error boundary and correlation<br/>server/incidents.ts"]
         DB[("Postgres<br/>auth metadata, encrypted vaults,<br/>reminders and submitted feedback")]
         Auth --> DB
         API --> DB
         PushAPI --> DB
         FeedbackAPI --> DB
+        Auth --> ErrorBoundary
+        API --> ErrorBoundary
+        PushAPI --> ErrorBoundary
+        FeedbackAPI --> ErrorBoundary
     end
     Session --> Auth
     Sync --> API
     Phone --> PushAPI
     FeedbackUI --> FeedbackAPI
+    ErrorBoundary -->|"5xx only · bounded delivery"| Slack["Slack #incidents"]
 ```
 
 - **Keys and data:** the local vault uses AES-GCM encryption. Usable vault keys are held in page memory while unlocked; the server receives an encrypted cloud envelope, not the financial plaintext or recovery root. Authentication and reminder metadata remain server-side.
@@ -86,6 +100,7 @@ flowchart TB
 - **Sync:** local data is the working copy. Cloud writes use version checks; conflicts are surfaced rather than merged automatically. A cloud restore contains only data that successfully synced.
 - **Reminders:** schedule dates, frequencies and time zone leave the encrypted vault; push endpoints are encrypted at rest. Notifications omit account names and financial values. See [payment notifications](payment-notifications.md).
 - **Feedback:** the user deliberately submits a message and chosen area. Feedback is not end-to-end encrypted and is readable by authorised reviewers; no account records are automatically attached. An authorised agent can query it when invoked. See [feedback and agent triage](feedback.md).
+- **Incidents:** API 5xx responses and uncaught route exceptions receive a correlation reference and a short-lived, best-effort Slack alert when `DRIP_INCIDENT_SLACK_WEBHOOK` is configured. Alerts contain environment, route, method, status, error class and a one-way fingerprint; they omit request data, cookies, credentials, account values and raw error messages. Slack failures do not replace the app response. Configure and exercise the webhook in Preview first; Production credentials are not part of this change. See [incident reporting](incidents.md).
 - **Compatibility:** encrypted data versions and the IndexedDB schema fence older writers when needed. Review [account workflows](account-workflows.md), migrations and old-to-new upgrade evidence before changing storage or recovery.
 
 ## Verification and deployment
