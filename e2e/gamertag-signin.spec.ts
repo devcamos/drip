@@ -31,6 +31,7 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
     frequency: "monthly" as const, nextPayoutDate: "2030-01-01", colour: "#2b2d86", payouts: [], createdAt: "2026-10-26",
   }] };
   const records = { data: await encryptLocal(data, keys), localVault: keys.header, verifier: await codeVerifier(root),
+    cloudState: { userId: owner, identityId: data.identity.id, version: 1, dirty: false, lastSyncAt: null, generation: "synthetic-cloud", revision: 0 },
     passwordUnlock: { vaultId: keys.header.id, envelope } };
   // This journey uses a synthetic WebAuthn ceremony. Server-side signature
   // verification and one-use proof consumption are covered by auth/Postgres
