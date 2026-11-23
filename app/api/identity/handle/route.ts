@@ -41,18 +41,20 @@ export async function POST(request: Request) {
   const base = authBaseURL(process.env);
   if (!base || request.headers.get("origin") !== new URL(base).origin) return reply({ error: "Invalid origin." }, 403);
   if (!cloudConfigured()) return reply({ error: "Gamertag service is unavailable." }, 503);
-  const userId = (await getAuth().api.getSession({ headers: request.headers }))?.user.id;
-  if (!userId) return reply({ error: "Sign in to reserve your profile gamertag." }, 401);
+  const authSession = await getAuth().api.getSession({ headers: request.headers });
+  const userId = authSession?.user.id;
+  if (!authSession || !userId) return reply({ error: "Sign in to reserve your profile gamertag." }, 401);
   const parsed = requestBody.safeParse(await bodyOf(request));
   if (!parsed.success) return reply({ error: "Enter a gamertag with 3–16 letters, numbers or underscores." }, 400);
   if (isReservedHandle(parsed.data.handle)) return reply({ error: "That gamertag is reserved. Choose another." }, 400);
   try {
     if (!(await allowed(userId, request, parsed.data.mode === "rename"))) return reply({ error: "Too many gamertag changes. Try again later." }, 429);
-    return reply(await reserveHandle(database(), parsed.data.identityId, userId, parsed.data.handle, parsed.data.mode === "rename"));
+    return reply(await reserveHandle(database(), parsed.data.identityId, userId, parsed.data.handle, parsed.data.mode === "rename", authSession.session.id));
   } catch (error) {
     if (error instanceof HandleReservationError) {
       if (error.code === "IDENTITY_OWNED") return reply({ error: "This profile belongs to a different account. Sign in to its original account." }, 409);
       if (error.code === "ACCOUNT_ALREADY_HAS_IDENTITY") return reply({ error: "This account already has a different Drip profile." }, 409);
+      if (error.code === "PASSKEY_REQUIRED") return reply({ error: "Confirm with your cloud sign-in passkey before changing your profile gamertag." }, 403);
       return reply({ error: "Could not reserve that gamertag. Try again." }, 503);
     }
     return reply({ error: "Gamertag service is unavailable. Your local account is safe; try again shortly." }, 503);
