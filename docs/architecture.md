@@ -49,6 +49,19 @@ flowchart LR
 
 The app origin matters for browser storage, cookies and passkeys. Preview and Production use separate environments and secrets. Cron runs automatically in Production; Preview requires a controlled manual dispatch for testing.
 
+```mermaid
+flowchart LR
+    VercelPreview["Vercel Preview deployment"] -->|"success status · exact URL and commit SHA"| GitHubAction["GitHub Actions<br/>Checkly integration"]
+    GitHubAction -->|"runs the checked-out commit"| Checkly["Checkly<br/>synthetic browser check"]
+    Checkly -->|"HTTPS + Preview-only bypass<br/>synthetic account"| VercelPreview
+    Checkly -->|"result for deployment SHA"| GitHubCheck["GitHub Check<br/>PR gate when required"]
+    Checkly -->|"failure and recovery alerts<br/>after channel setup"| Incidents["Slack #incidents"]
+```
+
+The Checkly path is restricted to Preview and is activated only after its account,
+GitHub connection, synthetic test account, protected-deployment bypass and Slack
+alert channel are configured. See [Checkly Preview setup](checkly-preview.md).
+
 ## C4 level 3: components and trust boundaries
 
 ```mermaid
@@ -86,8 +99,9 @@ flowchart TB
 - **Sync:** local data is the working copy. Cloud writes use version checks; conflicts are surfaced rather than merged automatically. A cloud restore contains only data that successfully synced.
 - **Reminders:** schedule dates, frequencies and time zone leave the encrypted vault; push endpoints are encrypted at rest. Notifications omit account names and financial values. See [payment notifications](payment-notifications.md).
 - **Feedback:** the user deliberately submits a message and chosen area. Feedback is not end-to-end encrypted and is readable by authorised reviewers; no account records are automatically attached. An authorised agent can query it when invoked. See [feedback and agent triage](feedback.md).
+- **Preview verification:** Checkly receives only a dedicated synthetic account's login and expected account summary. The deployment bypass credential is sent as a secret header; Production credentials and user data are excluded. Browser screenshots, video and traces are disabled. The external Checkly GitHub Check identifies the deployed commit; it becomes a merge gate only after the repository explicitly requires that check. Slack notifications route to `#incidents` once the account channel is connected. See [Checkly Preview setup](checkly-preview.md).
 - **Compatibility:** encrypted data versions and the IndexedDB schema fence older writers when needed. Review [account workflows](account-workflows.md), migrations and old-to-new upgrade evidence before changing storage or recovery.
 
 ## Verification and deployment
 
-Run the relevant tests and the full [regression gate](testing/regression-policy.md) for application changes. Use isolated databases and synthetic accounts for Preview tests. Production migrations and secrets are environment-specific; do not copy Preview data or secrets into Production. The app's live URL and release history are linked from the [README](../README.md).
+Run the relevant tests and the full [regression gate](testing/regression-policy.md) for application changes. Use isolated databases and synthetic accounts for Preview tests. The Checkly deployment check runs only after its external account and environment are configured; a code change alone does not establish hosted-login verification. Production migrations and secrets are environment-specific; do not copy Preview data or secrets into Production. The app's live URL and release history are linked from the [README](../README.md).
