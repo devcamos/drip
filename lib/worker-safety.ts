@@ -26,7 +26,7 @@ export const safeFetch: typeof fetch = async (input, init) => {
   // Parsing base only: fetch still receives the caller's original input.
   const url = new URL(address, "https://drip.invalid");
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || url.pathname === "/api/feedback" || (url.pathname === "/api/recovery-codes" && method !== "POST") || ["/api/notifications/subscription", "/api/notifications/test"].includes(url.pathname);
+  const privateRequest = url.pathname.startsWith("/api/auth/") || url.pathname === "/api/cloud" || url.pathname === "/api/feedback" || url.pathname === "/api/identity/handle" || (url.pathname === "/api/recovery-codes" && method !== "POST") || ["/api/notifications/subscription", "/api/notifications/test"].includes(url.pathname);
   if (!privateRequest) return fetch(input, init);
   const run = async () => {
     const deviceId = await browserDeviceId();
@@ -38,7 +38,7 @@ export const safeFetch: typeof fetch = async (input, init) => {
     const disconnectGeneration = headers.get("X-Drip-Disconnect");
     const signupNonce = headers.get("X-Drip-Signup");
     const signup = !!signupNonce && gate?.signedOut && gate.signupNonce === signupNonce && resumeGeneration === gate.generation &&
-      ((method === "POST" && ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password"].includes(url.pathname)) || (url.pathname === "/api/cloud" && ["GET", "PUT"].includes(method)));
+      ((method === "POST" && ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password", "/api/identity/handle"].includes(url.pathname)) || (url.pathname === "/api/cloud" && ["GET", "PUT"].includes(method)));
     if (signupNonce && !signup) throw new Error("Signup changed in another tab. Your current local account is kept.");
     if (resumeGeneration && (!gate?.signedOut || gate.generation !== resumeGeneration)) throw new Error("Device session changed. Try signing in again.");
     if (reconnectGeneration && (gate?.signedOut || (gate?.generation ?? "initial") !== reconnectGeneration)) throw new Error("Device session changed. Try signing in again.");

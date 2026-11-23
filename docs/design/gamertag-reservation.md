@@ -22,8 +22,8 @@ sequenceDiagram
   participant API as Same-origin API
   participant Auth as Better Auth session
   participant DB as Postgres
-  App->>API: POST /api/identity/handle (identity UUID, handle, mode)
-  API->>Auth: Validate session and same origin
+  App->>API: POST /api/identity/handle (identity UUID, expected owner, handle, mode)
+  API->>Auth: Validate same-origin session and match expected owner + X-Drip-Owner
   API->>DB: Rate limit, lock account, reserve unique handle
   DB-->>API: Existing name or collision suffix
   API-->>App: Assigned profile gamertag
@@ -36,3 +36,5 @@ The database unique indexes arbitrate concurrent claims. User-level transaction 
 ## Deployment
 
 The migration is additive and idempotent. The regression suite extracts and runs the actual migration SQL against a disposable local Postgres schema. For deployment, apply it to Preview first, verify the Preview signup, collision, rename, restore and sync paths, then include it in the normal application release migration. Do not point local tests or the initial release step at Production.
+
+New signup and explicit rename modes reject reserved names. The idempotent `ensure` mode can confirm legacy profiles whose gamertags are now reserved, so existing users continue to sync. Every request is owner-bound to the authenticated Better Auth user and passes through the device-session request gate; signed-out account replacement carries its existing signup nonce and resume generation.

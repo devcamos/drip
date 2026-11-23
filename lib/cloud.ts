@@ -143,7 +143,7 @@ export async function syncNow(): Promise<string> {
     let data = migrateData(snapshot, localToday());
     if (data.identity?.id !== state.identityId) throw new Error("This local backup belongs to another account. Disconnect cloud recovery first.");
     let handleNotice = "";
-    const reserved = await reserveIdentity(data.identity, "ensure");
+    const reserved = await reserveIdentity(data.identity, { userId: state.userId }, "ensure");
     if (reserved.handle !== data.identity.handle || reserved.suffix !== data.identity.suffix) {
       if (reserved.suffix && !data.identity.suffix) handleNotice = `Your profile gamertag was already in use, so Drip assigned ${reserved.handle}#${reserved.suffix}. Your sign-in name is unchanged.`;
       await mutateData(current => current.identity?.id === state!.identityId ? { ...current, identity: reserved } : current);

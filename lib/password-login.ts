@@ -59,7 +59,7 @@ export async function signUpPassword(username: string, password: string, data: A
   try {
   const { user, key } = await connect(root, data, true, replacement?.generation, undefined, replacement?.nonce);
   signupOwner = user.id;
-  const reservedIdentity = await reserveIdentity(identity, "ensure");
+  const reservedIdentity = await reserveIdentity(identity, { userId: user.id, ...(replacement ? { resumeGeneration: replacement.generation, signupNonce: replacement.nonce } : {}) }, "signup");
   data = { ...data, identity: reservedIdentity };
   const remote = await vault("GET", undefined, user.id, replacement?.generation, replacement?.nonce);
   if (remote.version !== 0 || remote.envelope) throw new Error("Account setup changed. Try again.");

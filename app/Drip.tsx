@@ -21,7 +21,7 @@ import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
 import { reserveIdentity } from "@/lib/identity-reservation";
-import { authClient } from "@/lib/cloud";
+import { authClient, readCloudState } from "@/lib/cloud";
 import { SignupForm } from "./SignupForm";
 import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
@@ -376,7 +376,9 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         const result = await authClient.signIn.passkey();
         if (result.error) throw new Error("A cloud sign-in passkey is required. Add one in Security & devices, then try again.");
       }} onRenameIdentity={async handle => {
-        const identity = await reserveIdentity({ ...data.identity!, handle }, "rename");
+        const cloudState = await readCloudState();
+        if (!cloudState) throw new Error("Connect your account before changing your profile gamertag.");
+        const identity = await reserveIdentity({ ...data.identity!, handle }, { userId: cloudState.userId }, "rename");
         const saved = await update(current => {
           if (current.identity?.id !== identity.id) throw Object.assign(new Error("Profile changed"), { name: "StaleAccountEdit" });
           return { ...current, identity };

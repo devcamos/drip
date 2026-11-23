@@ -217,32 +217,32 @@ it("expires a stored session without extending its access or exposing the encryp
 it("reserves profile gamertags case-insensitively, assigns a stable suffix, and retains renamed tags for 30 days", async () => {
   const first = await createAccount(), second = await createAccount();
   const firstIdentity = first.data.identity.id, secondIdentity = second.data.identity.id;
-  const a = await send("/api/identity/handle", { identityId: firstIdentity, handle: "Riverbank", mode: "ensure" }, first.session);
+  const a = await send("/api/identity/handle", { identityId: firstIdentity, expectedUserId: first.owner, handle: "Riverbank", mode: "ensure" }, first.session, first.owner);
   expect(a.status).toBe(200); expect(await a.json()).toMatchObject({ identityId: firstIdentity, handle: "Riverbank", changed: true });
-  const b = await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session);
+  const b = await send("/api/identity/handle", { identityId: secondIdentity, expectedUserId: second.owner, handle: "riverbank", mode: "ensure" }, second.session, second.owner);
   expect(b.status).toBe(200); const assigned = await b.json();
   expect(assigned).toMatchObject({ identityId: secondIdentity, handle: "riverbank", changed: true }); expect(assigned.suffix).toMatch(/^\d{4}$/);
-  expect(await (await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session)).json()).toMatchObject({ ...assigned, changed: false });
+  expect(await (await send("/api/identity/handle", { identityId: secondIdentity, expectedUserId: second.owner, handle: "riverbank", mode: "ensure" }, second.session, second.owner)).json()).toMatchObject({ ...assigned, changed: false });
 
-  expect((await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session)).status).toBe(403);
+  expect((await send("/api/identity/handle", { identityId: firstIdentity, expectedUserId: first.owner, handle: "NewRiver", mode: "rename" }, first.session, first.owner)).status).toBe(403);
   await grantSyntheticPasskeyProof(first.owner);
-  const rename = await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session);
+  const rename = await send("/api/identity/handle", { identityId: firstIdentity, expectedUserId: first.owner, handle: "NewRiver", mode: "rename" }, first.session, first.owner);
   expect(rename.status).toBe(200); expect(await rename.json()).toMatchObject({ handle: "NewRiver" });
   const third = await createAccount();
-  const held = await send("/api/identity/handle", { identityId: third.data.identity.id, handle: "Riverbank", mode: "ensure" }, third.session);
+  const held = await send("/api/identity/handle", { identityId: third.data.identity.id, expectedUserId: third.owner, handle: "Riverbank", mode: "ensure" }, third.session, third.owner);
   expect(held.status).toBe(200); expect((await held.json()).suffix).toMatch(/^\d{4}$/);
   await grantSyntheticPasskeyProof(first.owner);
-  const reclaim = await send("/api/identity/handle", { identityId: firstIdentity, handle: "Riverbank", mode: "rename" }, first.session);
+  const reclaim = await send("/api/identity/handle", { identityId: firstIdentity, expectedUserId: first.owner, handle: "Riverbank", mode: "rename" }, first.session, first.owner);
   expect(reclaim.status).toBe(200); const reclaimed = await reclaim.json(); expect(reclaimed.handle).toBe("Riverbank"); expect(reclaimed).not.toHaveProperty("suffix");
   expect((await pool.query("SELECT count(*)::int AS count FROM drip_handle_reservations WHERE identity_id=$1 AND NOT active AND cooling_until > now()", [firstIdentity])).rows[0].count).toBe(1);
   await grantSyntheticPasskeyProof(first.owner);
-  await send("/api/identity/handle", { identityId: firstIdentity, handle: "FinalRiver", mode: "rename" }, first.session);
+  await send("/api/identity/handle", { identityId: firstIdentity, expectedUserId: first.owner, handle: "FinalRiver", mode: "rename" }, first.session, first.owner);
   await pool.query("UPDATE drip_handle_reservations SET cooling_until=now()-interval '1 second' WHERE identity_id=$1 AND NOT active AND handle_key='riverbank'", [firstIdentity]);
   // This scenario creates four synthetic users in one test; reset Better Auth's
   // unrelated signup burst limiter so fixture creation does not hit its cap.
   await pool.query('TRUNCATE "rateLimit"');
   const fourth = await createAccount();
-  const expired = await send("/api/identity/handle", { identityId: fourth.data.identity.id, handle: "Riverbank", mode: "ensure" }, fourth.session);
+  const expired = await send("/api/identity/handle", { identityId: fourth.data.identity.id, expectedUserId: fourth.owner, handle: "Riverbank", mode: "ensure" }, fourth.session, fourth.owner);
   expect(expired.status).toBe(200); expect(await expired.json()).toMatchObject({ handle: "Riverbank" });
 });
 
@@ -252,15 +252,15 @@ it("does not spend the profile rename allowance on automatic identity checks", a
   const renameKey = `handle:user:rename:${digest}`;
   await pool.query("INSERT INTO drip_handle_limits (key, bucket, hits) VALUES ($1, date_trunc('hour', now()), 9)", [renameKey]);
 
-  const ensured = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: a.username, mode: "ensure" }, a.session);
+  const ensured = await send("/api/identity/handle", { identityId: a.data.identity.id, expectedUserId: a.owner, handle: a.username, mode: "ensure" }, a.session, a.owner);
   expect(ensured.status).toBe(200);
   expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(9);
 
   await grantSyntheticPasskeyProof(a.owner);
-  const renamed = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: "new_profile", mode: "rename" }, a.session);
+  const renamed = await send("/api/identity/handle", { identityId: a.data.identity.id, expectedUserId: a.owner, handle: "new_profile", mode: "rename" }, a.session, a.owner);
   expect(renamed.status).toBe(200);
   expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(10);
-  const limited = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: "another_name", mode: "rename" }, a.session);
+  const limited = await send("/api/identity/handle", { identityId: a.data.identity.id, expectedUserId: a.owner, handle: "another_name", mode: "rename" }, a.session, a.owner);
   expect(limited.status).toBe(429);
   expect(await limited.json()).toMatchObject({ error: "Too many gamertag changes. Try again later." });
 });
@@ -278,13 +278,15 @@ it("serializes concurrent claims and gives every account a distinct server gamer
 
 it("requires the authenticated profile owner, same origin, valid names and non-reserved tags", async () => {
   const account = await createAccount(), identityId = account.data.identity.id;
-  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" })).status).toBe(401);
-  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" }, account.session, "", device(), "https://attacker.example")).status).toBe(403);
-  expect((await send("/api/identity/handle", { identityId, handle: "admin" }, account.session)).status).toBe(400);
-  expect((await send("/api/identity/handle", { identityId, handle: "bad tag" }, account.session)).status).toBe(400);
-  const created = await send("/api/identity/handle", { identityId, handle: "valid_tag" }, account.session);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "valid_tag" })).status).toBe(401);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "valid_tag" }, account.session, "", device(), "https://attacker.example")).status).toBe(403);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "admin", mode: "signup" }, account.session, account.owner)).status).toBe(400);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "bad tag" }, account.session, account.owner)).status).toBe(400);
+  const created = await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "valid_tag" }, account.session, account.owner);
   expect(created.status).toBe(200);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "admin", mode: "ensure" }, account.session, account.owner)).status).toBe(200);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: "another-owner", handle: "wrong_owner", mode: "ensure" }, account.session, account.owner)).status).toBe(409);
   const other = await createAccount();
-  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" }, other.session)).status).toBe(409);
-  expect((await send("/api/identity/handle", { identityId: randomUUID(), handle: "another_tag" }, account.session)).status).toBe(409);
+  expect((await send("/api/identity/handle", { identityId, expectedUserId: account.owner, handle: "valid_tag" }, other.session, other.owner)).status).toBe(409);
+  expect((await send("/api/identity/handle", { identityId: randomUUID(), expectedUserId: account.owner, handle: "another_tag" }, account.session, account.owner)).status).toBe(409);
 });

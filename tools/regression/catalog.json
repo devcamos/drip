@@ -8,9 +8,16 @@
   "pyramids": [
     {
       "featureId": "handle-reservations",
-      "unit": ["tests/handle-reservation.test.ts", "tests/identity-reservation.test.ts"],
-      "integration": ["integration/handle-reservations-postgres.integration.test.ts"],
-      "browser": ["e2e/gamertag-signin.spec.ts"]
+      "unit": [
+        "tests/handle-reservation.test.ts",
+        "tests/identity-reservation.test.ts"
+      ],
+      "integration": [
+        "integration/handle-reservations-postgres.integration.test.ts"
+      ],
+      "browser": [
+        "e2e/gamertag-signin.spec.ts"
+      ]
     },
     {
       "featureId": "calendar",
@@ -166,7 +173,8 @@
       "sources": [
         "app/api/identity/handle/route.ts",
         "lib/identity-reservation.ts",
-        "server/handle-reservations.ts"
+        "server/handle-reservations.ts",
+        "lib/worker-safety.ts"
       ],
       "tests": [
         "tests/handle-reservation.test.ts",
@@ -174,7 +182,8 @@
         "integration/handle-reservations-postgres.integration.test.ts",
         "integration/account-http.integration.test.ts",
         "tests/profile-handle.integration.test.tsx",
-        "e2e/gamertag-signin.spec.ts"
+        "e2e/gamertag-signin.spec.ts",
+        "tests/worker-safety.test.ts"
       ]
     },
     {

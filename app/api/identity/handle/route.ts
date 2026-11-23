@@ -8,7 +8,7 @@ import { HandleReservationError, reserveHandle } from "@/server/handle-reservati
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const requestBody = z.strictObject({ identityId: z.string().uuid(), handle: z.string().regex(/^[A-Za-z0-9_]{3,16}$/), mode: z.enum(["ensure", "rename"]).optional() });
+const requestBody = z.strictObject({ identityId: z.string().uuid(), expectedUserId: z.string().min(1), handle: z.string().regex(/^[A-Za-z0-9_]{3,16}$/), mode: z.enum(["ensure", "rename", "signup"]).optional() });
 async function bodyOf(request: Request) {
   const reader = request.body?.getReader(); if (!reader) return null;
   const chunks: Uint8Array[] = []; let length = 0;
@@ -46,10 +46,12 @@ export async function POST(request: Request) {
   if (!authSession || !userId) return reply({ error: "Sign in to reserve your profile gamertag." }, 401);
   const parsed = requestBody.safeParse(await bodyOf(request));
   if (!parsed.success) return reply({ error: "Enter a gamertag with 3–16 letters, numbers or underscores." }, 400);
-  if (isReservedHandle(parsed.data.handle)) return reply({ error: "That gamertag is reserved. Choose another." }, 400);
+  if (parsed.data.expectedUserId !== userId || request.headers.get("x-drip-owner") !== userId) return reply({ error: "This profile belongs to a different account." }, 409);
+  const mode = parsed.data.mode ?? "ensure";
+  if (isReservedHandle(parsed.data.handle) && mode !== "ensure") return reply({ error: "That gamertag is reserved. Choose another." }, 400);
   try {
-    if (!(await allowed(userId, request, parsed.data.mode === "rename"))) return reply({ error: "Too many gamertag changes. Try again later." }, 429);
-    return reply(await reserveHandle(database(), parsed.data.identityId, userId, parsed.data.handle, parsed.data.mode === "rename", authSession.session.id));
+    if (!(await allowed(userId, request, mode === "rename"))) return reply({ error: "Too many gamertag changes. Try again later." }, 429);
+    return reply(await reserveHandle(database(), parsed.data.identityId, userId, parsed.data.handle, mode === "rename", authSession.session.id));
   } catch (error) {
     if (error instanceof HandleReservationError) {
       if (error.code === "IDENTITY_OWNED") return reply({ error: "This profile belongs to a different account. Sign in to its original account." }, 409);

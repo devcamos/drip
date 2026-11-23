@@ -2,8 +2,9 @@ import { safeFetch } from "./worker-safety";
 import { handleError, type Identity } from "./identity";
 
 type Reservation = { identityId: string; handle: string; suffix?: string; changed: boolean; error?: string };
-export async function reserveIdentity(identity: Identity, mode: "ensure" | "rename" = "ensure"): Promise<Identity> {
-  const response = await safeFetch("/api/identity/handle", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identityId: identity.id, handle: identity.handle, mode }) });
+export type ReservationContext = { userId: string; resumeGeneration?: string; signupNonce?: string };
+export async function reserveIdentity(identity: Identity, context: ReservationContext, mode: "ensure" | "rename" | "signup" = "ensure"): Promise<Identity> {
+  const response = await safeFetch("/api/identity/handle", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-Drip-Owner": context.userId, ...(context.resumeGeneration ? { "X-Drip-Resume": context.resumeGeneration } : {}), ...(context.signupNonce ? { "X-Drip-Signup": context.signupNonce } : {}) }, body: JSON.stringify({ identityId: identity.id, expectedUserId: context.userId, handle: identity.handle, mode }) });
   let result: Reservation;
   try { result = await response.json() as Reservation; }
   catch { throw new Error("Gamertag service is unavailable. Your local account is safe; try again shortly."); }
