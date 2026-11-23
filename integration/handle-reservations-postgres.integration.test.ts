@@ -11,11 +11,16 @@ const url = regressionDatabaseURL(process.env.DRIP_TEST_DATABASE_URL ?? "postgre
 const schema = "handle_reservation_" + randomUUID().replaceAll("-", "");
 const admin = new Pool({ connectionString: url.href });
 const pool = new Pool({ connectionString: url.href, options: `-c search_path=${schema}`, max: 8 });
-const reserve = (identityId: string, userId: string, handle: string, rename = false) => reserveHandle(pool as unknown as NeonPool, identityId, userId, handle, rename);
+const reserve = (identityId: string, userId: string, handle: string, rename = false, sessionId?: string) => reserveHandle(pool as unknown as NeonPool, identityId, userId, handle, rename, sessionId);
 async function owner() {
   const userId = randomUUID(), identityId = randomUUID();
   await pool.query('INSERT INTO "user" (id) VALUES ($1)', [userId]);
   return { userId, identityId };
+}
+async function passkeySession(userId: string, fresh = true) {
+  const id = randomUUID();
+  await pool.query('INSERT INTO "session" (id, "userId", "expiresAt", "dripPasskeyVerifiedAt") VALUES ($1, $2, now() + interval \'1 day\', $3)', [id, userId, fresh ? new Date() : new Date(Date.now() - 6 * 60_000)]);
+  return id;
 }
 
 beforeAll(async () => {
@@ -23,7 +28,7 @@ beforeAll(async () => {
   await pool.query('CREATE TABLE "user" (id text PRIMARY KEY)');
   // The production migration also adds the device field to Better Auth's
   // session table. This focused fixture only needs its existing primary key.
-  await pool.query('CREATE TABLE "session" (id text PRIMARY KEY)');
+  await pool.query('CREATE TABLE "session" (id text PRIMARY KEY, "userId" text REFERENCES "user"(id) ON DELETE CASCADE, "expiresAt" timestamptz, "dripPasskeyVerifiedAt" timestamptz)');
   for (const sql of migrationStatements(readFileSync(new URL("../scripts/migrate.mjs", import.meta.url), "utf8"))) await pool.query(sql);
 }, 30_000);
 beforeEach(async () => { await pool.query('TRUNCATE "user" CASCADE'); });
@@ -46,15 +51,29 @@ it("returns the same reserved identity on retries and never renames an ensure re
 it("keeps renamed handles for 30 days, lets their owner reclaim them, then frees expired handles", async () => {
   const original = await owner(), competitor = await owner();
   await reserve(original.identityId, original.userId, "Riverbank");
-  await reserve(original.identityId, original.userId, "NewRiver", true);
+  let proof = await passkeySession(original.userId);
+  await reserve(original.identityId, original.userId, "NewRiver", true, proof);
   const held = await reserve(competitor.identityId, competitor.userId, "riverbank");
   expect(held.suffix).toMatch(/^\d{4}$/);
-  const reclaim = await reserve(original.identityId, original.userId, "Riverbank", true);
+  proof = await passkeySession(original.userId);
+  const reclaim = await reserve(original.identityId, original.userId, "Riverbank", true, proof);
   expect(reclaim.suffix).toBeUndefined();
-  await reserve(original.identityId, original.userId, "FinalRiver", true);
+  proof = await passkeySession(original.userId);
+  await reserve(original.identityId, original.userId, "FinalRiver", true, proof);
   await pool.query("UPDATE drip_handle_reservations SET cooling_until=now()-interval '1 second' WHERE identity_id=$1 AND NOT active AND handle_key='riverbank'", [original.identityId]);
   const latecomer = await owner(), released = await reserve(latecomer.identityId, latecomer.userId, "Riverbank");
   expect(released).toMatchObject({ handle: "Riverbank" }); expect(released.suffix).toBeUndefined();
+});
+
+it("requires and consumes a fresh account passkey proof for an actual rename", async () => {
+  const item = await owner(); await reserve(item.identityId, item.userId, "Original");
+  await expect(reserve(item.identityId, item.userId, "WithoutProof", true)).rejects.toMatchObject({ code: "PASSKEY_REQUIRED" });
+  const expired = await passkeySession(item.userId, false);
+  await expect(reserve(item.identityId, item.userId, "ExpiredProof", true, expired)).rejects.toMatchObject({ code: "PASSKEY_REQUIRED" });
+  const fresh = await passkeySession(item.userId);
+  await expect(reserve(item.identityId, item.userId, "Renamed", true, fresh)).resolves.toMatchObject({ handle: "Renamed", changed: true });
+  await expect(reserve(item.identityId, item.userId, "ThirdName", true, fresh)).rejects.toMatchObject({ code: "PASSKEY_REQUIRED" });
+  await expect(reserve(item.identityId, item.userId, "Renamed", true, fresh)).resolves.toMatchObject({ handle: "Renamed", changed: false });
 });
 
 it("binds one stable identity per user and never renames during an ensure", async () => {
