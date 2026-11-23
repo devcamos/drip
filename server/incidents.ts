@@ -81,6 +81,7 @@ export async function sendIncident(incident: Incident, options: IncidentOptions 
       `Error: ${incident.errorType}; ${incident.summary}; fingerprint ${incident.fingerprint}`,
     ].join("\n"),
   };
+  const log = options.log ?? console.error;
   try {
     const response = await (options.fetcher ?? fetch)(webhook, {
       method: "POST",
@@ -89,9 +90,9 @@ export async function sendIncident(incident: Incident, options: IncidentOptions 
       signal: AbortSignal.timeout(1500),
       redirect: "error",
     });
-    if (!response.ok) options.log?.(JSON.stringify({ event: "drip.incident.delivery_failed", reference: incident.reference, status: response.status }));
+    if (!response.ok) log(JSON.stringify({ event: "drip.incident.delivery_failed", reference: incident.reference, status: response.status }));
   } catch {
-    options.log?.(JSON.stringify({ event: "drip.incident.delivery_failed", reference: incident.reference }));
+    log(JSON.stringify({ event: "drip.incident.delivery_failed", reference: incident.reference }));
   }
 }
 
@@ -128,7 +129,14 @@ export function withApiIncidents<Args extends unknown[]>(handler: ApiHandler<Arg
     }
     if (response.status < 500) return response;
 
-    const reference = await report(request, response.status);
+    // Some route services already log and return a support reference. Preserve
+    // it when present so the user, server log, and Slack alert share one ID.
+    const existingReference = response.headers.get("x-drip-incident-reference");
+    const reference = await report(request, response.status, undefined, {
+      ...(existingReference && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existingReference)
+        ? { reference: () => existingReference }
+        : {}),
+    });
     const headers = new Headers(response.headers);
     headers.set("x-drip-incident-reference", reference);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
