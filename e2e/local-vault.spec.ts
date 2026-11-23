@@ -39,14 +39,14 @@ test("legacy accounts migrate only with their code and reopen encrypted offline"
   await page.getByRole("button", { name: "Encrypt local data" }).click();
   await expect(page.getByRole("heading", { name: "Pick your gamertag" })).toBeVisible();
   await page.getByLabel(/Gamertag/).fill("oldfriend"); await page.getByRole("button", { name: "Save gamertag" }).click();
-  await expect(page.getByText("Sensitive legacy pot")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Open Sensitive legacy pot,/ })).toBeVisible();
   await expect.poll(async () => (await storage(page)).data.app).toBe("drip-local-data");
   const raw = await storage(page); expect(JSON.stringify(raw)).not.toContain("Sensitive legacy pot"); expect(raw.hasKey).toBe(false); expect(raw.draft).toBeUndefined();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await context.setOffline(true); await page.reload();
   await expect(page.getByText("Sensitive legacy pot")).toHaveCount(0);
-  await unlock(page, code); await expect(page.getByText("Sensitive legacy pot")).toBeVisible();
+  await unlock(page, code); await expect(page.getByRole("button", { name: /^Open Sensitive legacy pot,/ })).toBeVisible();
   await expect(page.getByTestId("header-tag")).toContainText("oldfriend");
 });
 
