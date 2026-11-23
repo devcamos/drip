@@ -62,6 +62,8 @@ shows the actual distribution separately from new-feature targets.
 
 ### Coverage gates
 
+`npm test` is a fast unit/component run and intentionally does not apply the app-wide coverage threshold: it omits the `postgres` project, which exercises server branches that are included in the full-app denominator. This command should not report a misleading coverage failure for an incomplete test layer. `npm run test:unit:coverage` checks the pure domain inventory independently, and `npm run test:regression` is the authoritative all-layer command that applies the app-wide 90% gate. CI runs the latter. Removing coverage from the quick command does not change either CI threshold.
+
 CI requires at least 90% lines, statements, functions and branches across the
 app, measured with the combined Vitest projects. Browser tests verify journeys
 but do not contribute to that instrumented coverage figure. It also runs
