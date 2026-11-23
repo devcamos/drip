@@ -14,6 +14,32 @@ export function regressionDatabaseURL(value: string, allowBrowserSchema = false)
   return url;
 }
 
+const localDatabaseSetup = [
+  "docker run --rm -d --name drip-regression-db \\",
+  "  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=drip_test \\",
+  "  -e POSTGRES_DB=drip_notifications_test \\",
+  "  -p 127.0.0.1:55438:5432 postgres:18-alpine",
+].join("\n");
+
+/**
+ * Fail before running the expensive regression stages if the documented,
+ * disposable loopback database is not available. The connection callback is
+ * injected so tests can verify the guard without opening a socket.
+ */
+export async function assertRegressionDatabaseAvailable(
+  value: string,
+  connect: (url: string) => Promise<void>,
+): Promise<void> {
+  const url = regressionDatabaseURL(value);
+  try {
+    await connect(url.href);
+  } catch {
+    throw new Error(
+      `Disposable regression Postgres is unavailable at ${url.host}${url.pathname}. Start the loopback test database with:\n\n${localDatabaseSetup}\n\nThen rerun npm run test:regression. See docs/testing/regression-policy.md#local-setup. This runner never connects to Preview or Production databases.`,
+    );
+  }
+}
+
 export function localTestDatabase(env: Record<string, string | undefined>): string | undefined {
   if (env.DRIP_CLOUD_E2E !== "1") return undefined;
   const denied = () => new Error("Cloud browser tests require an isolated loopback database and origin; deployment targets are forbidden.");

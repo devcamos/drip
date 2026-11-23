@@ -678,7 +678,8 @@
       ],
       "tests": [
         "tests/regression-policy.test.ts",
-        "tests/account-review.test.ts"
+        "tests/account-review.test.ts",
+        "tests/local-test-database.test.ts"
       ]
     },
     {
