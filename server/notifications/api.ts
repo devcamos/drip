@@ -5,7 +5,7 @@ import { dispatchReminders, providerStatus, type PushSender } from "./dispatch";
 import { devicePattern, registrationSchema, ReminderError } from "./model";
 import type { ReminderStore } from "./store";
 
-const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store", ...(status === 429 ? { "Retry-After": "60" } : {}) } });
+const reply = (value: unknown, status = 200, reference?: string) => Response.json(value, { status, headers: { "Cache-Control": "no-store", ...(status === 429 ? { "Retry-After": "60" } : {}), ...(reference ? { "x-drip-incident-reference": reference } : {}) } });
 export type ReminderDependencies = {
   config: () => PushConfig | null;
   origin: () => string;
@@ -40,7 +40,7 @@ async function run(operation: string, work: () => Response | Promise<Response>) 
     const reference = randomUUID();
     // Never log request payloads, URLs, subscription keys, SQL or raw provider errors.
     console.error(JSON.stringify({ event: "drip.reminders.error", operation, reference }));
-    return reply({ error: "Phone reminders are unavailable. Try again later.", reference }, 503);
+    return reply({ error: "Phone reminders are unavailable. Try again later.", reference }, 503, reference);
   }
 }
 
