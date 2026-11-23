@@ -67,6 +67,12 @@ async function createAccount() {
   expect(setup.status).toBe(200);
   return { root, username, browser, credentials, owner, session, data, key, envelope, proof, wrap };
 }
+async function grantSyntheticPasskeyProof(ownerId: string) {
+  // Model the server-written marker from a successful WebAuthn ceremony. The
+  // route still reads it only from the authenticated server session row.
+  const result = await pool.query('UPDATE "session" SET "dripPasskeyVerifiedAt"=now() WHERE "userId"=$1 AND "expiresAt">now()', [ownerId]);
+  expect(result.rowCount).toBeGreaterThan(0);
+}
 
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", url.href); vi.stubEnv("BETTER_AUTH_URL", origin); vi.stubEnv("BETTER_AUTH_SECRET", "Synthetic-account-contract-secret-only-42!"); vi.stubEnv("VERCEL_ENV", "");
@@ -218,14 +224,18 @@ it("reserves profile gamertags case-insensitively, assigns a stable suffix, and 
   expect(assigned).toMatchObject({ identityId: secondIdentity, handle: "riverbank", changed: true }); expect(assigned.suffix).toMatch(/^\d{4}$/);
   expect(await (await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session)).json()).toMatchObject({ ...assigned, changed: false });
 
+  expect((await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session)).status).toBe(403);
+  await grantSyntheticPasskeyProof(first.owner);
   const rename = await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session);
   expect(rename.status).toBe(200); expect(await rename.json()).toMatchObject({ handle: "NewRiver" });
   const third = await createAccount();
   const held = await send("/api/identity/handle", { identityId: third.data.identity.id, handle: "Riverbank", mode: "ensure" }, third.session);
   expect(held.status).toBe(200); expect((await held.json()).suffix).toMatch(/^\d{4}$/);
+  await grantSyntheticPasskeyProof(first.owner);
   const reclaim = await send("/api/identity/handle", { identityId: firstIdentity, handle: "Riverbank", mode: "rename" }, first.session);
   expect(reclaim.status).toBe(200); const reclaimed = await reclaim.json(); expect(reclaimed.handle).toBe("Riverbank"); expect(reclaimed).not.toHaveProperty("suffix");
   expect((await pool.query("SELECT count(*)::int AS count FROM drip_handle_reservations WHERE identity_id=$1 AND NOT active AND cooling_until > now()", [firstIdentity])).rows[0].count).toBe(1);
+  await grantSyntheticPasskeyProof(first.owner);
   await send("/api/identity/handle", { identityId: firstIdentity, handle: "FinalRiver", mode: "rename" }, first.session);
   await pool.query("UPDATE drip_handle_reservations SET cooling_until=now()-interval '1 second' WHERE identity_id=$1 AND NOT active AND handle_key='riverbank'", [firstIdentity]);
   // This scenario creates four synthetic users in one test; reset Better Auth's
@@ -246,6 +256,7 @@ it("does not spend the profile rename allowance on automatic identity checks", a
   expect(ensured.status).toBe(200);
   expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(9);
 
+  await grantSyntheticPasskeyProof(a.owner);
   const renamed = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: "new_profile", mode: "rename" }, a.session);
   expect(renamed.status).toBe(200);
   expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(10);
