@@ -43,7 +43,9 @@ async function signOutAndConfirm(context: BrowserContext, page: Page) {
     .getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to Drip" })).toBeVisible();
 
-  const response = await context.request.get(new URL("/api/auth/get-session", baseUrl).toString());
+  const response = await context.request.get(new URL("/api/auth/get-session", baseUrl).toString(), {
+    headers: { "x-vercel-protection-bypass": bypass },
+  });
   expect(response.status()).toBe(200);
   expect(await response.json()).toBeNull();
 }
