@@ -36,6 +36,19 @@ describe("regression evidence guard", () => {
     expect(workflow).toContain("reporting: github-check");
     expect(workflow).not.toMatch(/deployment\.environment\s*==\s*'Production'/);
   });
+  it("deploys only one configured Checkly browser monitor for the Preview journey", () => {
+    const config = readFileSync(new URL("../checkly.config.mjs", import.meta.url), "utf8");
+    expect(config).not.toContain("playwrightConfigPath");
+    expect(config).toContain('testMatch: "checks/preview-auth.spec.ts"');
+    expect(config).toContain("frequency: 60");
+    expect(config).toContain('locations: ["us-east-1"]');
+    expect(config).toContain('env("DRIP_PREVIEW_URL")');
+    expect(config).toContain('env("VERCEL_AUTOMATION_BYPASS_SECRET", true)');
+    expect(config).toContain('env("DRIP_CHECKLY_GAMERTAG", true)');
+    expect(config).toContain('env("DRIP_CHECKLY_PASSWORD", true)');
+    expect(config).toContain('env("DRIP_CHECKLY_ACCOUNT_LABEL")');
+    expect(config).toContain('env("DRIP_CHECKLY_EXPECTED_BALANCE", true)');
+  });
   const webkit = () => ({ suites: [{ specs: webkitJourneys.map(row => ({ ...row, tests: [{ projectName: "mobile-webkit", status: "expected", results: [{ status: "passed" }] }] })) }] });
   it("requires every named WebKit journey to pass once in the correct project", () => {
     expect(validateBrowserMatrix(webkit())).toEqual({ passed: webkitJourneys.length, required: webkitJourneys.length, errors: [] });

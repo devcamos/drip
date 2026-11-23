@@ -20,6 +20,7 @@ async function openPreview(browser: Browser): Promise<{ context: BrowserContext;
     extraHTTPHeaders: { "x-vercel-protection-bypass": bypass },
   });
   const page = await context.newPage();
+  page.on("dialog", dialog => dialog.accept());
   await page.goto(new URL("/", baseUrl).toString());
   return { context, page };
 }
@@ -37,7 +38,6 @@ async function signIn(page: Page) {
 }
 
 async function signOutAndConfirm(context: BrowserContext, page: Page) {
-  page.on("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: /Open profile and settings for/ }).click();
   await page.getByRole("dialog", { name: "Profile & settings", exact: true })
     .getByRole("button", { name: "Sign out", exact: true }).click();
@@ -50,14 +50,54 @@ async function signOutAndConfirm(context: BrowserContext, page: Page) {
   expect(await response.json()).toBeNull();
 }
 
-test("Preview login restores the synthetic balance in a fresh browser and signs out", async ({ browser }) => {
-  const first = await openPreview(browser);
-  await signIn(first.page);
-  await signOutAndConfirm(first.context, first.page);
-  await first.context.close();
+async function ensureServerSessionClosed(context: BrowserContext, page: Page) {
+  const sessionUrl = new URL("/api/auth/get-session", baseUrl).toString();
+  const headers = { "x-vercel-protection-bypass": bypass };
+  const readSession = async () => {
+    try {
+      const response = await context.request.get(sessionUrl, { headers });
+      return response.ok() ? await response.json() : undefined;
+    } catch {
+      return undefined;
+    }
+  };
 
-  const fresh = await openPreview(browser);
-  await signIn(fresh.page);
-  await signOutAndConfirm(fresh.context, fresh.page);
-  await fresh.context.close();
+  if (await readSession() === null) return;
+  try {
+    await page.goto(new URL("/", baseUrl).toString());
+    const profile = page.getByRole("button", { name: /Open profile and settings for/ });
+    if (await profile.isVisible()) {
+      await profile.click();
+      await page.getByRole("dialog", { name: "Profile & settings", exact: true })
+        .getByRole("button", { name: "Sign out", exact: true }).click();
+    }
+  } catch {
+    // A failed assertion or unavailable UI should still try server-side cleanup.
+  }
+
+  if (await readSession() === null) return;
+  const response = await context.request.post(new URL("/api/auth/sign-out", baseUrl).toString(), {
+    headers: { ...headers, origin: new URL(baseUrl).origin },
+  });
+  expect(response.ok()).toBe(true);
+  expect(await readSession()).toBeNull();
+}
+
+async function verifyInFreshContext(browser: Browser) {
+  const { context, page } = await openPreview(browser);
+  try {
+    await signIn(page);
+    await signOutAndConfirm(context, page);
+  } finally {
+    try {
+      await ensureServerSessionClosed(context, page);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
+test("Preview login restores the synthetic balance in a fresh browser and signs out", async ({ browser }) => {
+  await verifyInFreshContext(browser);
+  await verifyInFreshContext(browser);
 });
