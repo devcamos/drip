@@ -6,7 +6,7 @@ export { isReservedHandle };
 const SUFFIX_ATTEMPTS = 32;
 export type HandleReservation = { identityId: string; handle: string; suffix?: string; changed: boolean };
 export class HandleReservationError extends Error {
-  constructor(readonly code: "IDENTITY_OWNED" | "ACCOUNT_ALREADY_HAS_IDENTITY" | "HANDLE_UNAVAILABLE") { super(code); }
+  constructor(readonly code: "IDENTITY_OWNED" | "ACCOUNT_ALREADY_HAS_IDENTITY" | "HANDLE_UNAVAILABLE" | "PASSKEY_REQUIRED") { super(code); }
 }
 type ReservationRow = { identity_id: string; user_id: string; handle: string; suffix: string | null; active: boolean };
 const publicRow = (row: ReservationRow, changed: boolean): HandleReservation => ({
@@ -22,7 +22,7 @@ async function allocate(client: PoolClient, identityId: string, userId: string, 
 
 /** Atomically assign the profile handle to the authenticated account. Old names
  * remain unavailable for 30 days after a rename, then are lazily reclaimed. */
-export async function reserveHandle(db: Pool, identityId: string, userId: string, handle: string, allowRename = false): Promise<HandleReservation> {
+export async function reserveHandle(db: Pool, identityId: string, userId: string, handle: string, allowRename = false, sessionId?: string): Promise<HandleReservation> {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
@@ -44,6 +44,15 @@ export async function reserveHandle(db: Pool, identityId: string, userId: string
     }
 
     if (activeForIdentity) {
+      // A real rename consumes a recent passkey-authenticated session proof.
+      // The field is server-written, hidden from the client, time-limited and
+      // cleared in the same transaction that changes the reservation.
+      const proof = sessionId ? await client.query(`UPDATE "session"
+        SET "dripPasskeyVerifiedAt" = NULL
+        WHERE id = $1 AND "userId" = $2 AND "expiresAt" > now()
+          AND "dripPasskeyVerifiedAt" > now() - interval '5 minutes'
+        RETURNING id`, [sessionId, userId]) : { rows: [] };
+      if (!proof.rows.length) throw new HandleReservationError("PASSKEY_REQUIRED");
       await client.query(`UPDATE drip_handle_reservations SET active = false, cooling_until = now() + interval '30 days'
         WHERE reservation_id = (SELECT reservation_id FROM drip_handle_reservations WHERE active AND identity_id = $1)`, [identityId]);
     }
