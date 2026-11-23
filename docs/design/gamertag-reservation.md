@@ -12,7 +12,7 @@ Drip has two distinct names. The sign-in gamertag belongs to password authentica
 
 Only the authenticated account can reserve or rename its active identity. Existing cloud accounts claim their current name on sync. Sync uses `ensure`: it creates a reservation if missing and returns the server's existing assignment, but it cannot rename a handle silently. The profile settings form uses `rename` explicitly. Other account/identity combinations receive a conflict response.
 
-On rename, the previous tag stays reserved for 30 days. The owner can reclaim it during that period. Expired history is removed lazily during the next reservation. Reserved names are `admin`, `drip` and `support`, compared without regard to case. Changes are limited to 10 per account per hour; idempotent ensures allow 120 per account per hour. Requests also have an IP-based hourly limit using keyed hashes rather than stored IP addresses.
+On rename, the previous tag stays reserved for 30 days. The owner can reclaim it during that period. Expired history is removed lazily during the next reservation. Reserved names are `admin`, `drip` and `support`, compared without regard to case. Explicit renames are limited to 10 per account per hour. Background ensures use a separate counter with room for four active devices checking once a minute (600 per account per hour). Both request types share an IP-based hourly limit using keyed hashes rather than stored IP addresses.
 
 ## Request flow
 

@@ -1,7 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ getSession: vi.fn(), signIn: { email: vi.fn() }, signUp: { email: vi.fn() } }));
+const identityReservation = vi.hoisted(() => ({ reserve: vi.fn() }));
 vi.mock("better-auth/client", () => ({ createAuthClient: () => api }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
+vi.mock("../lib/identity-reservation", () => ({ reserveIdentity: identityReservation.reserve }));
 import { unlockLocalVault as cloudUnlock } from "../lib/db";
 import { seedVault } from "./storage-fixtures";
 import * as cloud from "../lib/cloud";
@@ -14,6 +16,7 @@ const data: AppData = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f
 beforeAll(async () => { key = await cloud.cloudKey(code); email = (await cloud.recoveryCredentials(code)).email; });
 beforeEach(() => {
   vi.clearAllMocks();
+  identityReservation.reserve.mockImplementation(async (identity: typeof data.identity) => identity);
   api.getSession.mockResolvedValue({ data: { user: { id: "user-1", email } } });
   api.signIn.email.mockResolvedValue({ data: { user: { id: "user-1", email } }, error: null });
   api.signUp.email.mockResolvedValue({ data: { user: { id: "user-1", email } }, error: null });

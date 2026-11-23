@@ -1,8 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const cloud = vi.hoisted(() => ({ connect: vi.fn(), readCloudState: vi.fn(), syncNow: vi.fn(), vault: vi.fn(), writeCloudState: vi.fn(), recoveryCredentials: vi.fn(), seal: vi.fn(), authClient: { signOut: vi.fn() }, restoreCloud: vi.fn() }));
 const request = vi.hoisted(() => vi.fn());
+const identityReservation = vi.hoisted(() => ({ reserve: vi.fn() }));
 vi.mock("../lib/cloud", () => cloud);
 vi.mock("../lib/worker-safety", () => ({ safeFetch: request }));
+vi.mock("../lib/identity-reservation", () => ({ reserveIdentity: identityReservation.reserve }));
 import { signUpPassword, passwordUsername } from "../lib/password-login";
 import { cloudSnapshot, commitCloudRestore, completeDeviceSession, emptyData, getItem, loadData, reserveSignupReplacement, setItem, unlockLocalVault } from "../lib/db";
 import { codeVerifier, generateRecoveryCode } from "../lib/crypto";
@@ -14,6 +16,7 @@ const fresh = { ...emptyData(), identity: { ...identity, id: "8f1c2a4e-0b7d-4c1e
 const password = "Synthetic meadow 2026!";
 beforeEach(async () => {
   vi.clearAllMocks(); vi.stubGlobal("navigator", { onLine: true });
+  identityReservation.reserve.mockImplementation(async (value: typeof identity) => value);
   await seedVault(original, fixtureCode, { userId: "old-owner", identityId: identity.id, key: {} as CryptoKey, version: 3, dirty: false, lastSyncAt: "2026-10-20", generation: "old-connection", revision: 2 });
   await setItem("deviceSession", { signedOut: true, remotePending: false, generation: "old-out" });
   cloud.connect.mockResolvedValue({ user: { id: "new-owner" }, key: {} });

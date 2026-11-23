@@ -24,13 +24,17 @@ async function allowed(userId: string, request: Request, isRename: boolean) {
   const secret = process.env.BETTER_AUTH_SECRET!;
   const ip = process.env.VERCEL === "1" ? request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ?? "unknown" : "local";
   const digest = (value: string) => createHmac("sha256", secret).update(value).digest("hex");
-  const keys = [`handle:user:${digest(userId)}`, `handle:ip:${digest(ip)}`];
+  // Background ensure calls are frequent and must not spend a user's rename
+  // allowance. Keep their counters separate while retaining the shared IP cap.
+  const keys = [`handle:user:${isRename ? "rename" : "ensure"}:${digest(userId)}`, `handle:ip:${digest(ip)}`];
   await database().query("DELETE FROM drip_handle_limits WHERE bucket < now() - interval '2 days'");
   const { rows } = await database().query(`INSERT INTO drip_handle_limits (key, bucket, hits) VALUES
     ($1, date_trunc('hour', now()), 1), ($2, date_trunc('hour', now()), 1)
     ON CONFLICT (key) DO UPDATE SET hits = CASE WHEN drip_handle_limits.bucket = date_trunc('hour', now()) THEN drip_handle_limits.hits + 1 ELSE 1 END,
     bucket = date_trunc('hour', now()) RETURNING key, hits`, keys);
-  return rows.every((row) => row.hits <= (row.key === keys[0] ? (isRename ? 10 : 120) : 300));
+  // Four active devices may each check once a minute (240 requests/hour).
+  // Allow normal sync headroom; explicit profile renames remain tightly capped.
+  return rows.every((row) => row.hits <= (row.key === keys[0] ? (isRename ? 10 : 600) : 300));
 }
 
 export async function POST(request: Request) {

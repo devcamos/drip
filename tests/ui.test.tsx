@@ -35,7 +35,7 @@ async function seed(d: Partial<AppData>, code = "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF")
 beforeEach(() => {
   localStorage.removeItem("drip-install-task-v1");
   vi.stubGlobal("confirm", () => true);
-  signup.mockImplementation(async (_name, _password, data) => { await seedVault(data); });
+  signup.mockImplementation(async (_name, _password, data) => { await seedVault(data); return data.identity; });
 });
 
 describe("layout and page", () => {
@@ -135,6 +135,17 @@ describe("migration", () => {
 });
 
 describe("accounts", () => {
+  it("refreshes the visible profile gamertag after a cloud sync assigns a suffix", async () => {
+    await seed({ accounts: [acct()] });
+    render(<Drip />);
+    await screen.findByRole("button", { name: /Open Rainy day pot/ });
+    expect(screen.getByTestId("header-tag")).toHaveTextContent("devo");
+
+    await DB.mutateData(current => ({ ...current, identity: { ...current.identity!, suffix: "4821" } }));
+
+    await waitFor(() => expect(screen.getByTestId("header-tag")).toHaveTextContent("devo#4821"));
+  });
+
   it("does not let a stale legacy gamertag picker overwrite a profile and debt saved by another tab", async () => {
     await seed({ identity: undefined, accounts: [acct()] });
     render(<Drip />);

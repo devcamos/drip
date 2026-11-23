@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 import { betterAuth } from "better-auth";
@@ -216,7 +216,7 @@ it("reserves profile gamertags case-insensitively, assigns a stable suffix, and 
   const b = await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session);
   expect(b.status).toBe(200); const assigned = await b.json();
   expect(assigned).toMatchObject({ identityId: secondIdentity, handle: "riverbank", changed: true }); expect(assigned.suffix).toMatch(/^\d{4}$/);
-  expect(await (await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session)).json()).toEqual(assigned);
+  expect(await (await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session)).json()).toMatchObject({ ...assigned, changed: false });
 
   const rename = await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session);
   expect(rename.status).toBe(200); expect(await rename.json()).toMatchObject({ handle: "NewRiver" });
@@ -231,6 +231,24 @@ it("reserves profile gamertags case-insensitively, assigns a stable suffix, and 
   const fourth = await createAccount();
   const expired = await send("/api/identity/handle", { identityId: fourth.data.identity.id, handle: "Riverbank", mode: "ensure" }, fourth.session);
   expect(expired.status).toBe(200); expect(await expired.json()).toMatchObject({ handle: "Riverbank" });
+});
+
+it("does not spend the profile rename allowance on automatic identity checks", async () => {
+  const a = await createAccount();
+  const digest = createHmac("sha256", "Synthetic-account-contract-secret-only-42!").update(a.owner).digest("hex");
+  const renameKey = `handle:user:rename:${digest}`;
+  await pool.query("INSERT INTO drip_handle_limits (key, bucket, hits) VALUES ($1, date_trunc('hour', now()), 9)", [renameKey]);
+
+  const ensured = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: a.username, mode: "ensure" }, a.session);
+  expect(ensured.status).toBe(200);
+  expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(9);
+
+  const renamed = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: "new_profile", mode: "rename" }, a.session);
+  expect(renamed.status).toBe(200);
+  expect((await pool.query("SELECT hits FROM drip_handle_limits WHERE key=$1", [renameKey])).rows[0].hits).toBe(10);
+  const limited = await send("/api/identity/handle", { identityId: a.data.identity.id, handle: "another_name", mode: "rename" }, a.session);
+  expect(limited.status).toBe(429);
+  expect(await limited.json()).toMatchObject({ error: "Too many gamertag changes. Try again later." });
 });
 
 it("serializes concurrent claims and gives every account a distinct server gamertag", async () => {

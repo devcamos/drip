@@ -21,6 +21,9 @@ async function owner() {
 beforeAll(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
   await pool.query('CREATE TABLE "user" (id text PRIMARY KEY)');
+  // The production migration also adds the device field to Better Auth's
+  // session table. This focused fixture only needs its existing primary key.
+  await pool.query('CREATE TABLE "session" (id text PRIMARY KEY)');
   for (const sql of migrationStatements(readFileSync(new URL("../scripts/migrate.mjs", import.meta.url), "utf8"))) await pool.query(sql);
 }, 30_000);
 beforeEach(async () => { await pool.query('TRUNCATE "user" CASCADE'); });

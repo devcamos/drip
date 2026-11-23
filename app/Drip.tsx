@@ -186,6 +186,27 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     return () => { loadSequence.current++; };
   }, []);
 
+  // Cloud sync can learn a server-assigned collision suffix in another task.
+  // Refresh only this profile identity so the header/settings reflect it without
+  // replacing unsaved React state or switching to a different local account.
+  useEffect(() => {
+    let active = true;
+    const refreshProfile = async () => {
+      const before = latestData.current?.identity;
+      if (!before) return;
+      try {
+        const saved = await loadData();
+        const current = latestData.current;
+        if (!active || !current?.identity || current.identity.id !== before.id || saved.identity?.id !== before.id) return;
+        if (current.identity.handle === saved.identity.handle && current.identity.suffix === saved.identity.suffix) return;
+        const next = { ...current, identity: saved.identity };
+        latestData.current = next; setData(next);
+      } catch { /* Locking or storage failures are handled by the active vault flow. */ }
+    };
+    window.addEventListener("drip-data-saved", refreshProfile);
+    return () => { active = false; window.removeEventListener("drip-data-saved", refreshProfile); };
+  }, []);
+
   const update = useCallback((fn: (d: AppData) => AppData) => {
     const generation = dataGeneration.current;
     setPendingSaves(n => n + 1);
