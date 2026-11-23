@@ -8,7 +8,7 @@
     "validate:deployment": "node scripts/validate-deployment.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --project unit --project integration --coverage",
+    "test": "vitest run --project unit --project integration",
     "test:unit": "vitest run --project unit",
     "test:unit:coverage": "vitest run --config vitest.unit-coverage.config.mts --coverage",
     "test:components": "vitest run --project integration",
