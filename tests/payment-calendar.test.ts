@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { paymentCalendar } from "../lib/payment-calendar";
 import { payoutAmount, recordedIncome, round2 } from "../lib/maths";
 import { calendarAccount as account } from "./payment-calendar-fixtures";
+import { releaseDebt, releaseSaver } from "./saved-experience-fixtures";
 
 // Pure domain tests. No React, IndexedDB, crypto, HTTP, files or real clock.
 beforeEach(() => {
@@ -37,6 +38,18 @@ describe("payment calendar — unit (14 cases)", () => {
     expect(rows[0].date).toBe("2026-12-15");
     expect(rows.at(-1)!.date).toBe("2027-11-15");
     expect(rows.every(row => row.account.id !== "outside")).toBe(true);
+  });
+
+  it("returns today's expected income and repayment separately from forward months", () => {
+    const today = "2026-11-20";
+    const cash = releaseSaver({ nextPayoutDate: today });
+    const debt = releaseDebt({ nextPayoutDate: today, creditCard: { apr: 24, minimumPayment: 25, plannedPayment: 100 } });
+    const result = paymentCalendar([cash, debt], today)!;
+    expect(result.dueToday.map(payment => ({ id: payment.account.id, date: payment.date, repayment: payment.repayment }))).toEqual([
+      { id: "cash", date: today, repayment: undefined },
+      { id: "credit", date: today, repayment: true },
+    ]);
+    expect(result.months.flatMap(month => month.payments).every(payment => payment.date > today)).toBe(true);
   });
 
   it("catches up old quarterly anchors and preserves month-end across years", () => {
