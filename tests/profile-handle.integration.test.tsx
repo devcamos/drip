@@ -14,7 +14,9 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 it("keeps profile naming separate from sign-in and confirms a server-assigned suffix", async () => {
-  const user = userEvent.setup(), identity = newIdentity("riverbank"), onRenameIdentity = vi.fn(async (handle: string) => withSuffix({ ...identity, handle }, "4821")), confirmRename = vi.fn(async () => {}), onRenameBusyChange = vi.fn();
+  const user = userEvent.setup(), identity = newIdentity("riverbank"), order: string[] = [];
+  const onRenameIdentity = vi.fn(async (handle: string) => { order.push("reserve"); return withSuffix({ ...identity, handle }, "4821"); });
+  const confirmRename = vi.fn(async () => { order.push("passkey"); }), onRenameBusyChange = vi.fn();
   render(<ProfileSettings open identity={identity} counts={{ cash: 2, stocks: 1, credits: 1 }} incomePeriod="month" onIncomePeriod={() => {}} onClose={() => {}} onAccounts={() => {}} onSettings={() => {}} onPayments={() => {}} onFeedback={() => {}} onRenameIdentity={onRenameIdentity} confirmRename={confirmRename} onRenameBusyChange={onRenameBusyChange} signOut={null} />);
   const dialog = within(screen.getByRole("dialog", { name: "Profile & settings" }));
   expect(dialog.getByText(/This display name is separate from the gamertag you use to sign in/)).toBeVisible();
@@ -22,6 +24,7 @@ it("keeps profile naming separate from sign-in and confirms a server-assigned su
   await user.click(dialog.getByRole("button", { name: "Save profile gamertag" }));
   expect(onRenameIdentity).toHaveBeenCalledWith("newriver");
   expect(confirmRename).toHaveBeenCalledTimes(1);
+  expect(order).toEqual(["passkey", "reserve"]);
   expect(onRenameBusyChange).toHaveBeenNthCalledWith(1, true); expect(onRenameBusyChange).toHaveBeenNthCalledWith(2, false);
   expect(await dialog.findByRole("status")).toHaveTextContent("newriver#4821");
   await user.clear(dialog.getByLabelText("Display gamertag")); await user.type(dialog.getByLabelText("Display gamertag"), "ab");

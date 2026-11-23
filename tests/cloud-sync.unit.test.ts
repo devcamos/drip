@@ -35,9 +35,11 @@ it("does not upload over a newer cloud version", async () => {
   dep.fetch.mockResolvedValueOnce(Response.json({ version: 3, envelope: null })); await expect(syncNow()).rejects.toThrow(/Cloud changed/);
   expect(dep.fetch).toHaveBeenCalledTimes(1); expect(dep.fetch.mock.calls[0][1].method).toBe("GET"); expect(dep.acknowledge).not.toHaveBeenCalled();
 });
-it("requires a profile reservation before syncing account data", async () => {
+it("binds each profile reservation to the cloud owner and requires it before syncing account data", async () => {
   dep.reserve.mockRejectedValueOnce(new Error("Gamertag service is unavailable."));
-  await expect(syncNow()).rejects.toThrow(/Gamertag service is unavailable/); expect(dep.fetch).not.toHaveBeenCalled();
+  await expect(syncNow()).rejects.toThrow(/Gamertag service is unavailable/);
+  expect(dep.reserve).toHaveBeenCalledWith(data.identity, { userId: state.userId }, "ensure");
+  expect(dep.fetch).not.toHaveBeenCalled();
 });
 it("stores a collision suffix in the encrypted local identity before syncing", async () => {
   const assigned = { ...data.identity!, suffix: "4821" };
