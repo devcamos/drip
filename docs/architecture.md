@@ -62,6 +62,7 @@ flowchart TB
         Vault --> Sync["Cloud sync<br/>lib/cloud"]
         View --> Schedule["Reminder schedule<br/>lib/payment-reminders"]
         View --> FeedbackUI["Feedback form<br/>app/Feedback"]
+        View --> HandleUI["Profile gamertag settings<br/>app/accounts/ProfileSettings"]
         Schedule --> Phone["Phone-reminder client<br/>lib/phone-reminders"]
     end
     subgraph Server["Server trust boundary"]
@@ -69,20 +70,24 @@ flowchart TB
         API["Authenticated vault route<br/>app/api/cloud"]
         PushAPI["Reminder validation and dispatch<br/>server/notifications/"]
         FeedbackAPI["Feedback validation and inbox<br/>server/feedback/"]
+        HandleAPI["Profile handle reservation<br/>app/api/identity/handle · server/handle-reservations"]
         DB[("Postgres<br/>auth metadata, encrypted vaults,<br/>reminders and submitted feedback")]
         Auth --> DB
         API --> DB
         PushAPI --> DB
         FeedbackAPI --> DB
+        HandleAPI --> DB
     end
     Session --> Auth
     Sync --> API
     Phone --> PushAPI
     FeedbackUI --> FeedbackAPI
+    HandleUI --> HandleAPI
 ```
 
 - **Keys and data:** the local vault uses AES-GCM encryption. Usable vault keys are held in page memory while unlocked; the server receives an encrypted cloud envelope, not the financial plaintext or recovery root. Authentication and reminder metadata remain server-side.
 - **Sessions and devices:** Better Auth verifies cloud sessions. Drip limits active cloud sessions to four device profiles; local unlock and cloud authentication are separate. See [session policy](session-policy.md) and [device management](device-management.md).
+- **Profile name changes:** cloud sign-in passkeys provide a fresh, five-minute, one-use server session proof before a display gamertag rename. The marker is server-written and hidden from clients; the rename and proof consumption share one Postgres transaction. Password authentication alone cannot authorize a rename. See [gamertag reservation](design/gamertag-reservation.md).
 - **Sync:** local data is the working copy. Cloud writes use version checks; conflicts are surfaced rather than merged automatically. A cloud restore contains only data that successfully synced.
 - **Reminders:** schedule dates, frequencies and time zone leave the encrypted vault; push endpoints are encrypted at rest. Notifications omit account names and financial values. See [payment notifications](payment-notifications.md).
 - **Feedback:** the user deliberately submits a message and chosen area. Feedback is not end-to-end encrypted and is readable by authorised reviewers; no account records are automatically attached. An authorised agent can query it when invoked. See [feedback and agent triage](feedback.md).
