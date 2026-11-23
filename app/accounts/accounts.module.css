@@ -134,6 +134,9 @@ button.accountCard:focus-visible { outline-color:currentColor !important; outlin
 .profileSection { padding:21px 0; border-bottom:1px solid var(--edge); }
 .profileSection h3 { margin:0; font-size:15px; }
 .profileSection p { color:var(--quiet); font-size:12px; line-height:1.7; margin:8px 0 14px; }
+.profileHandleLabel { display:block; margin:10px 0 6px; color:var(--quiet); font-size:12px; }
+.profileSection input#profile-gamertag { width:100%; min-height:46px; padding:11px 13px; border:1px solid #cdbba5; border-radius:11px; background:#fff4b7; color:var(--ink); font:inherit; }
+.profileSection input#profile-gamertag:focus-visible { outline:3px solid #b95b2d55; border-color:var(--copper); }
 .profileSection > small { display:block; color:var(--quiet); font-size:11px; line-height:1.7; margin-top:13px; }
 .profileCounts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:15px 0 4px; }
 .profileCounts > div { border:1px solid var(--edge); border-radius:12px; padding:12px; background:#f6ecdf; min-width:0; }

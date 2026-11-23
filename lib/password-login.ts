@@ -7,6 +7,8 @@ import { finishDeviceSignOut, notifyDeviceSession, readDeviceSession, restoreOth
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validLoginTag, validPasswordWrap, wrapPasswordRoot, type PasswordWrap } from "./password-crypto";
 import { resolveRecoveryCode } from "./recovery-codes";
 import { originalRecoveryCodes } from "./original-recovery-codes";
+import { reserveIdentity } from "./identity-reservation";
+import { isReservedHandle } from "./identity";
 import { safeFetch } from "./worker-safety";
 import type { AppData } from "./types";
 
@@ -42,6 +44,7 @@ async function cleanUpFailedSignup(replacement: SignupReplacement | undefined) {
 /** Register cloud/password access before atomically installing a new local vault. */
 export async function signUpPassword(username: string, password: string, data: AppData, replaceExisting = false) {
   const { name, identity } = validateSignup(username, password, data, replaceExisting);
+  if (isReservedHandle(identity.handle)) throw new Error("That profile gamertag is reserved. Choose another.");
   let before = await readDeviceSession();
   let replacement: SignupReplacement | undefined;
   const existing = (await passwordUnlockContext()).binding || await getItem("verifier");
@@ -56,6 +59,8 @@ export async function signUpPassword(username: string, password: string, data: A
   try {
   const { user, key } = await connect(root, data, true, replacement?.generation, undefined, replacement?.nonce);
   signupOwner = user.id;
+  const reservedIdentity = await reserveIdentity(identity, "ensure");
+  data = { ...data, identity: reservedIdentity };
   const remote = await vault("GET", undefined, user.id, replacement?.generation, replacement?.nonce);
   if (remote.version !== 0 || remote.envelope) throw new Error("Account setup changed. Try again.");
   const saved = await vault("PUT", { version: 0, envelope: await seal(data, key) }, user.id, replacement?.generation, replacement?.nonce);
@@ -73,6 +78,7 @@ export async function signUpPassword(username: string, password: string, data: A
   try { await originalRecoveryCodes(root, signupOwner, AbortSignal.timeout(3000)); }
   catch { /* The required save step remains visible until completed. */ }
   notifyDeviceSession();
+  return data.identity!;
 }
 
 /** Password confirmation can create recovery codes without an earlier code. */

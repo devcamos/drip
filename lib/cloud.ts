@@ -1,7 +1,8 @@
 import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { normaliseCode, isValidCode, codeVerifier, deriveCloudEncryptionKey, checkCode } from "./crypto";
-import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection, type RetainedAccount } from "./db";
+import { getItem, isAppData, commitCloudRestore, cloudSnapshot, acknowledgeCloudUpload, storeCloudConnection, mutateData, type RetainedAccount } from "./db";
+import { reserveIdentity } from "./identity-reservation";
 import type { AppData, CloudState } from "./types";
 export type { CloudState } from "./types";
 import { localToday, migrateData } from "./maths";
@@ -132,15 +133,24 @@ export async function syncNow(): Promise<string> {
   if (syncing) return "Sync already in progress.";
   syncing = true;
   try {
-    const { state, data: snapshot, signedOut } = await cloudSnapshot();
+    let { state, data: snapshot, signedOut } = await cloudSnapshot();
     if (signedOut) return "Signed out. Cloud sync is paused.";
     if (!state) return "Cloud recovery is off.";
     const session = await authClient.getSession();
     if (session.error?.status === 429) throw new Error("Cloud sync is temporarily rate limited. Drip will retry automatically; your local data is safe.");
     if (session.error) throw new Error("Could not check cloud sign-in. Drip will retry automatically; your local data is safe.");
     if (session.data?.user.id !== state.userId) throw new Error("Sign in again to sync. Your local data is safe.");
-    const data = migrateData(snapshot, localToday());
+    let data = migrateData(snapshot, localToday());
     if (data.identity?.id !== state.identityId) throw new Error("This local backup belongs to another account. Disconnect cloud recovery first.");
+    let handleNotice = "";
+    const reserved = await reserveIdentity(data.identity, "ensure");
+    if (reserved.handle !== data.identity.handle || reserved.suffix !== data.identity.suffix) {
+      if (reserved.suffix && !data.identity.suffix) handleNotice = `Your profile gamertag was already in use, so Drip assigned ${reserved.handle}#${reserved.suffix}. Your sign-in name is unchanged.`;
+      await mutateData(current => current.identity?.id === state!.identityId ? { ...current, identity: reserved } : current);
+      const refreshed = await cloudSnapshot();
+      if (refreshed.signedOut || refreshed.state?.userId !== state.userId || refreshed.state.identityId !== state.identityId || refreshed.state.generation !== state.generation) return "Cloud connection changed during gamertag sync. Check its status before continuing.";
+      state = refreshed.state; snapshot = refreshed.data; data = migrateData(snapshot, localToday());
+    }
     const remote = await vault("GET", undefined, state.userId);
     if (remote.version !== state.version) throw new Error("Cloud changed on another device. Export a local backup, then restore the cloud copy before saving again.");
     // Replace older cloud copies that included device-only nicknames, even when
@@ -169,7 +179,7 @@ export async function syncNow(): Promise<string> {
       changed: "Cloud connection changed during sync. Check its status before continuing.",
       saved: "Encrypted cloud copy saved.",
     };
-    return messages[acknowledged];
+    return handleNotice ? `${handleNotice} ${messages[acknowledged]}` : messages[acknowledged];
   } finally { syncing = false; }
 }
 

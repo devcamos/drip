@@ -7,6 +7,8 @@
 export interface Identity { id: string; handle: string; suffix?: string; createdAt: string }
 
 export const HANDLE_RE = /^[A-Za-z0-9_]{3,16}$/;
+export const RESERVED_HANDLES = new Set(["admin", "drip", "support"]);
+export const isReservedHandle = (handle: string) => RESERVED_HANDLES.has(handle.toLowerCase());
 
 export function handleError(h: string): string | null {
   if (h.length < 3) return "Use at least 3 characters.";

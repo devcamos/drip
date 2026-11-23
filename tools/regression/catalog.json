@@ -7,6 +7,12 @@
   },
   "pyramids": [
     {
+      "featureId": "handle-reservations",
+      "unit": ["tests/handle-reservation.test.ts", "tests/identity-reservation.test.ts"],
+      "integration": ["integration/handle-reservations-postgres.integration.test.ts"],
+      "browser": ["e2e/gamertag-signin.spec.ts"]
+    },
+    {
       "featureId": "calendar",
       "unit": [
         "tests/payment-calendar.test.ts"
@@ -154,6 +160,23 @@
     }
   ],
   "features": [
+    {
+      "id": "handle-reservations",
+      "name": "Server-owned profile gamertag reservations and rename history",
+      "sources": [
+        "app/api/identity/handle/route.ts",
+        "lib/identity-reservation.ts",
+        "server/handle-reservations.ts"
+      ],
+      "tests": [
+        "tests/handle-reservation.test.ts",
+        "tests/identity-reservation.test.ts",
+        "integration/handle-reservations-postgres.integration.test.ts",
+        "integration/account-http.integration.test.ts",
+        "tests/profile-handle.integration.test.tsx",
+        "e2e/gamertag-signin.spec.ts"
+      ]
+    },
     {
       "id": "auth",
       "name": "Gamertag signup, password login and session policies",
@@ -614,7 +637,8 @@
         "tests/local-test-database.test.ts",
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
-        "e2e/account-workflows.e2e.spec.ts"
+        "e2e/account-workflows.e2e.spec.ts",
+        "integration/account-http.integration.test.ts"
       ]
     },
     {
@@ -634,6 +658,7 @@
         "tests/ui.test.tsx",
         "tests/trusted-session.test.ts",
         "tests/identity.test.ts",
+        "tests/handle-reservation.test.ts",
         "tests/signup-form.test.tsx",
         "e2e/smoke.spec.ts",
         "e2e/auth-screens.spec.ts",
@@ -643,6 +668,7 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
+        "tests/profile-handle.integration.test.tsx",
         "tests/analytics-dashboard.integration.test.tsx",
         "tests/account-review.integration.test.tsx"
       ]
@@ -790,6 +816,7 @@
         "tests/account-workflows.test.ts",
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
+        "tests/profile-handle.integration.test.tsx",
         "tests/stock-reading.integration.test.tsx",
         "e2e/stock-reading.e2e.spec.ts",
         "tests/payment-carousel.integration.test.tsx",
@@ -883,6 +910,8 @@
       "tests/exchange-rates.test.ts",
       "tests/gaps.test.ts",
       "tests/identity.test.ts",
+      "tests/handle-reservation.test.ts",
+      "tests/identity-reservation.test.ts",
       "tests/income-reminders.test.ts",
       "tests/income.test.ts",
       "tests/lock.test.ts",
@@ -982,6 +1011,7 @@
       "tests/saved-experience.integration.test.tsx",
       "tests/account-workflows.integration.test.tsx",
       "tests/feedback.integration.test.tsx",
+      "tests/profile-handle.integration.test.tsx",
       "tests/stock-reading.integration.test.tsx",
       "tests/trusted-device.test.ts",
       "tests/trusted-session.test.ts",
@@ -991,6 +1021,7 @@
     ],
     "postgres": [
       "integration/account-http.integration.test.ts",
+      "integration/handle-reservations-postgres.integration.test.ts",
       "integration/device-management.test.ts",
       "integration/notification-rate-limits.test.ts",
       "integration/notifications-postgres.test.ts",

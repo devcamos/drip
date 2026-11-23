@@ -39,6 +39,10 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
       if (body.username !== username || body.proof !== proof) return route.fulfill({ status: 401, json: { message: "Gamertag or password is incorrect." } });
       return route.fulfill({ json: { owner, envelope } });
     }
+    if (path === "/api/identity/handle") {
+      const body = request.postDataJSON();
+      return route.fulfill({ json: { identityId: body.identityId, handle: body.handle, suffix: "4821", changed: true } });
+    }
     if (path === "/api/cloud/status") return route.fulfill({ json: { available: false } });
     return route.fulfill({ status: 503, json: { message: "Unexpected synthetic request." } });
   });
@@ -73,6 +77,12 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
   await expect(page.getByTestId("header-tag")).toContainText(username);
   await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
   await capture(page, "accounts");
+  await page.getByRole("button", { name: /Open profile and settings/ }).click();
+  const profile = page.getByRole("dialog", { name: "Profile & settings" });
+  await profile.getByLabel("Display gamertag").fill("display_name");
+  await profile.getByRole("button", { name: "Save profile gamertag" }).click();
+  await expect(profile.getByRole("region", { name: "Profile gamertag" }).getByRole("status")).toContainText("display_name#4821");
+  await expect(page.getByTestId("header-tag")).toHaveText("display_name#4821");
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   page.on("dialog", dialog => dialog.accept());

@@ -26,6 +26,8 @@ vi.mock("../server/auth", async original => ({ ...await original<typeof import("
 import * as authRoute from "../app/api/auth/[...all]/route";
 import * as vaultRoute from "../app/api/cloud/route";
 import * as recoveryRoute from "../app/api/recovery-codes/route";
+import * as handleRoute from "../app/api/identity/handle/route";
+import { reserveHandle } from "../server/handle-reservations";
 
 const url = regressionDatabaseURL(process.env.DRIP_TEST_DATABASE_URL ?? "postgresql://drip_test@127.0.0.1:55438/drip_notifications_test");
 const schema = "account_http_" + randomUUID().replaceAll("-", "");
@@ -83,7 +85,7 @@ beforeAll(async () => {
       const headers = new Headers(); for (const [key, value] of Object.entries(incoming.headers)) if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
       const path = incoming.url ?? "/", method = incoming.method ?? "GET";
       const request = new Request(origin + path, { method, headers, ...(method === "GET" ? {} : { body: Buffer.concat(chunks).toString("utf8") }) });
-      const handlers: Record<string, (request: Request) => Promise<Response>> = path.startsWith("/api/auth/") ? { GET: authRoute.GET, POST: authRoute.POST } : path === "/api/cloud" ? { GET: vaultRoute.GET, PUT: vaultRoute.PUT } : { GET: recoveryRoute.GET, PUT: recoveryRoute.PUT, POST: recoveryRoute.POST };
+      const handlers: Record<string, (request: Request) => Promise<Response>> = path.startsWith("/api/auth/") ? { GET: authRoute.GET, POST: authRoute.POST } : path === "/api/cloud" ? { GET: vaultRoute.GET, PUT: vaultRoute.PUT } : path === "/api/identity/handle" ? { POST: handleRoute.POST } : { GET: recoveryRoute.GET, PUT: recoveryRoute.PUT, POST: recoveryRoute.POST };
       const handler = handlers[method];
       const response = handler ? await handler(request) : new Response(null, { status: 405 });
       outgoing.statusCode = response.status;
@@ -96,7 +98,7 @@ beforeAll(async () => {
   const address = server.address(); if (!address || typeof address === "string") throw new Error("No loopback test listener");
   transport = `http://127.0.0.1:${address.port}`;
 }, 30_000);
-beforeEach(async () => { await pool.query('TRUNCATE "user" CASCADE'); await pool.query('TRUNCATE "rateLimit", drip_recovery_limits'); });
+beforeEach(async () => { await pool.query('TRUNCATE "user" CASCADE'); await pool.query('TRUNCATE "rateLimit", drip_recovery_limits, drip_handle_limits'); });
 afterAll(async () => {
   if (server) await new Promise<void>(resolve => server.close(() => resolve()));
   await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); vi.unstubAllEnvs();
@@ -204,4 +206,53 @@ it("expires a stored session without extending its access or exposing the encryp
   await pool.query('UPDATE "session" SET "expiresAt"=now()-interval \'1 second\' WHERE "userId"=$1', [a.owner]);
   expect(await (await send("/api/auth/get-session", undefined, a.session)).json()).toBeNull();
   expect((await send("/api/cloud", undefined, a.session, a.owner)).status).toBe(401);
+});
+
+it("reserves profile gamertags case-insensitively, assigns a stable suffix, and retains renamed tags for 30 days", async () => {
+  const first = await createAccount(), second = await createAccount();
+  const firstIdentity = first.data.identity.id, secondIdentity = second.data.identity.id;
+  const a = await send("/api/identity/handle", { identityId: firstIdentity, handle: "Riverbank", mode: "ensure" }, first.session);
+  expect(a.status).toBe(200); expect(await a.json()).toMatchObject({ identityId: firstIdentity, handle: "Riverbank", changed: true });
+  const b = await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session);
+  expect(b.status).toBe(200); const assigned = await b.json();
+  expect(assigned).toMatchObject({ identityId: secondIdentity, handle: "riverbank", changed: true }); expect(assigned.suffix).toMatch(/^\d{4}$/);
+  expect(await (await send("/api/identity/handle", { identityId: secondIdentity, handle: "riverbank", mode: "ensure" }, second.session)).json()).toEqual(assigned);
+
+  const rename = await send("/api/identity/handle", { identityId: firstIdentity, handle: "NewRiver", mode: "rename" }, first.session);
+  expect(rename.status).toBe(200); expect(await rename.json()).toMatchObject({ handle: "NewRiver" });
+  const third = await createAccount();
+  const held = await send("/api/identity/handle", { identityId: third.data.identity.id, handle: "Riverbank", mode: "ensure" }, third.session);
+  expect(held.status).toBe(200); expect((await held.json()).suffix).toMatch(/^\d{4}$/);
+  const reclaim = await send("/api/identity/handle", { identityId: firstIdentity, handle: "Riverbank", mode: "rename" }, first.session);
+  expect(reclaim.status).toBe(200); const reclaimed = await reclaim.json(); expect(reclaimed.handle).toBe("Riverbank"); expect(reclaimed).not.toHaveProperty("suffix");
+  expect((await pool.query("SELECT count(*)::int AS count FROM drip_handle_reservations WHERE identity_id=$1 AND NOT active AND cooling_until > now()", [firstIdentity])).rows[0].count).toBe(1);
+  await send("/api/identity/handle", { identityId: firstIdentity, handle: "FinalRiver", mode: "rename" }, first.session);
+  await pool.query("UPDATE drip_handle_reservations SET cooling_until=now()-interval '1 second' WHERE identity_id=$1 AND NOT active AND handle_key='riverbank'", [firstIdentity]);
+  const fourth = await createAccount();
+  const expired = await send("/api/identity/handle", { identityId: fourth.data.identity.id, handle: "Riverbank", mode: "ensure" }, fourth.session);
+  expect(expired.status).toBe(200); expect(await expired.json()).toMatchObject({ handle: "Riverbank" });
+});
+
+it("serializes concurrent claims and gives every account a distinct server gamertag", async () => {
+  const records = Array.from({ length: 12 }, () => ({ userId: randomUUID(), identityId: randomUUID(), email: `${randomUUID()}@synthetic.test` }));
+  for (const item of records) await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+    VALUES ($1, 'Synthetic', $2, false, now(), now())`, [item.userId, item.email]);
+  const assigned = await Promise.all(records.map(item => reserveHandle(pool as unknown as NeonPool, item.identityId, item.userId, "SharedName")));
+  const tags = assigned.map(item => `${item.handle.toLowerCase()}#${item.suffix ?? ""}`);
+  expect(new Set(tags).size).toBe(records.length);
+  expect(assigned.filter(item => !item.suffix)).toHaveLength(1);
+  expect(assigned.filter(item => item.suffix)).toHaveLength(records.length - 1);
+});
+
+it("requires the authenticated profile owner, same origin, valid names and non-reserved tags", async () => {
+  const account = await createAccount(), identityId = account.data.identity.id;
+  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" })).status).toBe(401);
+  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" }, account.session, "", device(), "https://attacker.example")).status).toBe(403);
+  expect((await send("/api/identity/handle", { identityId, handle: "admin" }, account.session)).status).toBe(400);
+  expect((await send("/api/identity/handle", { identityId, handle: "bad tag" }, account.session)).status).toBe(400);
+  const created = await send("/api/identity/handle", { identityId, handle: "valid_tag" }, account.session);
+  expect(created.status).toBe(200);
+  const other = await createAccount();
+  expect((await send("/api/identity/handle", { identityId, handle: "valid_tag" }, other.session)).status).toBe(409);
+  expect((await send("/api/identity/handle", { identityId: randomUUID(), handle: "another_tag" }, account.session)).status).toBe(409);
 });

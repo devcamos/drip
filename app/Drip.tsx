@@ -20,6 +20,7 @@ import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
+import { reserveIdentity } from "@/lib/identity-reservation";
 import { SignupForm } from "./SignupForm";
 import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
@@ -111,6 +112,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const profileButton = useRef<HTMLButtonElement>(null);
   const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>("month");
   const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [profileRenameBusy, setProfileRenameBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState("");
   const preferenceSequence = useRef(0);
@@ -216,7 +218,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud, expectedGeneration, root, password) => {
     let d = restored ?? { ...data, identity };
     if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
-    if (password && identity) await signUpPassword(identity.handle, password, d);
+    if (password && identity) d = { ...d, identity: await signUpPassword(identity.handle, password, d) };
     else if (!fromCloud) {
       if (!v) throw new Error("Could not verify the restored account.");
       await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
@@ -348,7 +350,15 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => navigate({ name: "settings" })} /> : null}
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
-      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
+      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} onRenameIdentity={async handle => {
+        const identity = await reserveIdentity({ ...data.identity!, handle }, "rename");
+        const saved = await update(current => {
+          if (current.identity?.id !== identity.id) throw Object.assign(new Error("Profile changed"), { name: "StaleAccountEdit" });
+          return { ...current, identity };
+        });
+        if (!saved) throw new Error("Gamertag reserved, but Drip could not save it on this device. Reload and sync to finish.");
+        return identity;
+      }} onRenameBusyChange={setProfileRenameBusy} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || profileRenameBusy || draftGuard.dirty} />} />
       <nav className="tabs" aria-label="Main">
         {(["home", "portfolio", "analytics", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>
