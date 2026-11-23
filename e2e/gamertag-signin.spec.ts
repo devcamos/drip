@@ -32,8 +32,20 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
   }] };
   const records = { data: await encryptLocal(data, keys), localVault: keys.header, verifier: await codeVerifier(root),
     passwordUnlock: { vaultId: keys.header.id, envelope } };
+  // This journey uses a synthetic WebAuthn ceremony. Server-side signature
+  // verification and one-use proof consumption are covered by auth/Postgres
+  // integration tests; no real authenticator or account is used here.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.credentials, "get", { configurable: true, value: async () => ({
+      id: "synthetic-passkey", rawId: Uint8Array.from([1, 2, 3]).buffer, type: "public-key",
+      response: { authenticatorData: Uint8Array.from([1]).buffer, clientDataJSON: Uint8Array.from([2]).buffer, signature: Uint8Array.from([3]).buffer, userHandle: null },
+      getClientExtensionResults: () => ({}), authenticatorAttachment: "platform",
+    }) });
+  });
   await context.route("**/api/**", async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
+    if (path === "/api/auth/passkey/generate-authenticate-options") return route.fulfill({ json: { challenge: "AQ", rpId: "localhost", timeout: 60_000, userVerification: "preferred", allowCredentials: [] } });
+    if (path === "/api/auth/passkey/verify-authentication") return route.fulfill({ json: { session: { id: "synthetic-session" }, user: { id: owner } } });
     if (path.startsWith("/api/auth/sign-in/gamertag")) {
       const body = request.postDataJSON();
       if (body.username !== username || body.proof !== proof) return route.fulfill({ status: 401, json: { message: "Gamertag or password is incorrect." } });
