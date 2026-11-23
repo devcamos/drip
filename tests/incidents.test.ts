@@ -76,7 +76,23 @@ it("does not let Slack timeouts or provider errors replace an API response", asy
   const response = await handler(new Request("https://drip.example/api/exchange-rates"));
   expect(response.status).toBe(502);
   expect(await response.text()).toBe("upstream failure");
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('"event":"drip.incident.delivery_failed"'));
   expect(JSON.stringify(warn.mock.calls)).not.toContain("network details must stay private");
+});
+
+it("uses a route's existing incident reference for the Slack alert and response header", async () => {
+  const reference = "550e8400-e29b-41d4-a716-446655440000";
+  vi.stubEnv("DRIP_INCIDENT_SLACK_WEBHOOK", "https://hooks.slack.com/services/T000/B000/placeholder");
+  const fetcher = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response("ok")); vi.stubGlobal("fetch", fetcher);
+  const handler = withApiIncidents(async (_request: Request) => Response.json(
+    { error: "Phone reminders are unavailable. Try again later.", reference },
+    { status: 503, headers: { "x-drip-incident-reference": reference } },
+  ));
+  const response = await handler(new Request("https://drip.example/api/notifications/test", { method: "POST" }));
+  expect(response.headers.get("x-drip-incident-reference")).toBe(reference);
+  expect((await response.json()).reference).toBe(reference);
+  const payload = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as { text: string };
+  expect(payload.text).toContain(`Drip server incident ${reference}`);
 });
 
 it("does not enable delivery when no webhook is configured", async () => {
