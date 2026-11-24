@@ -51,7 +51,13 @@ it("derives a missing Preview auth origin from the branch URL only", () => {
     "https://drip-git-feature-123-devonte-amos-projects.vercel.app",
   ]);
   expect(authTrustedOrigins({ VERCEL_ENV: "production", BETTER_AUTH_URL: "https://drip.example", VERCEL_URL: "drip-git-main.vercel.app" })).toEqual(["https://drip.example"]);
-  expect(authTrustedOrigins({ VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "drip-preview.vercel.app", VERCEL_URL: "https://evil.example/path" })).toEqual(["https://drip-preview.vercel.app"]);\n  const preview = { VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "drip-preview.vercel.app", VERCEL_URL: "drip-git-feature-123-devonte-amos-projects.vercel.app" };\n  expect(isTrustedAuthOrigin("https://drip-preview.vercel.app", preview)).toBe(true);\n  expect(isTrustedAuthOrigin("https://drip-git-feature-123-devonte-amos-projects.vercel.app", preview)).toBe(true);\n  expect(isTrustedAuthOrigin("https://drip-git-other-devonte-amos-projects.vercel.app", preview)).toBe(false);\n  expect(isTrustedAuthOrigin("https://drip-git-feature-123-devonte-amos-projects.vercel.app/path", preview)).toBe(false);\n  expect(isTrustedAuthOrigin(null, preview)).toBe(false);
+  expect(authTrustedOrigins({ VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "drip-preview.vercel.app", VERCEL_URL: "https://evil.example/path" })).toEqual(["https://drip-preview.vercel.app"]);
+  const preview = { VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "drip-preview.vercel.app", VERCEL_URL: "drip-git-feature-123-devonte-amos-projects.vercel.app" };
+  expect(isTrustedAuthOrigin("https://drip-preview.vercel.app", preview)).toBe(true);
+  expect(isTrustedAuthOrigin("https://drip-git-feature-123-devonte-amos-projects.vercel.app", preview)).toBe(true);
+  expect(isTrustedAuthOrigin("https://drip-git-other-devonte-amos-projects.vercel.app", preview)).toBe(false);
+  expect(isTrustedAuthOrigin("https://drip-git-feature-123-devonte-amos-projects.vercel.app/path", preview)).toBe(false);
+  expect(isTrustedAuthOrigin(null, preview)).toBe(false);
   expect(authBaseURL({ ...configured, VERCEL_ENV: "production", BETTER_AUTH_URL: " https://drip.invalid " })).toBe("https://drip.invalid");
   // A project-wide Preview value set for another branch never overrides this branch's origin.
   expect(authBaseURL({ ...configured, BETTER_AUTH_URL: "https://drip-git-other-devonte-amos-projects.vercel.app" })).toBe(configured.BETTER_AUTH_URL);
