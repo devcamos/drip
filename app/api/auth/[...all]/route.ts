@@ -1,10 +1,10 @@
 import { getAuth, cloudConfigured } from "@/server/auth";
 import { guardDeviceAuthResponse } from "@/server/device-sessions";
-import { authBaseURL } from "@/scripts/deployment-config.mjs";
+import { isTrustedAuthOrigin } from "@/scripts/deployment-config.mjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function boundedPasswordRequest(request: Request): Promise<Request | Response> {
-  if (request.headers.get("origin") !== new URL(authBaseURL(process.env) ?? request.url).origin) return Response.json({ error: "Invalid origin." }, { status: 403 });
+  if (!isTrustedAuthOrigin(request.headers.get("origin"), process.env)) return Response.json({ error: "Invalid origin." }, { status: 403 });
   const reader = request.body?.getReader(); if (!reader) return Response.json({ error: "Missing body." }, { status: 400 });
   let length = 0; const chunks: Uint8Array[] = [];
   while (true) {
