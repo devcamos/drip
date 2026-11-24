@@ -7,7 +7,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { passwordLogin } from "./password-login";
 import { databaseTypes } from "./database-types";
 import { deviceSessionHooks } from "./device-sessions";
-import { authBaseURL } from "../scripts/deployment-config.mjs";
+import { authBaseURL, authTrustedOrigins } from "../scripts/deployment-config.mjs";
 import { localTestDatabase } from "./local-test-database";
 
 neonConfig.webSocketConstructor = process.env.HTTPS_PROXY
@@ -34,7 +34,7 @@ export function authOptions() {
   const origin = new URL(baseURL).origin;
   return {
     database: database(), baseURL, secret: process.env.BETTER_AUTH_SECRET,
-    appName: "Drip", trustedOrigins: [origin],
+    appName: "Drip", trustedOrigins: authTrustedOrigins(process.env),
     emailAndPassword: { enabled: true, minPasswordLength: 32, requireEmailVerification: false },
     // Identifiers are generated from high-entropy recovery codes, not real email addresses.
     user: { changeEmail: { enabled: false } },

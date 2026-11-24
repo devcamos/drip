@@ -1,0 +1,169 @@
+name: Checkly Preview authentication
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Deploy the hourly Preview monitor or run one Preview verification.
+        type: choice
+        required: true
+        default: deploy-monitor
+        options:
+          - deploy-monitor
+          - verify-preview
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  preview-auth:
+    if: >-
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment.environment == 'Preview' &&
+       github.event.deployment_status.state == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.operation == 'verify-preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: checkly-preview
+    concurrency:
+      group: checkly-preview-${{ github.event.deployment.sha || github.sha }}
+      cancel-in-progress: false
+    env:
+      DRIP_PREVIEW_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url || vars.DRIP_CHECKLY_MONITOR_URL }}
+      CHECKLY_REPO_SHA: ${{ github.event.deployment.sha || github.sha }}
+      CHECKLY_REPO_BRANCH: ${{ github.event.deployment.ref || github.ref_name }}
+      CHECKLY_REPO_URL: https://github.com/devcamos/drip
+      CHECKLY_TEST_ENVIRONMENT: preview
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify Checkly Preview setup
+        env:
+          CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+          CHECKLY_ACCOUNT_ID: ${{ vars.CHECKLY_ACCOUNT_ID }}
+          DRIP_CHECKLY_GAMERTAG: ${{ secrets.DRIP_CHECKLY_GAMERTAG }}
+          DRIP_CHECKLY_PASSWORD: ${{ secrets.DRIP_CHECKLY_PASSWORD }}
+          DRIP_CHECKLY_ACCOUNT_LABEL: ${{ vars.DRIP_CHECKLY_ACCOUNT_LABEL }}
+          DRIP_CHECKLY_EXPECTED_BALANCE: ${{ vars.DRIP_CHECKLY_EXPECTED_BALANCE }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          node <<'NODE'
+          const required = [
+            "CHECKLY_API_KEY",
+            "CHECKLY_ACCOUNT_ID",
+            "DRIP_PREVIEW_URL",
+            "DRIP_CHECKLY_GAMERTAG",
+            "DRIP_CHECKLY_PASSWORD",
+            "DRIP_CHECKLY_ACCOUNT_LABEL",
+            "DRIP_CHECKLY_EXPECTED_BALANCE",
+            "VERCEL_AUTOMATION_BYPASS_SECRET",
+          ];
+          const missing = required.filter(name => !process.env[name]?.trim());
+          if (missing.length) {
+            console.error(`Missing Checkly Preview configuration: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+          const url = new URL(process.env.DRIP_PREVIEW_URL);
+          if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app")) {
+            console.error("DRIP_PREVIEW_URL must be an HTTPS Vercel Preview URL.");
+            process.exit(1);
+          }
+          NODE
+      - uses: checkly/checkly-action@v1
+        with:
+          command: test
+          cli-version: 10.2.0
+          install-command: npm ci
+          reporting: github-check
+          github-check-name: Checkly Preview authentication
+          github-sha: ${{ github.event.deployment.sha || github.sha }}
+          files: checks/preview-auth.spec.ts
+        env:
+          CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+          CHECKLY_ACCOUNT_ID: ${{ vars.CHECKLY_ACCOUNT_ID }}
+          DRIP_PREVIEW_URL: ${{ env.DRIP_PREVIEW_URL }}
+          DRIP_CHECKLY_GAMERTAG: ${{ secrets.DRIP_CHECKLY_GAMERTAG }}
+          DRIP_CHECKLY_PASSWORD: ${{ secrets.DRIP_CHECKLY_PASSWORD }}
+          DRIP_CHECKLY_ACCOUNT_LABEL: ${{ vars.DRIP_CHECKLY_ACCOUNT_LABEL }}
+          DRIP_CHECKLY_EXPECTED_BALANCE: ${{ vars.DRIP_CHECKLY_EXPECTED_BALANCE }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          CHECKLY_REPO_SHA: ${{ github.event.deployment.sha || github.sha }}
+          CHECKLY_REPO_BRANCH: ${{ github.event.deployment.ref || github.ref_name }}
+          CHECKLY_REPO_URL: https://github.com/devcamos/drip
+          CHECKLY_TEST_ENVIRONMENT: preview
+
+  deploy-preview-monitor:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: checkly-preview
+    env:
+      DRIP_PREVIEW_URL: ${{ vars.DRIP_CHECKLY_MONITOR_URL }}
+      CHECKLY_REPO_SHA: ${{ github.sha }}
+      CHECKLY_REPO_BRANCH: ${{ github.ref_name }}
+      CHECKLY_REPO_URL: https://github.com/devcamos/drip
+      CHECKLY_TEST_ENVIRONMENT: preview
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify Checkly Preview setup
+        env:
+          CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+          CHECKLY_ACCOUNT_ID: ${{ vars.CHECKLY_ACCOUNT_ID }}
+          DRIP_CHECKLY_GAMERTAG: ${{ secrets.DRIP_CHECKLY_GAMERTAG }}
+          DRIP_CHECKLY_PASSWORD: ${{ secrets.DRIP_CHECKLY_PASSWORD }}
+          DRIP_CHECKLY_ACCOUNT_LABEL: ${{ vars.DRIP_CHECKLY_ACCOUNT_LABEL }}
+          DRIP_CHECKLY_EXPECTED_BALANCE: ${{ vars.DRIP_CHECKLY_EXPECTED_BALANCE }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          node <<'NODE'
+          const required = [
+            "CHECKLY_API_KEY",
+            "CHECKLY_ACCOUNT_ID",
+            "DRIP_PREVIEW_URL",
+            "DRIP_CHECKLY_GAMERTAG",
+            "DRIP_CHECKLY_PASSWORD",
+            "DRIP_CHECKLY_ACCOUNT_LABEL",
+            "DRIP_CHECKLY_EXPECTED_BALANCE",
+            "VERCEL_AUTOMATION_BYPASS_SECRET",
+          ];
+          const missing = required.filter(name => !process.env[name]?.trim());
+          if (missing.length) {
+            console.error(`Missing Checkly Preview configuration: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+          const url = new URL(process.env.DRIP_PREVIEW_URL);
+          if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app")) {
+            console.error("DRIP_CHECKLY_MONITOR_URL must be an HTTPS Vercel Preview URL.");
+            process.exit(1);
+          }
+          NODE
+      - name: Deploy hourly Preview monitor
+        run: npm exec --yes --package=checkly@10.2.0 -- checkly deploy --force --schedule-on-deploy
+        env:
+          CHECKLY_API_KEY: ${{ secrets.CHECKLY_API_KEY }}
+          CHECKLY_ACCOUNT_ID: ${{ vars.CHECKLY_ACCOUNT_ID }}
+          DRIP_PREVIEW_URL: ${{ vars.DRIP_CHECKLY_MONITOR_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DRIP_CHECKLY_GAMERTAG: ${{ secrets.DRIP_CHECKLY_GAMERTAG }}
+          DRIP_CHECKLY_PASSWORD: ${{ secrets.DRIP_CHECKLY_PASSWORD }}
+          DRIP_CHECKLY_ACCOUNT_LABEL: ${{ vars.DRIP_CHECKLY_ACCOUNT_LABEL }}
+          DRIP_CHECKLY_EXPECTED_BALANCE: ${{ vars.DRIP_CHECKLY_EXPECTED_BALANCE }}
+          CHECKLY_REPO_SHA: ${{ github.sha }}
+          CHECKLY_REPO_BRANCH: ${{ github.ref_name }}
+          CHECKLY_REPO_URL: https://github.com/devcamos/drip
+          CHECKLY_TEST_ENVIRONMENT: preview

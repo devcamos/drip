@@ -176,6 +176,7 @@
       "tests": [
         "tests/password-server.test.ts",
         "tests/password-login.test.ts",
+        "tests/deployment-preflight.test.ts",
         "tests/password-ui.test.tsx",
         "tests/signup-form.test.tsx",
         "tests/signup-recovery-ui.test.tsx",
@@ -653,6 +654,7 @@
       "sources": [
         ".github/workflows/ci.yml",
         ".github/workflows/pr-architecture-intelligence.yml",
+        ".github/workflows/checkly-preview.yml",
         "package-lock.json",
         "package.json",
         "playwright.config.ts",
