@@ -19,6 +19,10 @@ export function authTrustedOrigins(env) {
   }
   return [...origins];
 }
+/** Match the exact serialized Origin header against this deployment's allowlist. */
+export function isTrustedAuthOrigin(origin, env) {
+  return typeof origin === "string" && authTrustedOrigins(env).includes(origin);
+}
 const local = host => ["localhost", "127.0.0.1", "[::1]"].includes(host);
 function validDatabase(value) {
   try {
