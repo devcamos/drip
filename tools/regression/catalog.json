@@ -151,6 +151,18 @@
       "browser": [
         "e2e/account-review.e2e.spec.ts"
       ]
+    },
+    {
+      "featureId": "incident-reporting",
+      "unit": [
+        "tests/incidents.test.ts"
+      ],
+      "integration": [
+        "tests/incident-api.integration.test.ts"
+      ],
+      "browser": [
+        "e2e/incident-boundary.spec.ts"
+      ]
     }
   ],
   "features": [
@@ -191,7 +203,9 @@
         "tests/local-test-database.test.ts",
         "tests/saved-experience.integration.test.tsx",
         "e2e/saved-experience.e2e.spec.ts",
-        "tests/credential-validation.unit.test.ts"
+        "tests/credential-validation.unit.test.ts",
+        "tests/incidents.test.ts",
+        "e2e/incident-boundary.spec.ts"
       ]
     },
     {
@@ -229,7 +243,8 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
         "tests/recovery-boundaries.unit.test.ts",
-        "tests/account-review.integration.test.tsx"
+        "tests/account-review.integration.test.tsx",
+        "tests/incidents.test.ts"
       ]
     },
     {
@@ -290,7 +305,8 @@
         "e2e/account-workflows.e2e.spec.ts",
         "tests/domain-boundaries.unit.test.ts",
         "tests/cloud-sync.unit.test.ts",
-        "tests/account-review.integration.test.tsx"
+        "tests/account-review.integration.test.tsx",
+        "tests/incidents.test.ts"
       ]
     },
     {
@@ -455,7 +471,9 @@
         "tests/saved-experience.test.ts",
         "tests/saved-experience.integration.test.tsx",
         "e2e/saved-experience.e2e.spec.ts",
-        "tests/domain-boundaries.unit.test.ts"
+        "tests/domain-boundaries.unit.test.ts",
+        "tests/incidents.test.ts",
+        "tests/incident-api.integration.test.ts"
       ]
     },
     {
@@ -532,7 +550,8 @@
         "tests/account-workflows.integration.test.tsx",
         "e2e/account-workflows.e2e.spec.ts",
         "tests/domain-boundaries.unit.test.ts",
-        "tests/notification-boundaries.unit.test.ts"
+        "tests/notification-boundaries.unit.test.ts",
+        "tests/incidents.test.ts"
       ]
     },
     {
@@ -826,7 +845,8 @@
         "tests/feedback.test.ts",
         "tests/feedback.integration.test.tsx",
         "integration/feedback-postgres.test.ts",
-        "e2e/feedback.e2e.spec.ts"
+        "e2e/feedback.e2e.spec.ts",
+        "tests/incidents.test.ts"
       ]
     },
     {
@@ -873,11 +893,24 @@
         "tests/domain-boundaries.unit.test.ts",
         "e2e/account-review.e2e.spec.ts"
       ]
+    },
+    {
+      "id": "incident-reporting",
+      "name": "Privacy-safe API 5xx reporting and Slack alert delivery",
+      "sources": [
+        "server/incidents.ts"
+      ],
+      "tests": [
+        "tests/incidents.test.ts",
+        "tests/incident-api.integration.test.ts",
+        "e2e/incident-boundary.spec.ts"
+      ]
     }
   ],
   "layers": {
     "unit": [
       "tests/cloud-api.test.ts",
+      "tests/incidents.test.ts",
       "tests/database-types.test.ts",
       "tests/device-sessions.test.ts",
       "tests/exchange-rates.test.ts",
@@ -926,6 +959,7 @@
       "tests/device-management-client.test.ts",
       "tests/device-management-race.test.tsx",
       "tests/device-management-ui.test.tsx",
+      "tests/incident-api.integration.test.ts",
       "tests/device-session-ui.test.tsx",
       "tests/device-session.test.ts",
       "tests/device-sessions-http.test.ts",
@@ -1037,7 +1071,8 @@
       "e2e/stock-valuation.e2e.spec.ts",
       "e2e/welcome-prototype.e2e.spec.ts",
       "e2e/analytics-dashboard.e2e.spec.ts",
-      "e2e/account-review.e2e.spec.ts"
+      "e2e/account-review.e2e.spec.ts",
+      "e2e/incident-boundary.spec.ts"
     ]
   },
   "conditional": [

@@ -1,6 +1,7 @@
 import { getAuth, cloudConfigured } from "@/server/auth";
 import { guardDeviceAuthResponse } from "@/server/device-sessions";
 import { authBaseURL } from "@/scripts/deployment-config.mjs";
+import { withApiIncidents } from "@/server/incidents";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function boundedPasswordRequest(request: Request): Promise<Request | Response> {
@@ -41,4 +42,5 @@ async function handler(request: Request) {
   headers.set("Vercel-CDN-Cache-Control", "no-store");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
-export { handler as GET, handler as POST };
+export const GET = withApiIncidents(handler);
+export const POST = withApiIncidents(handler);
