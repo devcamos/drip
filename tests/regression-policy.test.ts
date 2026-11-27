@@ -257,4 +257,19 @@ describe("regression evidence guard", () => {
     expect(readFileSync("vitest.calendar.config.mts", "utf8")).toContain('environment: "jsdom"');
 
   });
+  it("keeps quick tests separate from the coverage gates", () => {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    expect(pkg.scripts.test).toBe("vitest run --project unit --project integration");
+    expect(pkg.scripts["test:unit:coverage"]).toContain("--coverage");
+    expect(pkg.scripts["test:unit:coverage"]).toContain("vitest.unit-coverage.config.mts");
+    expect(pkg.scripts["test:regression"]).toBe("node tools/regression/run.mjs");
+
+    const fullRegression = readFileSync(new URL("../tools/regression/run.mjs", import.meta.url), "utf8");
+    expect(fullRegression).toContain('"run", "--coverage"');
+    const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+    const policy = readFileSync(new URL("../docs/testing/regression-policy.md", import.meta.url), "utf8");
+    expect(readme).toContain("npm run test:unit:coverage");
+    expect(readme).toContain("npm run test:regression");
+    expect(policy).toContain("authoritative all-layer command");
+  });
 });

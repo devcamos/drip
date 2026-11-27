@@ -33,7 +33,7 @@ npm run build
 npm run start
 ```
 
-For the full regression gate, including browser journeys and a disposable local Postgres database, see the [regression standard](docs/testing/regression-policy.md). Never point test databases at Production. CI also runs a dependency audit.
+`npm test` is the quick unit and component suite. Use `npm run test:unit:coverage` for the 90% pure business-logic coverage gate. The full app-wide 90% coverage gate, real Postgres checks and browser journeys run with `npm run test:regression`; see the [regression standard](docs/testing/regression-policy.md) for setup. Never point test databases at Production. CI also runs a dependency audit.
 
 ## Security and recovery
 
