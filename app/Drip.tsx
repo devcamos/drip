@@ -20,6 +20,8 @@ import { PasswordSetup } from "./PasswordSetup";
 import { PasswordSignIn } from "./PasswordSignIn";
 import { AuthLayout, useAuthScreen } from "./AuthScreen";
 import { signUpPassword } from "@/lib/password-login";
+import { reserveIdentity } from "@/lib/identity-reservation";
+import { authClient, readCloudState } from "@/lib/cloud";
 import { SignupForm } from "./SignupForm";
 import { RecoveryTask } from "./RecoveryTask";
 import { Trends } from "./Trends";
@@ -111,6 +113,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   const profileButton = useRef<HTMLButtonElement>(null);
   const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>("month");
   const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [profileRenameBusy, setProfileRenameBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState("");
   const preferenceSequence = useRef(0);
@@ -184,6 +187,27 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
     return () => { loadSequence.current++; };
   }, []);
 
+  // Cloud sync can learn a server-assigned collision suffix in another task.
+  // Refresh only this profile identity so the header/settings reflect it without
+  // replacing unsaved React state or switching to a different local account.
+  useEffect(() => {
+    let active = true;
+    const refreshProfile = async () => {
+      const before = latestData.current?.identity;
+      if (!before) return;
+      try {
+        const saved = await loadData();
+        const current = latestData.current;
+        if (!active || !current?.identity || current.identity.id !== before.id || saved.identity?.id !== before.id) return;
+        if (current.identity.handle === saved.identity.handle && current.identity.suffix === saved.identity.suffix) return;
+        const next = { ...current, identity: saved.identity };
+        latestData.current = next; setData(next);
+      } catch { /* Locking or storage failures are handled by the active vault flow. */ }
+    };
+    window.addEventListener("drip-data-saved", refreshProfile);
+    return () => { active = false; window.removeEventListener("drip-data-saved", refreshProfile); };
+  }, []);
+
   const update = useCallback((fn: (d: AppData) => AppData) => {
     const generation = dataGeneration.current;
     setPendingSaves(n => n + 1);
@@ -216,7 +240,7 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
   if (verifier === null) return <Onboarding onDone={async (v, restored, identity, fromCloud, expectedGeneration, root, password) => {
     let d = restored ?? { ...data, identity };
     if (restored && !fromCloud) d = { ...restored, lastBackupAt: new Date().toISOString() };
-    if (password && identity) await signUpPassword(identity.handle, password, d);
+    if (password && identity) d = { ...d, identity: await signUpPassword(identity.handle, password, d) };
     else if (!fromCloud) {
       if (!v) throw new Error("Could not verify the restored account.");
       await commitCloudRestore(d, undefined, v, expectedGeneration, undefined, root);
@@ -348,7 +372,20 @@ function UnlockedDrip({ installTask }: Readonly<{ installTask: ReturnType<typeof
         <InstallTask state={installTask} />{view.name === "home" ? <RecoveryTask onSetup={() => navigate({ name: "settings" })} /> : null}
         {body}<p className="disclaimer">Drip is for your own tracking. Not financial advice. Figures are estimates before tax.</p>
       </main>
-      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || draftGuard.dirty} />} />
+      <ProfileSettings key={data.identity.id} open={profileOpen} identity={data.identity} confirmRename={async () => {
+        const result = await authClient.signIn.passkey();
+        if (result.error) throw new Error("A cloud sign-in passkey is required. Add one in Security & devices, then try again.");
+      }} onRenameIdentity={async handle => {
+        const cloudState = await readCloudState();
+        if (!cloudState) throw new Error("Connect your account before changing your profile gamertag.");
+        const identity = await reserveIdentity({ ...data.identity!, handle }, { userId: cloudState.userId }, "rename");
+        const saved = await update(current => {
+          if (current.identity?.id !== identity.id) throw Object.assign(new Error("Profile changed"), { name: "StaleAccountEdit" });
+          return { ...current, identity };
+        });
+        if (!saved) throw new Error("Gamertag reserved, but Drip could not save it on this device. Reload and sync to finish.");
+        return identity;
+      }} onRenameBusyChange={setProfileRenameBusy} counts={counts} incomePeriod={incomePeriod} onIncomePeriod={changePeriod} preferenceBusy={preferenceBusy} preferenceStatus={preferenceStatus} preferenceError={preferenceError} onClose={closeProfile} onAccounts={() => profileNavigate({ name: "home" })} onSettings={() => profileNavigate({ name: "settings" })} onPayments={() => profileNavigate({ name: "payments" })} onFeedback={() => profileNavigate({ name: "feedback" })} signOut={<SignOutButton disabled={!!pendingSaves || preferenceBusy || profileRenameBusy || draftGuard.dirty} />} />
       <nav className="tabs" aria-label="Main">
         {(["home", "portfolio", "analytics", "trends", "add", "settings"] as const).map((n) => (
           <button key={n} className={view.name === n || (n === "home" && view.name === "detail") || (n === "add" && view.name === "choose") ? "on" : ""} onClick={() => navigate({ name: n === "add" ? "choose" : n } as View)}>

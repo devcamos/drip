@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { releaseData, releaseSaver } from "./saved-experience-fixtures";
-const dep = vi.hoisted(() => ({ snapshot: vi.fn(), acknowledge: vi.fn(), getItem: vi.fn(), store: vi.fn(), restore: vi.fn(), isAppData: vi.fn(), fetch: vi.fn(), session: vi.fn() }));
-vi.mock("../lib/db", () => ({ cloudSnapshot: dep.snapshot, acknowledgeCloudUpload: dep.acknowledge, getItem: dep.getItem, storeCloudConnection: dep.store, commitCloudRestore: dep.restore, isAppData: dep.isAppData }));
+const dep = vi.hoisted(() => ({ snapshot: vi.fn(), acknowledge: vi.fn(), getItem: vi.fn(), store: vi.fn(), restore: vi.fn(), isAppData: vi.fn(), fetch: vi.fn(), session: vi.fn(), reserve: vi.fn(), mutate: vi.fn() }));
+vi.mock("../lib/db", () => ({ cloudSnapshot: dep.snapshot, acknowledgeCloudUpload: dep.acknowledge, getItem: dep.getItem, storeCloudConnection: dep.store, commitCloudRestore: dep.restore, isAppData: dep.isAppData, mutateData: dep.mutate }));
+vi.mock("../lib/identity-reservation", () => ({ reserveIdentity: dep.reserve }));
 vi.mock("../lib/worker-safety", () => ({ safeFetch: dep.fetch }));
 vi.mock("better-auth/client", () => ({ createAuthClient: () => ({ getSession: dep.session }) }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
@@ -12,6 +13,8 @@ const state = { userId: "owner", identityId: data.identity!.id, key: {} as Crypt
 const snapshot = (changes = {}) => ({ data, state: { ...state, ...changes }, signedOut: false });
 beforeEach(() => {
   vi.resetAllMocks(); dep.snapshot.mockResolvedValue(snapshot()); dep.session.mockResolvedValue({ data: { user: { id: "owner" } } });
+  dep.reserve.mockImplementation(async (identity: typeof data.identity) => identity);
+  dep.mutate.mockImplementation(async (edit: (value: typeof data) => typeof data) => edit(data));
   dep.fetch.mockImplementation(async () => Response.json({ version: 2, envelope: null })); dep.acknowledge.mockResolvedValue("saved");
   vi.stubGlobal("crypto", { getRandomValues: (bytes: Uint8Array) => bytes, subtle: { encrypt: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]).buffer) } });
 });
@@ -31,6 +34,21 @@ it("rejects another authenticated owner or a mismatched local identity before up
 it("does not upload over a newer cloud version", async () => {
   dep.fetch.mockResolvedValueOnce(Response.json({ version: 3, envelope: null })); await expect(syncNow()).rejects.toThrow(/Cloud changed/);
   expect(dep.fetch).toHaveBeenCalledTimes(1); expect(dep.fetch.mock.calls[0][1].method).toBe("GET"); expect(dep.acknowledge).not.toHaveBeenCalled();
+});
+it("binds each profile reservation to the cloud owner and requires it before syncing account data", async () => {
+  dep.reserve.mockRejectedValueOnce(new Error("Gamertag service is unavailable."));
+  await expect(syncNow()).rejects.toThrow(/Gamertag service is unavailable/);
+  expect(dep.reserve).toHaveBeenCalledWith(data.identity, { userId: state.userId }, "ensure");
+  expect(dep.fetch).not.toHaveBeenCalled();
+});
+it("stores a collision suffix in the encrypted local identity before syncing", async () => {
+  const assigned = { ...data.identity!, suffix: "4821" };
+  const saved = { ...data, identity: assigned };
+  dep.reserve.mockResolvedValueOnce(assigned);
+  dep.snapshot.mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot({ dirty: true, revision: 5 })).mockResolvedValueOnce({ data: saved, state: { ...state, dirty: true, revision: 5 }, signedOut: false });
+  expect(await syncNow()).toMatch(/assigned release_test#4821/);
+  expect(dep.mutate).toHaveBeenCalledOnce();
+  expect(await dep.mutate.mock.calls[0][0](data).identity).toMatchObject(assigned);
 });
 it("distinguishes a clean copy from a newer unsynced local revision", async () => {
   dep.snapshot.mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot()); expect(await syncNow()).toBe("Cloud copy is up to date.");

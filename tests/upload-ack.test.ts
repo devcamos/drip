@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({ getSession: vi.fn() }));
+const identityReservation = vi.hoisted(() => ({ reserve: vi.fn() }));
 vi.mock("better-auth/client", () => ({ createAuthClient: () => auth }));
 vi.mock("@better-auth/passkey/client", () => ({ passkeyClient: () => ({}) }));
+vi.mock("../lib/identity-reservation", () => ({ reserveIdentity: identityReservation.reserve }));
 import { cloudKey, readCloudState, syncNow } from "../lib/cloud";
 import { acknowledgeCloudUpload, cloudSnapshot, commitCloudRestore, completeDeviceSession, emptyData, loadData, localVaultStatus, saveData, setItem, unlockLocalVault } from "../lib/db";
 import { codeVerifier } from "../lib/crypto";
@@ -9,6 +11,7 @@ import { fixtureCode, rawStore, seedVault } from "./storage-fixtures";
 import type { AppData } from "../lib/types";
 const data: AppData = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c9a10", handle: "demo", createdAt: "2026-10-20" } };
 beforeEach(async () => {
+  identityReservation.reserve.mockImplementation(async (identity: typeof data.identity) => identity);
   auth.getSession.mockResolvedValue({ data: { user: { id: "owner" } } });
   await seedVault(data, fixtureCode, { userId: "owner", identityId: data.identity!.id, key: await cloudKey(fixtureCode), version: 1, dirty: true, lastSyncAt: null, generation: "connection", revision: 0 });
 });

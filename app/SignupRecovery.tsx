@@ -5,10 +5,11 @@ import { originalRecoveryCodes } from "@/lib/original-recovery-codes";
 import { downloadRecoveryCodes } from "@/lib/recovery-codes";
 import { confirmRecoveryCodesSaved } from "@/lib/recovery-readiness";
 import { authClient, connect } from "@/lib/cloud";
+import { formatTag, type Identity } from "@/lib/identity";
 import { AuthLayout } from "./AuthScreen";
 import { SignOutButton } from "./DeviceSession";
 
-type Original = { codes: string[]; vaultId: string; handle?: string };
+type Original = { codes: string[]; vaultId: string; identity?: Identity };
 
 export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<void> }>) {
   const [original, setOriginal] = useState<Original>();
@@ -38,7 +39,7 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
       const file = await originalRecoveryCodes(context.root, context.ownerId, controller.signal);
       if (file.vaultId !== context.vaultId) throw new Error("Account changed.");
       if (active) {
-        setOriginal({ codes: file.codes, vaultId: file.vaultId, handle: data.identity?.handle });
+        setOriginal({ codes: file.codes, vaultId: file.vaultId, identity: data.identity });
         setShowCodes(autoReveal.current && document.visibilityState !== "hidden" && document.hasFocus());
       }
     })().catch(() => {
@@ -69,13 +70,14 @@ export function SignupRecovery({ onSaved }: Readonly<{ onSaved: () => Promise<vo
     {opening && <output>Opening your recovery codes…</output>}
     {!opening && error && <section className="panel"><p role="alert" className="err">{error}</p><button className="btn" onClick={() => setAttempt(value => value + 1)}>Try again</button></section>}
     {!opening && !error && original && <section className="panel signup-recovery" aria-label="Recovery codes">
+      {original.identity?.suffix && <p role="status" className="muted">That profile name was already in use, so your display gamertag is {formatTag(original.identity)}. Your sign-in gamertag and password are unchanged. You can edit the profile name in Profile &amp; settings.</p>}
       <h2>Your six recovery codes</h2>
       <p className="muted">Keep a copy somewhere safe. Any one of these codes can recover your account if you forget your password.</p>
       <ol id="signup-recovery-codes" className="recovery-list" data-revealed={showCodes}>{original.codes.map(code => <li key={code}><code>{showCodes ? code : "••••-••••-••••-••••-••••-••••"}</code></li>)}</ol>
       <button className="text-link" aria-expanded={showCodes} aria-controls="signup-recovery-codes" onClick={() => setShowCodes(value => !value)}>{showCodes ? "Hide recovery codes" : "Show recovery codes"}</button>
       <div className="row-gap"><button className="btn ghost" disabled={busy} onClick={() => {
         setMessage("");
-        try { downloadRecoveryCodes(original.codes, original.handle); }
+        try { downloadRecoveryCodes(original.codes, original.identity?.handle); }
         catch { setMessage("Could not download the file. Take a screenshot or try again."); }
       }}>Download recovery codes</button></div>
       <label className="check-label"><input type="checkbox" checked={acknowledged} disabled={busy} onChange={event => setAcknowledged(event.target.checked)} />I’ve saved a screenshot or a copy of these codes</label>

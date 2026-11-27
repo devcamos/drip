@@ -47,7 +47,12 @@ export function authOptions() {
       // Revoking a device must affect its next authenticated request, rather
       // than continuing to accept a cached session until a cookie TTL elapses.
       cookieCache: { enabled: false },
-      additionalFields: { dripDeviceId: { type: "string" as const, required: false, input: false, returned: false } },
+      additionalFields: {
+        dripDeviceId: { type: "string" as const, required: false, input: false, returned: false },
+        // Set only by the trusted passkey verification session hook. Kept out
+        // of client input/output; rename code consumes it once in Postgres.
+        dripPasskeyVerifiedAt: { type: "date" as const, required: false, input: false, returned: false },
+      },
     },
     advanced: {
       useSecureCookies: new URL(baseURL).protocol === "https:",

@@ -35,6 +35,7 @@ test(`signup saves original codes by ${method} without another password and resu
     if (path === "/api/cloud/status") value = { available: true };
     else if (path === "/api/auth/sign-in/email" && !user) return route.fulfill({ status: 401, json: { code: "INVALID_EMAIL_OR_PASSWORD" } });
     else if (path === "/api/auth/sign-up/email") { user = { id: owner, email: body.email, name: "original_demo" }; cloudSignedIn = true; value = { user, token: "synthetic" }; }
+    else if (path === "/api/identity/handle") value = { identityId: body.identityId, handle: body.handle, changed: false };
     else if (path === "/api/auth/get-session") value = cloudSignedIn ? { user, session: { id: "synthetic", userId: owner, expiresAt: "2099-01-01T00:00:00Z" } } : null;
     else if (path === "/api/auth/sign-in/email") { cloudSignedIn = true; value = { user, token: "synthetic" }; }
     else if (path === "/api/auth/sign-out") cloudSignedIn = false;

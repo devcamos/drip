@@ -48,7 +48,10 @@ export function deviceSessionHooks(db: Pool) {
     before: async (_session: Record<string, unknown>, context: HookContext) => {
       const value = (context?.headers ?? context?.request?.headers)?.get("X-Drip-Device");
       if (value !== null && value !== undefined && !devicePattern.test(value)) fail(new APIError("BAD_REQUEST", { code: "INVALID_DEVICE_ID", message: "Invalid browser identifier. Reload Drip and try again." }));
-      return { data: { dripDeviceId: value?.toLowerCase() ?? null } };
+      return { data: {
+        dripDeviceId: value?.toLowerCase() ?? null,
+        ...(context?.path === "/passkey/verify-authentication" ? { dripPasskeyVerifiedAt: new Date() } : {}),
+      } };
     },
     after: async (session: Candidate, context: HookContext) => {
       // The password endpoint rechecks its credential under this same owner lock

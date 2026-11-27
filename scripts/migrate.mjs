@@ -12,11 +12,15 @@ const db = new Pool({ connectionString: process.env.DATABASE_URL });
 const options = {
   database: db, secret: process.env.BETTER_AUTH_SECRET, baseURL: process.env.BETTER_AUTH_URL,
   emailAndPassword: { enabled: true }, rateLimit: { enabled: true, storage: "database" }, plugins: [passkey()],
-  session: { additionalFields: { dripDeviceId: { type: "string", required: false, input: false, returned: false } } },
+  session: { additionalFields: {
+    dripDeviceId: { type: "string", required: false, input: false, returned: false },
+    dripPasskeyVerifiedAt: { type: "date", required: false, input: false, returned: false },
+  } },
 };
 const migration = await getMigrations(options);
 await migration.runMigrations();
 await db.query('ALTER TABLE "session" ADD COLUMN IF NOT EXISTS "dripDeviceId" text');
+await db.query('ALTER TABLE "session" ADD COLUMN IF NOT EXISTS "dripPasskeyVerifiedAt" timestamptz');
 await db.query(`CREATE TABLE IF NOT EXISTS drip_vault (
   user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
   version integer NOT NULL CHECK (version > 0), envelope jsonb NOT NULL,
@@ -32,5 +36,28 @@ await db.query(`CREATE TABLE IF NOT EXISTS drip_password_login (
   password_hash text NOT NULL, envelope jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now()
 )`);
+await db.query(`CREATE TABLE IF NOT EXISTS drip_handle_reservations (
+  reservation_id bigserial PRIMARY KEY,
+  identity_id uuid NOT NULL,
+  user_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  handle text NOT NULL CHECK (handle ~ '^[A-Za-z0-9_]{3,16}$'),
+  handle_key text GENERATED ALWAYS AS (lower(handle)) STORED,
+  suffix text CHECK (suffix IS NULL OR suffix ~ '^[0-9]{1,4}$'),
+  active boolean NOT NULL DEFAULT true,
+  cooling_until timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((active AND cooling_until IS NULL) OR (NOT active AND cooling_until IS NOT NULL))
+)`);
+await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS drip_handle_reservations_tag
+  ON drip_handle_reservations (handle_key, (coalesce(suffix, '')))`);
+await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS drip_handle_reservations_identity_active
+  ON drip_handle_reservations (identity_id) WHERE active`);
+await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS drip_handle_reservations_user_active
+  ON drip_handle_reservations (user_id) WHERE active`);
+await db.query(`CREATE INDEX IF NOT EXISTS drip_handle_reservations_identity_history
+  ON drip_handle_reservations (identity_id, created_at DESC)`);
+await db.query(`CREATE TABLE IF NOT EXISTS drip_handle_limits (
+  key text PRIMARY KEY, bucket timestamptz NOT NULL, hits integer NOT NULL
+)`);
 await db.end();
-console.log("Auth and encrypted vault schema ready.");
+console.log("Auth, encrypted vault and gamertag reservation schema ready.");

@@ -1,60 +1,40 @@
-# Design note: reserving gamertags on the server (#13)
+# Profile gamertag reservations (#13)
 
-Status: **proposal, waiting for Devonte's yes.** No code, schema or migration is in this PR.
+Status: implemented on `feature/13-gamertag-reservations`; Preview database first. Production migration is not part of this change.
 
-## Why this stops at a design note
+## Product boundary
 
-Every option that meets #13 needs a new server table, so it needs a database migration. The agent rules say migrations need the maintainer's explicit yes.
+Drip has two distinct names. The sign-in gamertag belongs to password authentication. The profile gamertag is a display label carried in the encrypted vault and used around the app. This feature makes the display label unique across synced accounts. Changing it does not change sign-in credentials.
 
-- `drip_password_login.username` is already unique and lower-case, but only for accounts that use password sign-in. It can't hold a suffix (`CHECK username ~ '^[a-z0-9_]{3,16}$'`) and has no row for passkey-only or local-only identities.
-- Nothing else on the server stores `identity.id`, a handle or a suffix. The local `Identity` record (`lib/identity.ts`) is device-only.
+## Data and ownership
 
-## Proposed schema (one additive migration)
+`scripts/migrate.mjs` adds `drip_handle_reservations` and `drip_handle_limits`. Each reservation associates a random local identity UUID with an authenticated Better Auth user. The active tag is unique case-insensitively; an optional four-digit suffix disambiguates collisions. The table contains profile labels and account IDs, not financial records. Financial account data remains in the encrypted vault.
 
-```sql
-CREATE TABLE IF NOT EXISTS drip_handle (
-  identity_id uuid PRIMARY KEY,
-  user_id     text NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
-  handle      text NOT NULL CHECK (handle ~ '^[A-Za-z0-9_]{3,16}$'),  -- as typed, for display
-  handle_key  text GENERATED ALWAYS AS (lower(handle)) STORED,       -- Devo = devo
-  suffix      text CHECK (suffix ~ '^[0-9]{1,4}$'),
-  released_at timestamptz,                                           -- set on rename; cooling-off
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
--- One live owner per handle+suffix, case-insensitive. Released rows keep the name until the cooling-off ends.
-CREATE UNIQUE INDEX IF NOT EXISTS drip_handle_live ON drip_handle (handle_key, coalesce(suffix, '')) WHERE released_at IS NULL;
-CREATE TABLE IF NOT EXISTS drip_handle_limits (key text PRIMARY KEY, bucket timestamptz NOT NULL, hits integer NOT NULL);
+Only the authenticated account can reserve or rename its active identity. Existing cloud accounts claim their current name on sync. Sync uses `ensure`: it creates a reservation if missing and returns the server's existing assignment, but it cannot rename a handle silently. The profile settings form uses `rename` explicitly and first asks Better Auth to verify the account's cloud sign-in passkey. A successful passkey verification stamps the new server session; Postgres accepts that proof for five minutes and consumes it atomically with the rename. It is hidden from session responses and cannot be supplied by the client. Accounts without a cloud sign-in passkey must add one under Security & devices before renaming. Other account/identity combinations receive a conflict response.
+
+On rename, the previous tag stays reserved for 30 days. The owner can reclaim it during that period. Expired history is removed lazily during the next reservation. Reserved names are `admin`, `drip` and `support`, compared without regard to case. Explicit renames are limited to 10 per account per hour. Background ensures use a separate counter with room for four active devices checking once a minute (600 per account per hour). Both request types share an IP-based hourly limit using keyed hashes rather than stored IP addresses.
+
+## Request flow
+
+```mermaid
+sequenceDiagram
+  participant App as Drip client
+  participant API as Same-origin API
+  participant Auth as Better Auth session
+  participant DB as Postgres
+  App->>API: POST /api/identity/handle (identity UUID, expected owner, handle, mode)
+  API->>Auth: Validate same-origin session and match expected owner + X-Drip-Owner
+  API->>DB: Rate limit, lock account, reserve unique handle
+  DB-->>API: Existing name or collision suffix
+  API-->>App: Assigned profile gamertag
+  App->>App: Save assignment in encrypted local vault
+  App->>DB: Normal encrypted cloud sync
 ```
 
-It's additive only, with no change to existing tables or rows, and it stores only the id, handle and suffix (no personal data), as #13 asks.
+The database unique indexes arbitrate concurrent claims. User-level transaction locks serialize changes for one account; another user cannot take over an identity UUID. On a collision, the server retries generated four-digit suffixes under the same transaction.
 
-## Endpoint
+## Deployment
 
-`POST /api/identity/handle` with `{ identityId, handle }`. Requires a signed-in Better Auth session, and same-origin checks as the existing `/api/cloud` routes.
+The migration is additive and idempotent. The regression suite extracts and runs the actual migration SQL against a disposable local Postgres schema. For deployment, apply it to Preview first, verify the Preview signup, collision, rename, restore and sync paths, then include it in the normal application release migration. Do not point local tests or the initial release step at Production.
 
-1. Validate with `handleError()` and the optional block list (reserved words such as `admin`, `drip` and `support`, plus an offensive-word list).
-2. Rate limit per user and IP, reusing the `drip_*_limits` bucket pattern (for example 10 attempts an hour).
-3. In one transaction, try `INSERT … ON CONFLICT DO NOTHING` with no suffix. If that row is taken, retry with `randomSuffix()` (1–4 digits) up to N times. The unique index makes this atomic under concurrent signups.
-4. Return `{ handle, suffix }`. The client stores it with `withSuffix()` and shows "devo was taken, so you're devo#4821", with a button to pick a different handle instead.
-
-## Ownership
-
-- **Recommended (v1.1):** bind `identity_id` to the signed-in Better Auth `user_id` (UNIQUE above). Only that session can change it. This reuses the existing passkey and password auth with no new crypto.
-- **Issue's stronger option:** require a WebAuthn assertion over `{identityId, newHandle, nonce}` for renames. This adds a challenge endpoint and more tests, so it should be a follow-up.
-
-## Renames and restore
-
-- Rename sets `released_at = now()` on the old row and inserts a new one. A nightly job (or a lazy check on insert) frees released names after 30 days.
-- Restoring a backup with the same `identity.id` on a new device signs in to the same account and gets the same row back. Restoring under a different signed-in user is refused, and the app asks the user to sign in to the original account.
-
-## Tests this would add
-
-- **Postgres:** a case-insensitive clash gives a suffix; 50 concurrent reservations of one handle get unique suffixes; a released handle is held until the cooling-off ends; rate limit; another user can't take over an `identity_id`.
-- **Unit:** block list, retry loop and response mapping.
-- **UI:** a "was taken, so you're …" message, and picking a different handle.
-
-## Decision needed from Devonte
-
-1. Approve the additive `drip_handle` and `drip_handle_limits` migration (preview database first, then production after merge).
-2. Choose session-bound ownership for now, or a passkey signature from day one.
-3. Confirm a 30-day rename cooling-off and whether to ship the block list in v1.1.
+New signup and explicit rename modes reject reserved names. The idempotent `ensure` mode can confirm legacy profiles whose gamertags are now reserved, so existing users continue to sync. Every request is owner-bound to the authenticated Better Auth user and passes through the device-session request gate; signed-out account replacement carries its existing signup nonce and resume generation.

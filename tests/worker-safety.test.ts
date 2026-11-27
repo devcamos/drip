@@ -36,14 +36,14 @@ it("permits only the reserved signup paths while retaining the signed-out gate",
   const fetcher = vi.fn(async () => Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);
   await setItem("deviceSession", { signedOut: true, generation: "signup-generation", signupNonce: "signup-nonce" });
   const headers = { "X-Drip-Resume": "signup-generation", "X-Drip-Signup": "signup-nonce" };
-  for (const path of ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password"]) await safeFetch(path, { method: "POST", headers });
+  for (const path of ["/api/auth/sign-in/email", "/api/auth/sign-up/email", "/api/auth/gamertag-password", "/api/identity/handle"]) await safeFetch(path, { method: "POST", headers });
   await safeFetch("/api/cloud", { method: "PUT", headers });
-  expect(fetcher).toHaveBeenCalledTimes(4);
+  expect(fetcher).toHaveBeenCalledTimes(5);
   for (const [path, method] of [["/api/auth/change-email", "POST"], ["/api/cloud", "DELETE"], ["/api/auth/get-session", "GET"]]) await expect(safeFetch(path, { method, headers })).rejects.toThrow(/Signup changed/);
   await expect(safeFetch("/api/auth/sign-up/email", { method: "POST", headers: { ...headers, "X-Drip-Signup": "stale" } })).rejects.toThrow(/Signup changed/);
   await setItem("deviceSession", { signedOut: true, generation: "another-tab", signupNonce: "signup-nonce" });
   await expect(safeFetch("/api/auth/sign-up/email", { method: "POST", headers })).rejects.toThrow();
-  expect(fetcher).toHaveBeenCalledTimes(4);
+  expect(fetcher).toHaveBeenCalledTimes(5);
 });
 
 it("does not require a worker in server or fresh browser contexts", async () => {
@@ -75,6 +75,7 @@ it("blocks private requests when signed out and permits only explicit recovery-c
   await setItem("deviceSession", { signedOut: true, generation: "out" });
   const fetcher = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", fetcher);
   await expect(safeFetch("/api/cloud")).rejects.toThrow(/signed out/);
+  await expect(safeFetch("/api/identity/handle", { method: "POST" })).rejects.toThrow(/signed out/);
   await expect(safeFetch("/api/auth/sign-in/email", { method: "POST" })).rejects.toThrow(/signed out/);
   await safeFetch("/api/auth/sign-in/email", { method: "POST", headers: { "X-Drip-Resume": "out" } });
   await safeFetch(new Request("http://drip.local/api/auth/sign-out", { method: "POST" }));

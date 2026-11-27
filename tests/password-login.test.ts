@@ -2,9 +2,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 const cloud = vi.hoisted(() => ({ connect: vi.fn(), readCloudState: vi.fn(), syncNow: vi.fn(), vault: vi.fn(), writeCloudState: vi.fn(), recoveryCredentials: vi.fn(), seal: vi.fn(), authClient: { signOut: vi.fn() }, restoreCloud: vi.fn() }));
 const request = vi.hoisted(() => vi.fn());
 const provision = vi.hoisted(() => vi.fn());
+const identityReservation = vi.hoisted(() => ({ reserve: vi.fn() }));
 vi.mock("../lib/original-recovery-codes", () => ({ originalRecoveryCodes: provision }));
 vi.mock("../lib/cloud", () => cloud);
 vi.mock("../lib/worker-safety", () => ({ safeFetch: request }));
+vi.mock("../lib/identity-reservation", () => ({ reserveIdentity: identityReservation.reserve }));
 import { loginTag, passwordError, passwordProof, unwrapPasswordRoot, validPasswordWrap, wrapPasswordRoot } from "../lib/password-crypto";
 import { setLoginPassword, signInPassword, passwordUsername, signUpPassword, passwordRecoveryRoot } from "../lib/password-login";
 import { emptyData, loadData, lockLocalVault, passwordUnlockContext, savePasswordUnlock, setItem, getItem, commitCloudRestore } from "../lib/db";
@@ -15,6 +17,7 @@ const data = { ...emptyData(), identity: { id: "6f1c2a4e-0b7d-4c1e-9a2f-3d5e8b7c
 const password = "Green meadow 42!";
 beforeEach(async () => {
   vi.clearAllMocks(); provision.mockReset().mockResolvedValue({ codes: [], cached: true }); vi.stubGlobal("navigator", { onLine: false });
+  identityReservation.reserve.mockImplementation(async (identity: typeof data.identity) => identity);
   cloud.connect.mockResolvedValue({ user: { id: "owner" }, key: {} });
   cloud.readCloudState.mockResolvedValue({ userId: "owner" });
   cloud.vault.mockResolvedValue({ version: 1, envelope: { app: "drip-cloud" } });

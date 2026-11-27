@@ -52,6 +52,8 @@ it("sets only a valid public browser UUID, ignores missing legacy headers and re
   const { hooks } = fixture([]);
   expect(await hooks.session.create.before({}, { headers: new Headers({ "X-Drip-Device": first.toUpperCase() }) })).toEqual({ data: { dripDeviceId: first } });
   expect(await hooks.session.create.before({}, null)).toEqual({ data: { dripDeviceId: null } });
+  expect(await hooks.session.create.before({}, { path: "/passkey/verify-authentication", headers: new Headers({ "X-Drip-Device": first }) })).toMatchObject({ data: { dripDeviceId: first, dripPasskeyVerifiedAt: expect.any(Date) } });
+  expect(await hooks.session.create.before({}, { path: "/sign-in/email", headers: new Headers({ "X-Drip-Device": first }) })).toEqual({ data: { dripDeviceId: first } });
   await expect(hooks.session.create.before({}, { headers: new Headers({ "X-Drip-Device": "skip-this-device" }) })).rejects.toThrow(/Invalid browser identifier/);
 });
 

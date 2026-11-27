@@ -31,13 +31,30 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
     frequency: "monthly" as const, nextPayoutDate: "2030-01-01", colour: "#2b2d86", payouts: [], createdAt: "2026-10-26",
   }] };
   const records = { data: await encryptLocal(data, keys), localVault: keys.header, verifier: await codeVerifier(root),
+    cloudState: { userId: owner, identityId: data.identity.id, version: 1, dirty: false, lastSyncAt: null, generation: "synthetic-cloud", revision: 0 },
     passwordUnlock: { vaultId: keys.header.id, envelope } };
+  // This journey uses a synthetic WebAuthn ceremony. Server-side signature
+  // verification and one-use proof consumption are covered by auth/Postgres
+  // integration tests; no real authenticator or account is used here.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.credentials, "get", { configurable: true, value: async () => ({
+      id: "synthetic-passkey", rawId: Uint8Array.from([1, 2, 3]).buffer, type: "public-key",
+      response: { authenticatorData: Uint8Array.from([1]).buffer, clientDataJSON: Uint8Array.from([2]).buffer, signature: Uint8Array.from([3]).buffer, userHandle: null },
+      getClientExtensionResults: () => ({}), authenticatorAttachment: "platform",
+    }) });
+  });
   await context.route("**/api/**", async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
+    if (path === "/api/auth/passkey/generate-authenticate-options") return route.fulfill({ json: { challenge: "AQ", rpId: "localhost", timeout: 60_000, userVerification: "preferred", allowCredentials: [] } });
+    if (path === "/api/auth/passkey/verify-authentication") return route.fulfill({ json: { session: { id: "synthetic-session" }, user: { id: owner } } });
     if (path.startsWith("/api/auth/sign-in/gamertag")) {
       const body = request.postDataJSON();
       if (body.username !== username || body.proof !== proof) return route.fulfill({ status: 401, json: { message: "Gamertag or password is incorrect." } });
       return route.fulfill({ json: { owner, envelope } });
+    }
+    if (path === "/api/identity/handle") {
+      const body = request.postDataJSON();
+      return route.fulfill({ json: { identityId: body.identityId, handle: body.handle, suffix: "4821", changed: true } });
     }
     if (path === "/api/cloud/status") return route.fulfill({ json: { available: false } });
     return route.fulfill({ status: 503, json: { message: "Unexpected synthetic request." } });
@@ -73,6 +90,12 @@ test("one gamertag form reopens encrypted accounts, rejects bad credentials and 
   await expect(page.getByTestId("header-tag")).toContainText(username);
   await expect(page.getByRole("region", { name: "Account cards", exact: true }).getByRole("button", { name: /Zopa/ })).toContainText("£1,234.00");
   await capture(page, "accounts");
+  await page.getByRole("button", { name: /Open profile and settings/ }).click();
+  const profile = page.getByRole("dialog", { name: "Profile & settings" });
+  await profile.getByLabel("Display gamertag").fill("display_name");
+  await profile.getByRole("button", { name: "Save profile gamertag" }).click();
+  await expect(profile.getByRole("region", { name: "Profile gamertag" }).getByRole("status")).toContainText("display_name#4821");
+  await expect(page.getByTestId("header-tag")).toHaveText("display_name#4821");
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   page.on("dialog", dialog => dialog.accept());
